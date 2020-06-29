@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import traceback
 import atexit
 
-from cogment.api.environment_pb2_grpc import EnvironmentServicer as Servicer
+from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer as Servicer
 from cogment.api.environment_pb2 import (EnvStartRequest, EnvStartReply,
                                          EnvUpdateReply, EnvEndReply)
 from cogment.api.common_pb2 import Feedback, ObservationData

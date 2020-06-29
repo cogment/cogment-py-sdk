@@ -5,7 +5,7 @@ from typing import Dict
 import traceback
 import atexit
 
-from cogment.api.agent_pb2_grpc import AgentServicer
+from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
      AgentStartReply, AgentDecideReply, AgentRewardReply, AgentEndReply)
@@ -40,7 +40,7 @@ def trial_key(trial_id, actor_id):
     return f'{trial_id}_{actor_id}'
 
 
-class AgentService(AgentServicer):
+class AgentService(AgentEndpointServicer):
     def __init__(self, agent_class, settings):
         assert issubclass(agent_class, Agent)
 

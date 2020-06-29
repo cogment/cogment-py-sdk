@@ -9,11 +9,11 @@ from cogment.env_service import EnvService, Environment
 from cogment.utils import list_versions
 
 from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
-from cogment.api.environment_pb2_grpc import add_EnvironmentServicer_to_server
-from cogment.api.agent_pb2_grpc import add_AgentServicer_to_server
+from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_server
+from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
 
-from cogment.api.environment_pb2 import _ENVIRONMENT as env_descriptor
-from cogment.api.agent_pb2 import _AGENT as agent_descriptor
+from cogment.api.environment_pb2 import _ENVIRONMENTENDPOINT as env_descriptor
+from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_descriptor
 from cogment.api.hooks_pb2 import _TRIALHOOKS as hooks_descriptor
 
 from cogment.errors import ConfigError

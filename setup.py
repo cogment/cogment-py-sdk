@@ -14,7 +14,36 @@
 
 """cogment_sdk packaging."""
 
-from setuptools import setup
+from setuptools import setup, Command, find_packages
+from setuptools.command.build_py import build_py as _build_py
+from setuptools.command.develop import develop as _develop
+
+class BuildProtos(Command):
+    """Command to generate project *_pb2.py modules from proto files."""
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        # due to limitations of the proto generator, we require that only *one*
+        # directory is provided as an 'include' directory. We assume it's the '' key
+        # to `self.distribution.package_dir` (and get a key error if it's not
+        # there).
+        from grpc.tools import command
+        command.build_package_protos(self.distribution.package_dir[''])
+
+class build_py(_build_py):
+    def run(self):
+        super().run()
+        self.run_command('build_protos')
+
+class develop(_develop):
+    def run(self):
+        super().run()
+        self.run_command('build_protos')
 
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()
@@ -32,11 +61,19 @@ setup(name='cogment',
       author='Artificial Intelligence Redefined',
       author_email='dev+cogment@ai-r.com',
       license='Apache License 2.0',
+      package_dir={'' : '.'},
       packages=['cogment', 'cogment.api'],
+      include_package_data=True,
       tests_require=['pytest'],
       install_requires=[
           'grpcio>=1.19',
           'grpcio-reflection>=1.19',
-          'grpcio-tools>=1.19',
           'protobuf>=3.7'
-      ],)
+      ],
+      setup_requires=['grpcio-tools>=1.19'],
+      cmdclass={
+        'build_protos': BuildProtos,
+        'build_py': build_py,
+        'develop': develop
+      }
+)
