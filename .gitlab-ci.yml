@@ -1,0 +1,11 @@
+stages:
+  - lint
+
+python_lint:
+  stage: lint
+  image: python:3.7
+  script:
+    - python setup.py build_py
+    - pip install pycodestyle mypy
+    - pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/
+    - mypy --config-file mypy.ini cogment/
