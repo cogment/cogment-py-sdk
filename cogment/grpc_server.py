@@ -76,11 +76,11 @@ class GrpcServer:
         # Register service
         if issubclass(service_type, Agent):
             self._service_types.append(agent_descriptor)
-            add_AgentServicer_to_server(
+            add_AgentEndpointServicer_to_server(
                 AgentService(service_type, settings), self._grpc_server)
         elif issubclass(service_type, Environment):
             self._service_types.append(env_descriptor)
-            add_EnvironmentServicer_to_server(
+            add_EnvironmentEndpointServicer_to_server(
                 EnvService(service_type, settings), self._grpc_server)
         elif issubclass(service_type, TrialHooks):
             self._service_types.append(hooks_descriptor)

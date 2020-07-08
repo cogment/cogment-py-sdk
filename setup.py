@@ -37,13 +37,15 @@ class BuildProtos(Command):
 
 class build_py(_build_py):
     def run(self):
-        super().run()
         self.run_command('build_protos')
+        super().run()
+        
 
 class develop(_develop):
     def run(self):
-        super().run()
         self.run_command('build_protos')
+        super().run()
+
 
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()

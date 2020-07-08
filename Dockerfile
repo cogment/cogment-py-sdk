@@ -1,4 +1,4 @@
-FROM python:3.7
+FROM python:3.8.3-slim-buster
 
 RUN apt-get update
 
@@ -6,6 +6,6 @@ RUN pip install pytest
 
 WORKDIR /app
 
-ADD . /app
+ADD . /cogment-py-sdk
 
-RUN pip install -e .
+RUN cd /cogment-py-sdk && pip install -e .
