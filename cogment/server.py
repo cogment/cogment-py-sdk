@@ -67,7 +67,8 @@ class Server:
         assert impl_name not in self.__actor_impls
         assert self.__grpc_server is None
 
-        self.__actor_impls[impl_name] = (impl, actor_class)
+        self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, 
+                                                        actor_class=actor_class)
 
     def register_environment(self, impl, impl_name: str):
         assert impl_name not in self.__env_impl

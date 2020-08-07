@@ -33,9 +33,26 @@ def __trial_key(trial_id, actor_id):
     return f"{trial_id}_{actor_id}"
 
 
+def __impl_can_serve_actor_class(impl, actor_class):
+    if isinstance(impl.actor_class, typing.List):
+        return any(__impl_can_serve_actor_class(e) for e in impl.actor_class):
+
+    return impl.actor_class == "*" or impl.actor_class == actor_class
+
+class __AgentSession:
+    def __init__(self, impl, actor_class):
+        self.actor_class = actor_class
+        self.impl = impl
+
+
+
+
+
 class AgentService(AgentEndpointServicer):
     def __init__(self, agent_impls):
         self.__impls = agent_impls
+        self.__agents = {}
+
         atexit.register(self.__cleanup)
 
         logging.info("Agent Service started")
@@ -43,6 +60,14 @@ class AgentService(AgentEndpointServicer):
     def Start(self, request, context):
         if request.impl_name not in agent_impls:
             raise InvalidRequestError(message="Unknown agent impl", request=request)
+        impl = agent_impls[request.impl_name]
+
+        if not __impl_can_serve_actor_class(impl, request.actor_class)
+            raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}", request=request)
+
+        key = __trial_key(context.metadata["trial_id"], context.metadata["actor_id"])
+        if key in self.__agents:
+            raise InvalidRequestError(message="Agent already exists", request=request)
 
         return AgentStartReply()
 
