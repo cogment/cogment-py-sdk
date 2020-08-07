@@ -20,11 +20,7 @@
 
 from cogment.version import __version__
 
-
-from cogment.env_service import Environment
-from cogment.agent_service import Agent
-from cogment.hooks_service import TrialHooks
-from cogment.grpc_server import GrpcServer
-from cogment.actor_class import ActorClass
-from cogment.trial import Trial
-from cogment.trial import Actor
+from cogment.server import Server
+from cogment.actor import ActorClass, ActorClassList
+from cogment.environment import EnvClass
+import cogment.delta_encoding

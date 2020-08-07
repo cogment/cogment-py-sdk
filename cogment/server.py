@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable
+from threading import Thread
+from typing import Callable, Awaitable
+from types import ModuleType
 import os
+import asyncio
+from types import SimpleNamespace
+import grpc
+import grpc.experimental.aio
+
+from cogment.actor import ActorSession, ActorClass
+from cogment.trial import Trial
 
 # Agent
 from cogment.agent_service import AgentServicer
@@ -22,53 +31,53 @@ from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
 
 DEFAULT_PORT = 9000
 DEFAULT_MAX_WORKERS = 1
+ENABLE_REFLECTION_VAR_NAME = "COGMENT_GRPC_REFLECTION"
 DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, "false")
 
 
-def __add_actor_service(grpc_server, impls, service_names):
-    servicer = AgentServicer(impls=impls)
+def _add_actor_service(grpc_server, impls, service_names, cog_project):
+    servicer = AgentServicer(agent_impls=impls, cog_project=cog_project)
     add_AgentEndpointServicer_to_server(servicer, grpc_server)
-    service_names.append(_AGENTENDPOINT)
+    service_names.append(agent_endpoint_descriptor.full_name)
 
 
-def __add_env_service(grpc_server, impls):
+def _add_env_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
 
-def __add_env_service(grpc_server, impls):
+def _add_env_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
 
-def __add_datalog_service(grpc_server, impls):
+def _add_datalog_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
 
 class Server:
-    def __init__(
-        self, max_worker_threads: int = DEFAULT_MAX_WORKERS, port: int = DEFAULT_PORT
-    ):
+    def __init__(self, cog_project: ModuleType, port: int = DEFAULT_PORT):
         self.__actor_impls = {}
         self.__env_impls = {}
         self.__prehook_impls = {}
         self.__datalog_impls = {}
         self.__grpc_server = None
-        self.__thread_pool = ThreadPoolExecutor(max_workers=self.max_worker_threads)
         self.__port = port
+        self.__cog_project = cog_project
 
     def register_actor(
         self,
-        impl: Callable[[cogment.Actor, cogment.Trial], Awaitable[None]],
+        impl: Callable[[ActorSession, Trial], Awaitable[None]],
         impl_name: str,
-        actor_class: cogment.ActorClass,
+        actor_class: ActorClass,
     ):
         assert impl_name not in self.__actor_impls
         assert self.__grpc_server is None
 
-        self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, 
-                                                        actor_class=actor_class)
+        self.__actor_impls[impl_name] = SimpleNamespace(
+            impl=impl, actor_class=actor_class
+        )
 
     def register_environment(self, impl, impl_name: str):
         assert impl_name not in self.__env_impl
@@ -88,19 +97,33 @@ class Server:
 
         self.__datalog_impls = impl
 
-    def run(self):
-        assert self.__grpc_server is None
+    async def run(self):
+        self.__grpc_server = grpc.experimental.aio.server()
 
-        self._grpc_server = grpc.server(thread_pool=self.__thread_pool)
+        service_names = []
 
         if self.__actor_impls:
-            __add_actor_service(self._grpc_server, self.__actor_impls)
+            _add_actor_service(
+                self.__grpc_server,
+                self.__actor_impls,
+                service_names,
+                self.__cog_project,
+            )
 
         if self.__env_impls:
-            __add_env_service(self._grpc_server, self.__env_impls)
+            _add_env_service(self.__grpc_server, self.__env_impls, self.__cog_project)
 
         if self.__prehook_impls:
-            __add_env_service(self._grpc_server, self.__prehook_impls)
+            _add_env_service(
+                self.__grpc_server, self.__prehook_impls, self.__cog_project
+            )
 
         if self.__datalog_impls:
-            __add_datalog_service(self._grpc_server, self.__datalog_impls)
+            _add_datalog_service(
+                self.__grpc_server, self.__datalog_impls, self.__cog_project
+            )
+
+        self.__grpc_server.add_insecure_port(f"[::]:{self.__port}")
+
+        await self.__grpc_server.start()
+        await self.__grpc_server.wait_for_termination()

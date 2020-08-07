@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.actor_class import ActorClass
+from cogment.actor import ActorClass
 
 
 # This is the default delta application function that is used when the

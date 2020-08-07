@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-class Error(Exception):
-    def __init__(self, msg):
-        super().__init__(msg)
-
-
-class InvalidRequestError(Error):
-    def __init__(self, message, request):
-        self.request = request
-        super().__init__(message)
+class EnvClass:
+    def __init__(self, id_, config_type):
+        self.id_ = id_
+        self.config_type = config_type
