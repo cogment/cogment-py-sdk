@@ -1,4 +1,6 @@
+from threading import Thread
 from typing import Callable
+from types import ModuleType
 import os
 
 # Agent
@@ -11,34 +13,51 @@ DEFAULT_MAX_WORKERS = 1
 DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, 'false')
 
 
-def __add_actor_service(grpc_server, impls, service_names):
-    servicer = AgentServicer(impls=impls)
+def __add_actor_service(grpc_server, impls, service_names, cog_project):
+    servicer = AgentServicer(impls=impls, cog_project=cog_project)
     add_AgentEndpointServicer_to_server(servicer, grpc_server)
     service_names.append(_AGENTENDPOINT)
 
-def __add_env_service(grpc_server, impls):
+def __add_env_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
-def __add_env_service(grpc_server, impls):
+def __add_env_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
-def __add_datalog_service(grpc_server, impls):
+def __add_datalog_service(grpc_server, impls, cog_project):
     # TODO
     pass
+
+
+class Worker:
+    def __init__(self):
+        self.__thread = Thread(target=self.__main)
+        self.__thread.run()
+
+    def stop(self):
+        self.__thread.join()
+
+    def __main(self):
+        pass
+
+def __worker_entry():
+    asyncio.run(__worker_main())
 
 class Server:
     def __init__(self, 
-                 max_worker_threads: int = DEFAULT_MAX_WORKERS, 
+                 cog_project: ModuleType,
+                 woker_threads: int = DEFAULT_MAX_WORKERS, 
                  port: int = DEFAULT_PORT):
         self.__actor_impls = {}
         self.__env_impls = {}
         self.__prehook_impls = {}
         self.__datalog_impls = {}
         self.__grpc_server = None
-        self.__thread_pool = ThreadPoolExecutor(max_workers=self.max_worker_threads)
+        self.__workers = [Worker() for _ in range(woker_threads)]
         self.__port = port
+        self.__cog_project = cog_project
 
     def register_actor(self, 
                        impl: Callable[[cogment.Actor, cogment.Trial], Awaitable[None]], 
@@ -68,19 +87,26 @@ class Server:
 
         self.__datalog_impls = impl
 
-    def run(self):
-        assert self.__grpc_server is None
-
-        self._grpc_server = grpc.server(thread_pool=self.__thread_pool)
+    async def __serve(self):
+        self._grpc_server = grpc.experimental.aio.server()
 
         if self.__actor_impls:
-            __add_actor_service(self._grpc_server, self.__actor_impls)
+            __add_actor_service(self._grpc_server, self.__actor_impls, self.__cog_project)
 
         if self.__env_impls:
-            __add_env_service(self._grpc_server, self.__env_impls)
+            __add_env_service(self._grpc_server, self.__env_impls, self.__cog_project)
 
         if self.__prehook_impls:
-            __add_env_service(self._grpc_server, self.__prehook_impls)
+            __add_env_service(self._grpc_server, self.__prehook_impls, self.__cog_project)
 
         if self.__datalog_impls:
-            __add_datalog_service(self._grpc_server, self.__datalog_impls)
+            __add_datalog_service(self._grpc_server, self.__datalog_impls, self.__cog_project)
+
+        server.add_insecure_port(f'[::]:{self.__port}')
+
+        await server.start()
+        await server.wait_for_termination()
+
+    def run(self):
+        assert self.__grpc_server is None
+        asyncio.run(self.serve())
