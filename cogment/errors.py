@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 class Error(Exception):
-    pass
+    def __init__(self, msg):
+        super().__init__(msg)
 
 
-# Error that occured while configuring cogment
-class ConfigError(Error):
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message
+class InvalidRequestError(Error):
+    def __init__(self, message, request):
+        self.request = req
+        super().__init__(message)
