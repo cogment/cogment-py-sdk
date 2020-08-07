@@ -1,10 +1,10 @@
 # General cogment error
 class Error(Exception):
-    pass
+    def __init__(self, msg):
+        super().__init__(msg)
 
+class InvalidRequestError(Error):
+    def __init__(self, message, request):
+        self.request = req
+        super().__init__(message)
 
-# Error that occured while configuring cogment
-class ConfigError(Error):
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message

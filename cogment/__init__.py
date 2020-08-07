@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cogment.version import __version__
+
+
 from cogment.env_service import Environment
 from cogment.agent_service import Agent
 from cogment.hooks_service import TrialHooks
