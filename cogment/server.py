@@ -77,7 +77,7 @@ class Server:
 
         self.__datalog_impls = impl
 
-    async def __serve(self):
+    async def run(self):
         self.__grpc_server = grpc.experimental.aio.server()
 
         service_names = []
@@ -99,6 +99,3 @@ class Server:
         await self.__grpc_server.start()
         await self.__grpc_server.wait_for_termination()
 
-    def run(self):
-        assert self.__grpc_server is None
-        asyncio.run(self.__serve())

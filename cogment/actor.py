@@ -28,17 +28,8 @@ class ActorClassList:
     def __getitem__ (self, key):
         return getattr(self, key)
 
-    def get_actor_counts(self, trial_params):
-        result = [0] * len(self._actor_classes_list)
-
-        index_map = {}
-        for index, actor_class in enumerate(self._actor_classes_list):
-            index_map[actor_class.id] = index
-
-        for actor in trial_params.actors:
-            result[index_map[actor.actor_class]] += 1
-
-        return result
+    def get_class_by_index(self, index):
+        return self._actor_classes_list[index]
 
 
 class ActorSession:

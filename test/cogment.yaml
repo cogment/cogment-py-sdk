@@ -28,3 +28,9 @@ trial_params:
     - actor_class: player
       endpoint: grpc://player:9000
 
+    - actor_class: player
+      endpoint: client
+
+    - actor_class: player
+      endpoint: client
+
