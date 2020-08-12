@@ -18,7 +18,7 @@ def make_req(val, final = False):
     return req
 
 async def main():
-    async with grpc.experimental.aio.insecure_channel('localhost:9000') as channel:
+    async with grpc.experimental.aio.insecure_channel('localhost:9001') as channel:
         stub = cogment.api.agent_pb2_grpc.AgentEndpointStub(channel)
 
         await stub.Start(

@@ -6,7 +6,7 @@ import asyncio
 
 AS_SERVER = True
 
-async def my_agent(actor: cogment.ActorSession, trial: cogment.trial):
+async def my_agent(actor, trial):
     print(f"starting agent {actor.name} for trial id {trial.id_}")
     observation = await actor.start()
 
@@ -15,20 +15,6 @@ async def my_agent(actor: cogment.ActorSession, trial: cogment.trial):
         observation = await actor.do_action(data_pb2.Action(value=3))
 
     print(f"{actor.name}'s trial is over...")
-
-
-async def my_agent(actor, trial):
-    print(f"starting agent {actor.name} for trial id {trial.id_}")
-
-    actor.on_observation = 
-    observation = actor.start_nowait()
-
-    while not trial.over:
-        print(f"{actor.name} has observed {observation}")
-        actor.do_action_async(data_pb2.Action(value=3))
-
-    print(f"{actor.name}'s trial is over...")
-
 
 async def main():
     if AS_SERVER:
