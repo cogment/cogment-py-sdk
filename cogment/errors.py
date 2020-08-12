@@ -5,6 +5,6 @@ class Error(Exception):
 
 class InvalidRequestError(Error):
     def __init__(self, message, request):
-        self.request = req
+        self.request = request
         super().__init__(message)
 

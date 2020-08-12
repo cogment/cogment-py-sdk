@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package mytest;
+
+message Observation {
+  int32 value = 1;
+}
+
+message Action {
+  int32 value = 1;
+}
+
+message TrialConfig {}
+message EnvConfig {}

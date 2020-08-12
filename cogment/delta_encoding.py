@@ -1,4 +1,4 @@
-from cogment.actor_class import ActorClass
+from cogment.actor import ActorClass
 
 
 # This is the default delta application function that is used when the
