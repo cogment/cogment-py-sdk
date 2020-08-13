@@ -15,17 +15,17 @@
 import asyncio
 
 
+class Actor:
+
+    def __init__(self, actor_class, name):
+        self.actor_class = actor_class
+        self.name = name
+
+
 class ActorClass:
-    def __init__(
-        self,
-        id_,
-        config_type,
-        action_space,
-        observation_space,
-        observation_delta,
-        observation_delta_apply_fn,
-        feedback_space,
-    ):
+
+    def __init__(self, id_, config_type, action_space, observation_space,
+                 observation_delta, observation_delta_apply_fn, feedback_space):
         self.id_ = id_
         self.config_type = config_type
         self.action_space = action_space
@@ -36,6 +36,7 @@ class ActorClass:
 
 
 class ActorClassList:
+
     def __init__(self, *args):
         self._actor_classes_list = list(args)
 

@@ -14,10 +14,7 @@
 
 import grpc
 
-from cogment.api.orchestrator_pb2 import (
-    TrialJoinRequest, TrialStartRequest, TrialFeedbackRequest, TrialActionRequest, TrialEndRequest)
-
-from cogment.api.orchestrator_pb2_grpc import AgentEndpointServicer
+from cogment.api.orchestrator_pb2_grpc import AgentEndpointServicer, TrialStartRequest
 
 
 class Connection:
@@ -30,7 +27,8 @@ class Connection:
         self.__actor_stub = ActorEndpointStub(channel)
 
     async def start_trial(self, trial_config, user_id):
-        TrialStartRequest req
+        req = TrialStartRequest()
+        # TrialStartRequest req
         req.config.data = trial_config.SerializeToString()
         req.user_id = user_id
 

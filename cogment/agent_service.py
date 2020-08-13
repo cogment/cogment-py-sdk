@@ -106,6 +106,9 @@ class AgentServicer(AgentEndpointServicer):
         trial = Trial(
             id_=metadata["trial-id"], cog_project=self.__cog_project, trial_config=None
         )
+        # irv!!!
+        trial._add_actors(request.actors_in_trial)
+
         new_session = _ServedActorSession(impl.impl, actor_class, trial, self_info.name)
         self.__agent_sessions[key] = new_session
 
