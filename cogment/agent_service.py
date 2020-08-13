@@ -1,7 +1,7 @@
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
-     AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
+    AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -16,8 +16,10 @@ import logging
 import typing
 import asyncio
 
+
 def _trial_key(trial_id, actor_id):
     return f'{trial_id}_{actor_id}'
+
 
 def _impl_can_serve_actor_class(impl, actor_class):
     if isinstance(impl.actor_class, typing.List):
@@ -43,7 +45,9 @@ async def write_actions(context, agent_session):
         msg.action.content = act.SerializeToString()
         await context.write(msg)
 
+
 class AgentServicer(AgentEndpointServicer):
+
     def __init__(self, agent_impls, cog_project):
         self.__impls = agent_impls
         self.__agent_sessions = {}
@@ -67,15 +71,18 @@ class AgentServicer(AgentEndpointServicer):
 
         if not _impl_can_serve_actor_class(impl, actor_class):
             raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}", request=request)
-        
+
         if key in self.__agent_sessions:
-            raise InvalidRequestError(message="Agent already exists", request=request)
+            raise InvalidRequestError(
+                message="Agent already exists", request=request)
 
-        trial = Trial(id_=metadata["trial_id"], cog_project=self.__cog_project, trial_config=None)
+        trial = Trial(
+            id_=metadata["trial_id"], cog_project=self.__cog_project, trial_config=None)
         # irv!!!
-        trial._add_actors(request.actor_class_idx,request.actor_names)
+        trial._add_actors(request.actor_class_idx, request.actor_names)
 
-        new_session = _ServedActorSession(impl.impl, actor_class, trial, request.name)
+        new_session = _ServedActorSession(
+            impl.impl, actor_class, trial, request.name)
         self.__agent_sessions[key] = new_session
 
         loop = asyncio.get_running_loop()
@@ -84,7 +91,8 @@ class AgentServicer(AgentEndpointServicer):
         return AgentStartReply()
 
     async def End(self, request, context):
-        key = _trial_key(context.meta_data["trial_id"], context.meta_data["actor_id"])
+        key = _trial_key(context.meta_data[
+                         "trial_id"], context.meta_data["actor_id"])
 
         return AgentEndReply()
 
@@ -94,7 +102,8 @@ class AgentServicer(AgentEndpointServicer):
         agent_session = self.__agent_sessions[key]
 
         loop = asyncio.get_running_loop()
-        reader_task = loop.create_task(read_observations(request_iterator, agent_session))
+        reader_task = loop.create_task(
+            read_observations(request_iterator, agent_session))
         writer_task = loop.create_task(write_actions(context, agent_session))
 
         await agent_session._task

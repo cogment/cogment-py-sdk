@@ -1,11 +1,15 @@
 import asyncio
 
+
 class Actor:
+
     def __init__(self, actor_class, name):
         self.actor_class = actor_class
         self.name = name
 
+
 class ActorClass:
+
     def __init__(self, id_, config_type, action_space, observation_space,
                  observation_delta, observation_delta_apply_fn, feedback_space):
         self.id_ = id_
@@ -18,6 +22,7 @@ class ActorClass:
 
 
 class ActorClassList:
+
     def __init__(self, *args):
         self._actor_classes_list = list(args)
 
@@ -30,7 +35,7 @@ class ActorClassList:
     def __contains__(self, key):
         return hasattr(self, key)
 
-    def __getitem__ (self, key):
+    def __getitem__(self, key):
         return getattr(self, key)
 
     def get_class_by_index(self, index):
@@ -39,6 +44,7 @@ class ActorClassList:
 
 class ActorSession:
     """This represents an actor being performed locally."""
+
     def __init__(self, impl, actor_class, trial, name):
         self.actor_class = actor_class
         self.trial = trial
@@ -48,7 +54,7 @@ class ActorSession:
         self.on_reward = None
         self.on_message = None
         self.on_trial_over = None
-        
+
         self.latest_observation = None
         self.__impl = impl
         self.__started = False
@@ -75,10 +81,10 @@ class ActorSession:
 
         self.__obs_future = asyncio.get_running_loop().create_future()
         await self._consume_action(action)
-        
+
         # Wait until the next observation is available
-        # 
-        return await self.__obs_future        
+        #
+        return await self.__obs_future
 
     def do_action_nowait(self, action):
         assert self.__started
@@ -96,17 +102,16 @@ class ActorSession:
         if self.__obs_future:
             self.__obs_future.set_result(obs)
 
-
     async def _run(self):
         await self.__impl(self, self.trial)
 
 
 class _ServedActorSession(ActorSession):
     """An actor session that is served from an agent service."""
+
     def __init__(self, impl, actor_class, trial, name):
         super().__init__(impl, actor_class, trial, name)
         self._action_queue = asyncio.Queue()
-
 
     async def _consume_action(self, action):
         await self._action_queue.put(action)
