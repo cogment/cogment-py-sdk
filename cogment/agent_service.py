@@ -38,6 +38,7 @@ async def read_observations(request_iterator, agent_session):
         print("recv")
         agent_session._new_observation(obs, request.final)
 
+
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
@@ -70,7 +71,8 @@ class AgentServicer(AgentEndpointServicer):
         actor_class = self.__cog_project.actor_classes[request.actor_class]
 
         if not _impl_can_serve_actor_class(impl, actor_class):
-            raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}", request=request)
+            raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}",
+                                      request=request)
 
         if key in self.__agent_sessions:
             raise InvalidRequestError(
