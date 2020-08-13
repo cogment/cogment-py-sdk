@@ -55,7 +55,6 @@ class Server:
                        actor_class: ActorClass):
         assert impl_name not in self.__actor_impls
         assert self.__grpc_server is None
-
         self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, 
                                                         actor_class=actor_class)
 

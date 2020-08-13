@@ -1,7 +1,7 @@
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
-     AgentStartReply, AgentRewardReply, AgentEndReply)
+     AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -39,9 +39,9 @@ async def read_observations(request_iterator, agent_session):
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
-        await context.write(act)
-
-
+        msg = AgentActionReply()
+        msg.action.content = act.SerializeToString()
+        await context.write(msg)
 
 class AgentServicer(AgentEndpointServicer):
     def __init__(self, agent_impls, cog_project):
@@ -72,12 +72,14 @@ class AgentServicer(AgentEndpointServicer):
             raise InvalidRequestError(message="Agent already exists", request=request)
 
         trial = Trial(id_=metadata["trial_id"], cog_project=self.__cog_project, trial_config=None)
+        # irv!!!
+        trial._add_actors(request.actor_class_idx,request.actor_names)
+
         new_session = _ServedActorSession(impl.impl, actor_class, trial, request.name)
         self.__agent_sessions[key] = new_session
 
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
-        
 
         return AgentStartReply()
 

@@ -7,17 +7,22 @@ import asyncio
 AS_SERVER = True
 
 async def my_agent(actor, trial):
+    # print("AAAAAAAAAAAA",actor,trial.id_)
     print(f"starting agent {actor.name} for trial id {trial.id_}")
     observation = await actor.start()
+    print(f"{actor.name} has observed {observation}")
+    count = 4
 
     while not trial.over:
+        observation = await actor.do_action(data_pb2.Action(value=count))
         print(f"{actor.name} has observed {observation}")
-        observation = await actor.do_action(data_pb2.Action(value=3))
+        count += 1
 
     print(f"{actor.name}'s trial is over...")
 
 async def main():
     if AS_SERVER:
+        print("This is first")
         server = cogment.Server(cog_project=cog_settings, port=9001)
     
         server.register_actor(impl=my_agent, impl_name="blearg", actor_class="player")

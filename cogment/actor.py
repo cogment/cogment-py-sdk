@@ -1,5 +1,10 @@
 import asyncio
 
+class Actor:
+    def __init__(self, actor_class, name):
+        self.actor_class = actor_class
+        self.name = name
+
 class ActorClass:
     def __init__(self, id_, config_type, action_space, observation_space,
                  observation_delta, observation_delta_apply_fn, feedback_space):
