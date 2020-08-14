@@ -20,25 +20,31 @@ DEFAULT_MAX_WORKERS = 1
 ENABLE_REFLECTION_VAR_NAME = 'COGMENT_GRPC_REFLECTION'
 DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, 'false')
 
+
 def _add_actor_service(grpc_server, impls, service_names, cog_project):
     servicer = AgentServicer(agent_impls=impls, cog_project=cog_project)
     add_AgentEndpointServicer_to_server(servicer, grpc_server)
     service_names.append(agent_endpoint_descriptor.full_name)
 
-def _add_env_service(grpc_server, impls, cog_project):
-    # TODO
-    pass
 
 def _add_env_service(grpc_server, impls, cog_project):
     # TODO
     pass
+
+
+def _add_env_service(grpc_server, impls, cog_project):
+    # TODO
+    pass
+
 
 def _add_datalog_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
+
 class Server:
-    def __init__(self, 
+
+    def __init__(self,
                  cog_project: ModuleType,
                  port: int = DEFAULT_PORT):
         self.__actor_impls = {}
@@ -49,14 +55,13 @@ class Server:
         self.__port = port
         self.__cog_project = cog_project
 
-    def register_actor(self, 
-                       impl: Callable[[ActorSession, Trial], Awaitable[None]], 
-                       impl_name: str, 
+    def register_actor(self,
+                       impl: Callable[[ActorSession, Trial], Awaitable[None]],
+                       impl_name: str,
                        actor_class: ActorClass):
         assert impl_name not in self.__actor_impls
         assert self.__grpc_server is None
-
-        self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, 
+        self.__actor_impls[impl_name] = SimpleNamespace(impl=impl,
                                                         actor_class=actor_class)
 
     def register_environment(self, impl, impl_name: str):
@@ -83,19 +88,22 @@ class Server:
         service_names = []
 
         if self.__actor_impls:
-            _add_actor_service(self.__grpc_server, self.__actor_impls, service_names, self.__cog_project)
+            _add_actor_service(
+                self.__grpc_server, self.__actor_impls, service_names, self.__cog_project)
 
         if self.__env_impls:
-            _add_env_service(self.__grpc_server, self.__env_impls, self.__cog_project)
+            _add_env_service(self.__grpc_server,
+                             self.__env_impls, self.__cog_project)
 
         if self.__prehook_impls:
-            _add_env_service(self.__grpc_server, self.__prehook_impls, self.__cog_project)
+            _add_env_service(self.__grpc_server,
+                             self.__prehook_impls, self.__cog_project)
 
         if self.__datalog_impls:
-            _add_datalog_service(self.__grpc_server, self.__datalog_impls, self.__cog_project)
+            _add_datalog_service(self.__grpc_server,
+                                 self.__datalog_impls, self.__cog_project)
 
         self.__grpc_server.add_insecure_port(f'[::]:{self.__port}')
 
         await self.__grpc_server.start()
         await self.__grpc_server.wait_for_termination()
-

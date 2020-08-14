@@ -1,7 +1,7 @@
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
-     AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
+    AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -16,8 +16,10 @@ import logging
 import typing
 import asyncio
 
+
 def _trial_key(trial_id, actor_id):
     return f'{trial_id}_{actor_id}'
+
 
 def _impl_can_serve_actor_class(impl, actor_class):
     if isinstance(impl.actor_class, typing.List):
@@ -35,6 +37,7 @@ async def read_observations(request_iterator, agent_session):
         )
         agent_session._new_observation(obs, request.final)
 
+
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
@@ -43,8 +46,8 @@ async def write_actions(context, agent_session):
         await context.write(msg)
 
 
-
 class AgentServicer(AgentEndpointServicer):
+
     def __init__(self, agent_impls, cog_project):
         self.__impls = agent_impls
         self.__agent_sessions = {}
@@ -71,33 +74,43 @@ class AgentServicer(AgentEndpointServicer):
         actor_class = self.__cog_project.actor_classes[self_info.actor_class]
 
         if not _impl_can_serve_actor_class(impl, actor_class):
-            raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}", request=request)
-        
-        if key in self.__agent_sessions:
-            raise InvalidRequestError(message="Agent already exists", request=request)
+            raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}",
+                                      request=request)
 
-        trial = Trial(id_=metadata["trial-id"], cog_project=self.__cog_project, trial_config=None)
-        new_session = _ServedActorSession(impl.impl, actor_class, trial, self_info.name)
+        if key in self.__agent_sessions:
+            raise InvalidRequestError(
+                message="Agent already exists", request=request)
+
+        trial = Trial(id_=metadata["trial-id"],
+                      cog_project=self.__cog_project,
+                      trial_config=None)
+        # irv!!!
+        trial._add_actors(request.actors_in_trial)
+
+        new_session = _ServedActorSession(
+            impl.impl, actor_class, trial, self_info.name)
         self.__agent_sessions[key] = new_session
 
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
-        
 
         return AgentStartReply()
 
     async def End(self, request, context):
-        key = _trial_key(context.meta_data["trial-id"], context.meta_data["actor-id"])
+        key = _trial_key(context.meta_data["trial-id"],
+                         context.meta_data["actor-id"])
 
         return AgentEndReply()
 
     async def Decide(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
-        key = _trial_key(metadata["trial-id"], metadata["actor-id"])
+        key = _trial_key(metadata["trial-id"],
+                         metadata["actor-id"])
         agent_session = self.__agent_sessions[key]
 
         loop = asyncio.get_running_loop()
-        reader_task = loop.create_task(read_observations(request_iterator, agent_session))
+        reader_task = loop.create_task(
+            read_observations(request_iterator, agent_session))
         writer_task = loop.create_task(write_actions(context, agent_session))
 
         await agent_session._task

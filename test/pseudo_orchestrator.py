@@ -1,5 +1,5 @@
 import grpc
-from cogment.api.agent_pb2 import AgentStartRequest, AgentDataRequest
+from cogment.api.agent_pb2 import AgentStartRequest, AgentDataRequest, AgentActionReply
 import cogment.api.agent_pb2_grpc
 from cogment.api.common_pb2 import TrialActor
 import data_pb2
@@ -8,7 +8,8 @@ import grpc.experimental.aio
 import asyncio
 from queue import Queue
 
-def make_req(val, final = False):
+
+def make_req(val, final=False):
     obs = data_pb2.Observation(value=val)
     req = AgentDataRequest()
     req.observation.data.snapshot = True
@@ -53,15 +54,14 @@ async def main():
 
         decide_conn = stub.Decide(metadata=(("trial-id", "def"), ("actor-id", "0")))
     
-        await decide_conn.write(make_req(0))
-        print(await decide_conn.read())
-        await decide_conn.write(make_req(1))
-        print(await decide_conn.read())
+        for count in range(4):
+            await decide_conn.write(make_req(count))
+            tmp = await decide_conn.read()
+            act = data_pb2.Action()
+            act.ParseFromString(tmp.action.content)
+            print(f"Recieved from actor - {act}")
+
         await decide_conn.write(make_req(2, True))
-        print(await decide_conn.read())
+        mytest = await decide_conn.read()
 
 asyncio.run(main())
-
-
-    
-    
