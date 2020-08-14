@@ -1,7 +1,7 @@
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
-     AgentStartReply, AgentRewardReply, AgentEndReply)
+     AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -33,13 +33,14 @@ async def read_observations(request_iterator, agent_session):
             request.observation.data,
             agent_session.latest_observation
         )
-        print("recv")
         agent_session._new_observation(obs, request.final)
 
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
-        await context.write(act)
+        msg = AgentActionReply()
+        msg.action.content = act.SerializeToString()
+        await context.write(msg)
 
 
 
@@ -55,15 +56,19 @@ class AgentServicer(AgentEndpointServicer):
     async def Start(self, request, context):
         metadata = dict(context.invocation_metadata())
 
-        key = _trial_key(metadata["trial_id"], metadata["actor_id"])
+        actor_id = int(metadata["actor-id"])
+        trial_id = metadata["trial-id"]
+        key = _trial_key(trial_id, actor_id)
 
         if request.impl_name not in self.__impls:
             raise InvalidRequestError(message=f"Unknown agent impl: {request.impl_name}", request=request)
         impl = self.__impls[request.impl_name]
 
-        if request.actor_class not in self.__cog_project.actor_classes:
+        self_info = request.actors_in_trial[actor_id]
+
+        if self_info.actor_class not in self.__cog_project.actor_classes:
             raise InvalidRequestError(message=f"Unknown agent class: {request.actor_class}", request=request)
-        actor_class = self.__cog_project.actor_classes[request.actor_class]
+        actor_class = self.__cog_project.actor_classes[self_info.actor_class]
 
         if not _impl_can_serve_actor_class(impl, actor_class):
             raise InvalidRequestError(message=f"{request.impl_name} does not implement {request.actor_class}", request=request)
@@ -71,8 +76,8 @@ class AgentServicer(AgentEndpointServicer):
         if key in self.__agent_sessions:
             raise InvalidRequestError(message="Agent already exists", request=request)
 
-        trial = Trial(id_=metadata["trial_id"], cog_project=self.__cog_project, trial_config=None)
-        new_session = _ServedActorSession(impl.impl, actor_class, trial, request.name)
+        trial = Trial(id_=metadata["trial-id"], cog_project=self.__cog_project, trial_config=None)
+        new_session = _ServedActorSession(impl.impl, actor_class, trial, self_info.name)
         self.__agent_sessions[key] = new_session
 
         loop = asyncio.get_running_loop()
@@ -82,13 +87,13 @@ class AgentServicer(AgentEndpointServicer):
         return AgentStartReply()
 
     async def End(self, request, context):
-        key = _trial_key(context.meta_data["trial_id"], context.meta_data["actor_id"])
+        key = _trial_key(context.meta_data["trial-id"], context.meta_data["actor-id"])
 
         return AgentEndReply()
 
     async def Decide(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
-        key = _trial_key(metadata["trial_id"], metadata["actor_id"])
+        key = _trial_key(metadata["trial-id"], metadata["actor-id"])
         agent_session = self.__agent_sessions[key]
 
         loop = asyncio.get_running_loop()

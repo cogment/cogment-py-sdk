@@ -20,7 +20,7 @@ async def main():
     if AS_SERVER:
         server = cogment.Server(cog_project=cog_settings, port=9001)
     
-        server.register_actor(impl=my_agent, impl_name="blearg", actor_class="player")
+        server.register_actor(impl=my_agent, impl_name="blearg", actor_class="*")
     
         await server.run()
     else: # As client
