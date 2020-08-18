@@ -43,6 +43,9 @@ async def write_actions(context, agent_session):
         act = await agent_session._action_queue.get()
         msg = AgentActionReply()
         msg.action.content = act.SerializeToString()
+
+        msg.feedbacks.extend(agent_session.trial._gather_all_feedback())
+
         await context.write(msg)
 
 
@@ -84,7 +87,7 @@ class AgentServicer(AgentEndpointServicer):
         trial = Trial(id_=metadata["trial-id"],
                       cog_project=self.__cog_project,
                       trial_config=None)
-        # irv!!!
+
         trial._add_actors(request.actors_in_trial)
 
         new_session = _ServedActorSession(
@@ -119,6 +122,16 @@ class AgentServicer(AgentEndpointServicer):
         writer_task.cancel()
 
     async def Reward(self, request, context):
+        metadata = dict(context.invocation_metadata())
+
+        actor_id = int(metadata["actor-id"])
+        trial_id = metadata["trial-id"]
+        key = _trial_key(trial_id, actor_id)
+
+        agent_session = self.__agent_sessions[key]
+
+        agent_session._new_reward(request.reward)
+
         return AgentRewardReply()
 
     async def Version(self, request, context):

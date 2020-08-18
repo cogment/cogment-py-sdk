@@ -7,18 +7,28 @@ import asyncio
 AS_SERVER = True
 
 async def my_agent(actor, trial):
-    # print("AAAAAAAAAAAA",actor,trial.id_)
+    def on_reward(r):
+        print("bring on the rewards! \n",r)
+    actor.on_reward = on_reward
     print(f"starting agent {actor.name} for trial id {trial.id_}")
     observation = await actor.start()
     print(f"{actor.name} has observed {observation}")
     count = 4
 
     while not trial.over:
+        if actor.name == 'Joe':
+            trial.actors[1].add_feedback(value=1,confidence=1)
+            trial.actors[0].add_feedback(value=2,confidence=1)
+        else:
+            trial.actors[1].add_feedback(value=3,confidence=1)
+            trial.actors[0].add_feedback(value=4,confidence=1)
+
         observation = await actor.do_action(data_pb2.Action(value=count))
         print(f"{actor.name} has observed {observation}")
         count += 1
 
     print(f"{actor.name}'s trial is over...")
+
 
 async def main():
     if AS_SERVER:
