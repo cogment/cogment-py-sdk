@@ -99,8 +99,8 @@ async def main():
                     feedback_list1.append(feedback)
                     values1.append(feedback.value)
 
-            print("FFFF0000", feedback_list0)  # , 'VVV000', new_value0)
-            print("FFFF1111", feedback_list1)  # , 'VVV000', new_value1)
+            print("FFFF0000", feedback_list0)
+            print("FFFF1111", feedback_list1)
 
             if feedback_list0:
                 new_value0 = sum(values0) / float(len(values0))
@@ -149,20 +149,10 @@ async def main():
                 else:
                     message_list1.append(message)
 
-            print("MMMM0000", message_list0)  # , 'VVV000', new_value0)
-            print("MMMM1111", message_list1)  # , 'VVV000', new_value1)
+            print("MMMM0000", message_list0)
+            print("MMMM1111", message_list1)
 
             if message_list0:
-
-                # message0 = MessageCollection()
-                # message0.messages.extend(message_list0)
-
-                # aomr0 = AgentOnMessageRequest(
-                #     trial_id = "abc",
-                #     actor_id = 0,
-                #     messages = message0)
-
-
                 aomr0 = AgentOnMessageRequest(
                     trial_id = "abc",
                     actor_id = 0)
@@ -173,15 +163,6 @@ async def main():
                 )
 
             if message_list1:
-
-                # message1 = MessageCollection()
-                # message1.messages.extend(message_list1)
-
-                # aomr1 = AgentOnMessageRequest(
-                #     trial_id = "abc",
-                #     actor_id = 1,
-                #     messages = message1)
-
                 aomr1 = AgentOnMessageRequest(
                     trial_id = "abc",
                     actor_id = 1)
