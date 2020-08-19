@@ -122,7 +122,7 @@ class ActorSession:
         if self.on_reward:
             self.on_reward(reward)
 
-    def _new_message(self,message):
+    def _new_message(self, message):
         self.latest_message = message
 
         if self.on_message:

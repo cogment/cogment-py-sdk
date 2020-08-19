@@ -67,7 +67,7 @@ class Trial:
 
                 yield re
 
-    def send_message(self,to, user_data):
+    def send_message(self, to, user_data):
         for d in self.get_actors(pattern=to):
             d.send_message(user_data=user_data)
 
@@ -84,6 +84,7 @@ class Trial:
                 if msg is not None:
                     re.payload.Pack(msg)
                 yield re
+
 
 # A trial, from the perspective of the lifetime manager
 class TrialLifecycle(Trial):

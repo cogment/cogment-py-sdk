@@ -150,7 +150,6 @@ class AgentServicer(AgentEndpointServicer):
 
         return AgentOnMessageReply()
 
-
     async def Version(self, request, context):
         try:
             return list_versions()
