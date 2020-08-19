@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import importlib
 
 
 class Actor:
@@ -139,8 +140,13 @@ class ActorSession:
     def _new_message(self, message):
         self.latest_message = message
 
+        class_type = message.payload.type_url.split('.')
+        user_data = getattr(importlib.import_module(
+            self.trial.cog_project.protolib), class_type[-1])()
+        message.payload.Unpack(user_data)
+
         if self.on_message:
-            self.on_message(message)
+            self.on_message(message.sender_id, user_data)
 
     async def _run(self):
         await self.__impl(self, self.trial)

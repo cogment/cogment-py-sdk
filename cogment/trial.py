@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from cogment.actor import Actor
+from cogment.environment import Env
 from cogment.api.common_pb2 import Feedback, Message
 
 
@@ -22,8 +23,12 @@ class Trial:
         self.over = False
         self.cog_project = cog_project
         self.actors = []
+        self.tick_id = 0
 
         self.__actor_by_name = {}
+
+    def _add_env(self):
+        self.env = Env()
 
     def _add_actors(self, actors_in_trial):
 
@@ -32,35 +37,44 @@ class Trial:
             actor = Actor(actor_class, actor.name)
             self.actors.append(actor)
 
-    def get_actors(self, pattern):
+    def _add_actor_counts(self):
+        class_list = self.cog_project.actor_classes._actor_classes_list
+        self.actor_counts = [0] * len(class_list)
+        for class_index, class_member in enumerate(class_list):
+            for actor in self.actors:
+                if class_member.id_ == actor.actor_class.id_:
+                    self.actor_counts[class_index] += 1
+
+    def get_receivers(self, pattern):
         if isinstance(pattern, int) or isinstance(pattern, str):
             pattern_list = [pattern]
         elif isinstance(pattern, list):
             pattern_list = pattern
-        actor_list = []
+        receiver_list = []
+        all_receivers = self.actors + [self.env]
         for target in pattern_list:
-            for actor_index, actor in enumerate(self.actors):
+            for receiver_index, receiver in enumerate(all_receivers, -1):
                 if target == "*" or target == "*.*":
-                    actor_list.append(actor)
+                    receiver_list.append(receiver)
                 elif isinstance(target, int):
-                    if actor_index == target:
-                        actor_list.append(actor)
+                    if receiver_index == target:
+                        receiver_list.append(receiver)
                 elif isinstance(target, str):
                     if "." not in target:
-                        if actor.name == target:
-                            actor_list.append(actor)
+                        if receiver.name == target:
+                            receiver_list.append(receiver)
                     else:
                         class_name = target.split(".")
-                        if class_name[1] == actor.name:
-                            actor_list.append(actor)
+                        if class_name[1] == receiver.name:
+                            receiver_list.append(receiver)
                         elif class_name[1] == "*":
-                            if actor.actor_class.id_ == class_name[0]:
-                                actor_list.append(actor)
+                            if receiver.actor_class.id_ == class_name[0]:
+                                receiver_list.append(actor)
 
-        return actor_list
+        return receiver_list
 
     def add_feedback(self, to, value, confidence):
-        for d in self.get_actors(pattern=to):
+        for d in self.get_receivers(pattern=to):
             d.add_feedback(value=value, confidence=confidence)
 
     def _gather_all_feedback(self):
@@ -81,7 +95,7 @@ class Trial:
                 yield re
 
     def send_message(self, to, user_data):
-        for d in self.get_actors(pattern=to):
+        for d in self.get_receivers(pattern=to):
             d.send_message(user_data=user_data)
 
     def _gather_all_messages(self, source_id):
@@ -97,6 +111,18 @@ class Trial:
                 if msg is not None:
                     re.payload.Pack(msg)
                 yield re
+
+        e_msg = self.env._message
+        self.env._message = []
+        for msg in e_msg:
+            re = Message(
+                sender_id=source_id,
+                receiver_id=-1
+            )
+
+            if msg is not None:
+                re.payload.Pack(msg)
+            yield re
 
 
 # A trial, from the perspective of the lifetime manager

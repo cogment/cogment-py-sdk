@@ -71,7 +71,7 @@ async def main():
         abc0_decide_conn = stub.Decide(metadata=(("trial-id", "abc"), ("actor-id", "0")))
         abc1_decide_conn = stub.Decide(metadata=(("trial-id", "abc"), ("actor-id", "1")))
 
-        for count in range(2):  # the hard way
+        for count in range(5):  # the hard way
             await abc0_decide_conn.write(make_req(count))
             tmp0 = await abc0_decide_conn.read()
             act0 = data_pb2.Action()

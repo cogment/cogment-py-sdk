@@ -93,78 +93,28 @@ async def main():
             # print('Feedback from actor 1',tmp1.feedbacks)
             # print('Messages from actor 1', tmp1.messages)
 
-            feedback_list0 = []
-            feedback_list1 = []
-            values0 = []
-            values1 = []
-
-            for feedback in tmp0.feedbacks:
-                if feedback.actor_id == 0:
-                    feedback_list0.append(feedback)
-                    values0.append(feedback.value)
-                else:
-                    feedback_list1.append(feedback)
-                    values1.append(feedback.value)
-            for feedback in tmp1.feedbacks:
-                if feedback.actor_id == 0:
-                    feedback_list0.append(feedback)
-                    values0.append(feedback.value)
-                else:
-                    feedback_list1.append(feedback)
-                    values1.append(feedback.value)
-
-            print("FFFF0000", feedback_list0)
-            print("FFFF1111", feedback_list1)
-
-            if feedback_list0:
-                new_value0 = sum(values0) / float(len(values0))
-
-                reward0 = Reward(value=new_value0,
-                                 confidence=1.0)
-                reward0.feedbacks.extend(feedback_list0)
-
-                await stub.Reward(
-                    AgentRewardRequest(
-                        trial_id="abc",
-                        actor_id=0,
-                        tick_id=-1,
-                        reward=reward0),
-                    metadata=(("trial-id", "abc"), ("actor-id", "0"))
-                )
-
-            if feedback_list1:
-
-                new_value1 = sum(values1) / float(len(values1))
-
-                reward1 = Reward(value=new_value1,
-                                 confidence=1.0)
-                reward1.feedbacks.extend(feedback_list0)
-
-                await stub.Reward(
-                    AgentRewardRequest(
-                        trial_id="abc",
-                        actor_id=1,
-                        tick_id=-1,
-                        reward=reward1),
-                    metadata=(("trial-id", "abc"), ("actor-id", "1"))
-                )
-
             message_list0 = []
             message_list1 = []
+            env_messages = []
 
             for message in tmp0.messages:
-                if message.receiver_id == 0:
+                if message.receiver_id == -1:
+                    env_messages.append(message)
+                elif message.receiver_id == 0:
                     message_list0.append(message)
                 else:
                     message_list1.append(message)
             for message in tmp1.messages:
-                if message.receiver_id == 0:
+                if message.receiver_id == -1:
+                    env_messages.append(message)
+                elif message.receiver_id == 1:
                     message_list0.append(message)
                 else:
                     message_list1.append(message)
 
-            print("MMMM0000", message_list0)
-            print("MMMM1111", message_list1)
+            print("For Actor 0", message_list0)
+            print("For Actor 1", message_list1)
+            print("For Environment", env_messages)
 
             if message_list0:
                 aomr0 = AgentOnMessageRequest(

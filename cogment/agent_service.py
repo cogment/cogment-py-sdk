@@ -118,6 +118,7 @@ class AgentServicer(AgentEndpointServicer):
         )
 
         trial._add_actors(request.actors_in_trial)
+        trial._add_env()
 
         new_session = _ServedActorSession(impl.impl, actor_class, trial, self_info.name)
         self.__agent_sessions[key] = new_session
@@ -170,7 +171,8 @@ class AgentServicer(AgentEndpointServicer):
 
         agent_session = self.__agent_sessions[key]
 
-        agent_session._new_message(request.messages)
+        for message in request.messages:
+            agent_session._new_message(message)
 
         return AgentOnMessageReply()
 
