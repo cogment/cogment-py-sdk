@@ -89,37 +89,42 @@ async def main():
               else:
                 feedback_list1.append(feedback)
                 values1.append(feedback.value)
-            new_value0 = sum(values0)/float(len(values0))
-            new_value1 = sum(values1)/float(len(values1))
 
-            # print("FFFF0000", feedback_list0, 'VVV000', new_value0)
-            # print("FFFF1111", feedback_list1, 'VVV000', new_value1)
+            print("FFFF0000", feedback_list0) #, 'VVV000', new_value0)
+            print("FFFF1111", feedback_list1) #, 'VVV000', new_value1)
 
-            reward0 = Reward(value = new_value0,
-                confidence = 1.0)
-            reward0.feedbacks.extend(feedback_list0)
+            if feedback_list0:
+                new_value0 = sum(values0)/float(len(values0))
 
-            await stub.Reward(
-              AgentRewardRequest(
-                trial_id = "abc",
-                actor_id = 0,
-                tick_id = -1,
-                reward = reward0), 
-              metadata=(("trial-id", "abc"), ("actor-id", "0"))
-            )
+                reward0 = Reward(value = new_value0,
+                    confidence = 1.0)
+                reward0.feedbacks.extend(feedback_list0)
 
-            reward1 = Reward(value = new_value1,
-                confidence = 1.0)
-            reward1.feedbacks.extend(feedback_list0)
+                await stub.Reward(
+                  AgentRewardRequest(
+                    trial_id = "abc",
+                    actor_id = 0,
+                    tick_id = -1,
+                    reward = reward0), 
+                  metadata=(("trial-id", "abc"), ("actor-id", "0"))
+                )
 
-            await stub.Reward(
-              AgentRewardRequest(
-                trial_id = "abc",
-                actor_id = 1,
-                tick_id = -1,
-                reward = reward0), 
-              metadata=(("trial-id", "abc"), ("actor-id", "1"))
-            )
+            if feedback_list1:
+
+                new_value1 = sum(values1)/float(len(values1))
+
+                reward1 = Reward(value = new_value1,
+                    confidence = 1.0)
+                reward1.feedbacks.extend(feedback_list0)
+
+                await stub.Reward(
+                  AgentRewardRequest(
+                    trial_id = "abc",
+                    actor_id = 1,
+                    tick_id = -1,
+                    reward = reward1), 
+                  metadata=(("trial-id", "abc"), ("actor-id", "1"))
+                )
 
 
         await abc1_decide_conn.write(make_req(2, True))

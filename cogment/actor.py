@@ -7,13 +7,14 @@ class Actor:
         self.actor_class = actor_class
         self.name = name
 
-        self._feedback = []        
+        self._feedback = []
 
     def add_feedback(self, value=None, confidence=None, tick_id=None, user_data=None):
         if tick_id is None:
             tick_id = -1
 
         self._feedback.append((tick_id, value, confidence, user_data))
+
 
 class ActorClass:
 
@@ -26,6 +27,7 @@ class ActorClass:
         self.observation_delta = observation_delta
         self.observation_delta_apply_fn = observation_delta_apply_fn
         self.feedback_space = feedback_space
+
 
 class ActorClassList:
 

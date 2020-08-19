@@ -7,9 +7,14 @@ import asyncio
 AS_SERVER = True
 
 async def my_agent(actor, trial):
-    def on_reward(r):
-        print("bring on the rewards! \n",r)
-    actor.on_reward = on_reward
+    def on_reward_joe(r):
+        print("Joe bring on the rewards! \n",r)
+    def on_reward_jack(r):
+        print("Jack bring on the rewards! \n",r)
+    if actor.name == 'Joe':
+        actor.on_reward = on_reward_joe
+    else:
+        actor.on_reward = on_reward_jack
     print(f"starting agent {actor.name} for trial id {trial.id_}")
     observation = await actor.start()
     print(f"{actor.name} has observed {observation}")
@@ -17,11 +22,15 @@ async def my_agent(actor, trial):
 
     while not trial.over:
         if actor.name == 'Joe':
-            trial.actors[1].add_feedback(value=1,confidence=1)
-            trial.actors[0].add_feedback(value=2,confidence=1)
+            # trial.actors[1].add_feedback(value=3,confidence=1)
+            # trial.actors[0].add_feedback(value=3,confidence=1)
+            trial.add_feedback(to=3.6,value=3,confidence=1)
         else:
-            trial.actors[1].add_feedback(value=3,confidence=1)
-            trial.actors[0].add_feedback(value=4,confidence=1)
+            pass
+            # trial.actors[1].add_feedback(value=3,confidence=1)
+            # trial.actors[0].add_feedback(value=4,confidence=1)
+            # trial.add_feedback(to="*",value=2,confidence=1)
+            # trial.add_feedback(to=["*.Joe","*.Jack"],value=2,confidence=1)
 
         observation = await actor.do_action(data_pb2.Action(value=count))
         print(f"{actor.name} has observed {observation}")
