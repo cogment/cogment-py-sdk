@@ -22,12 +22,16 @@ class Actor:
         self.name = name
 
         self._feedback = []
+        self._message = []
 
     def add_feedback(self, value=None, confidence=None, tick_id=None, user_data=None):
         if tick_id is None:
             tick_id = -1
 
         self._feedback.append((tick_id, value, confidence, user_data))
+
+    def send_message(self, user_data=None):
+        self._message.append(user_data)
 
 
 class ActorClass:
@@ -79,6 +83,7 @@ class ActorSession:
 
         self.latest_observation = None
         self.latest_reward = None
+        self.latest_message = None
         self.__impl = impl
         self.__started = False
         self.__obs_future = None
@@ -130,6 +135,12 @@ class ActorSession:
 
         if self.on_reward:
             self.on_reward(reward)
+
+    def _new_message(self, message):
+        self.latest_message = message
+
+        if self.on_message:
+            self.on_message(message)
 
     async def _run(self):
         await self.__impl(self, self.trial)

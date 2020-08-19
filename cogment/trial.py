@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cogment.actor import Actor
-from cogment.api.common_pb2 import Feedback
+from cogment.api.common_pb2 import Feedback, Message
 
 
 class Trial:
@@ -37,27 +37,27 @@ class Trial:
             pattern_list = [pattern]
         elif isinstance(pattern, list):
             pattern_list = pattern
-        actor_fdbk_list = []
+        actor_list = []
         for target in pattern_list:
             for actor_index, actor in enumerate(self.actors):
                 if target == "*" or target == "*.*":
-                    actor_fdbk_list.append(actor)
+                    actor_list.append(actor)
                 elif isinstance(target, int):
                     if actor_index == target:
-                        actor_fdbk_list.append(actor)
+                        actor_list.append(actor)
                 elif isinstance(target, str):
                     if "." not in target:
                         if actor.name == target:
-                            actor_fdbk_list.append(actor)
+                            actor_list.append(actor)
                     else:
                         class_name = target.split(".")
                         if class_name[1] == actor.name:
-                            actor_fdbk_list.append(actor)
+                            actor_list.append(actor)
                         elif class_name[1] == "*":
                             if actor.actor_class.id_ == class_name[0]:
-                                actor_fdbk_list.append(actor)
+                                actor_list.append(actor)
 
-        return actor_fdbk_list
+        return actor_list
 
     def add_feedback(self, to, value, confidence):
         for d in self.get_actors(pattern=to):
@@ -78,6 +78,24 @@ class Trial:
                 if fb[3] is not None:
                     re.content = fb[3].SerializeToString()
 
+                yield re
+
+    def send_message(self, to, user_data):
+        for d in self.get_actors(pattern=to):
+            d.send_message(user_data=user_data)
+
+    def _gather_all_messages(self, source_id):
+        for actor_index, actor in enumerate(self.actors):
+            a_msg = actor._message
+            actor._message = []
+
+            for msg in a_msg:
+                re = Message(
+                    sender_id=source_id,
+                    receiver_id=actor_index
+                )
+                if msg is not None:
+                    re.payload.Pack(msg)
                 yield re
 
 

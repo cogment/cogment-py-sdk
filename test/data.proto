@@ -26,3 +26,7 @@ message Action {
 
 message TrialConfig {}
 message EnvConfig {}
+
+message MessageTest {
+	string name = 1;
+}
