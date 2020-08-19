@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0ftest/data.proto\x12\x06mytest\"\x1c\n\x0bObservation\x12\r\n\x05value\x18\x01 \x01(\x05\"\x17\n\x06\x41\x63tion\x12\r\n\x05value\x18\x01 \x01(\x05\"\r\n\x0bTrialConfig\"\x0b\n\tEnvConfigb\x06proto3'
+  serialized_pb=b'\n\x0ftest/data.proto\x12\x06mytest\"\x1c\n\x0bObservation\x12\r\n\x05value\x18\x01 \x01(\x05\"\x17\n\x06\x41\x63tion\x12\r\n\x05value\x18\x01 \x01(\x05\"\r\n\x0bTrialConfig\"\x0b\n\tEnvConfig\"\x1b\n\x0bMessageTest\x12\x0c\n\x04name\x18\x01 \x01(\tb\x06proto3'
 )
 
 
@@ -138,10 +138,43 @@ _ENVCONFIG = _descriptor.Descriptor(
   serialized_end=108,
 )
 
+
+_MESSAGETEST = _descriptor.Descriptor(
+  name='MessageTest',
+  full_name='mytest.MessageTest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='mytest.MessageTest.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=110,
+  serialized_end=137,
+)
+
 DESCRIPTOR.message_types_by_name['Observation'] = _OBSERVATION
 DESCRIPTOR.message_types_by_name['Action'] = _ACTION
 DESCRIPTOR.message_types_by_name['TrialConfig'] = _TRIALCONFIG
 DESCRIPTOR.message_types_by_name['EnvConfig'] = _ENVCONFIG
+DESCRIPTOR.message_types_by_name['MessageTest'] = _MESSAGETEST
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Observation = _reflection.GeneratedProtocolMessageType('Observation', (_message.Message,), {
@@ -171,6 +204,13 @@ EnvConfig = _reflection.GeneratedProtocolMessageType('EnvConfig', (_message.Mess
   # @@protoc_insertion_point(class_scope:mytest.EnvConfig)
   })
 _sym_db.RegisterMessage(EnvConfig)
+
+MessageTest = _reflection.GeneratedProtocolMessageType('MessageTest', (_message.Message,), {
+  'DESCRIPTOR' : _MESSAGETEST,
+  '__module__' : 'test.data_pb2'
+  # @@protoc_insertion_point(class_scope:mytest.MessageTest)
+  })
+_sym_db.RegisterMessage(MessageTest)
 
 
 # @@protoc_insertion_point(module_scope)

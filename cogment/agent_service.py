@@ -1,7 +1,7 @@
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
 
 from cogment.api.agent_pb2 import (
-    AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply)
+    AgentStartReply, AgentRewardReply, AgentEndReply, AgentActionReply, AgentOnMessageReply)
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -45,6 +45,9 @@ async def write_actions(context, agent_session):
         msg.action.content = act.SerializeToString()
 
         msg.feedbacks.extend(agent_session.trial._gather_all_feedback())
+
+        msg.messages.extend(agent_session.trial._gather_all_messages(
+            int(dict(context.invocation_metadata())["actor-id"])))
 
         await context.write(msg)
 
@@ -133,6 +136,20 @@ class AgentServicer(AgentEndpointServicer):
         agent_session._new_reward(request.reward)
 
         return AgentRewardReply()
+
+    async def OnMessage(self, request, context):
+        metadata = dict(context.invocation_metadata())
+
+        actor_id = int(metadata["actor-id"])
+        trial_id = metadata["trial-id"]
+        key = _trial_key(trial_id, actor_id)
+
+        agent_session = self.__agent_sessions[key]
+
+        agent_session._new_message(request.messages)
+
+        return AgentOnMessageReply()
+
 
     async def Version(self, request, context):
         try:

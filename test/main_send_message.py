@@ -11,26 +11,41 @@ async def my_agent(actor, trial):
         print("Joe bring on the rewards! \n",r)
     def on_reward_jack(r):
         print("Jack bring on the rewards! \n",r)
+    def on_message_joe(m):
+        print("Joe received the messages! \n",m)
+    def on_message_jack(m):
+        print("Jack received the messages! \n",m)
     if actor.name == 'Joe':
         actor.on_reward = on_reward_joe
+        actor.on_message = on_message_joe
     else:
         actor.on_reward = on_reward_jack
+        actor.on_message = on_message_jack
     print(f"starting agent {actor.name} for trial id {trial.id_}")
     observation = await actor.start()
     print(f"{actor.name} has observed {observation}")
     count = 4
 
     while not trial.over:
+        print("**********************************************")
+        msg_test = data_pb2.MessageTest(name="Doctor Who " + str(count))
         if actor.name == 'Joe':
+            # trial.send_message(to=['*'],user_data=msg_test)
+            # trial.actors[1].send_message(user_data=msg_test)
+            # trial.actors[0].send_message(user_data=msg_test)
             # trial.actors[1].add_feedback(value=3,confidence=1)
             # trial.actors[0].add_feedback(value=3,confidence=1)
-            trial.add_feedback(to=[0,'Jack'],value=3,confidence=1)
-        else:
+            # trial.add_feedback(to=[0,'Jack'],value=3,confidence=1)
             pass
+        else:
+            trial.send_message(to=[0,'Jack'],user_data=msg_test)
+            # trial.actors[1].send_message(user_data=msg_test)
+            # trial.actors[0].send_message(user_data=msg_test)
             # trial.actors[1].add_feedback(value=3,confidence=1)
             # trial.actors[0].add_feedback(value=4,confidence=1)
             # trial.add_feedback(to="*",value=2,confidence=1)
             # trial.add_feedback(to=["*.Joe","*.Jack"],value=2,confidence=1)
+            pass
 
         observation = await actor.do_action(data_pb2.Action(value=count))
         print(f"{actor.name} has observed {observation}")
