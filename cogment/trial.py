@@ -48,7 +48,7 @@ class Trial:
 
     def add_feedback(self, to, value, confidence):
         for d in self.get_actors(pattern=to):
-            d.add_feedback(value=value, confidence = confidence)
+            d.add_feedback(value=value, confidence=confidence)
 
     def _gather_all_feedback(self):
         for actor_index, actor in enumerate(self.actors):
