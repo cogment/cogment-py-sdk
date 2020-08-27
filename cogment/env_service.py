@@ -109,6 +109,7 @@ async def write_observations(context, env_session):
 
         await context.write(reply)
 
+
 async def read_actions(request_iterator, env_session):
     async for request in request_iterator:
         len_actions = len(request.action_set.actions)
