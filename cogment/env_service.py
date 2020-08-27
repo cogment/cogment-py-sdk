@@ -22,11 +22,13 @@ import typing
 import asyncio
 from time import time
 
+
 def new_actions_table(settings, trial):
     actions_by_actor_class = settings.ActionsTable(trial)
     actions_by_actor_id = actions_by_actor_class.all_actions()
 
     return actions_by_actor_class, actions_by_actor_id
+
 
 def pack_observations(env_session, observations, reply):
     new_obs = [None] * len(env_session.trial.actors)
@@ -54,7 +56,8 @@ def pack_observations(env_session, observations, reply):
     for actor_index, actor in enumerate(env_session.trial.actors):
         if new_obs[actor_index] == None:
             raise Exception("An actor is missing an observation")
-        snapshots[actor_index] = isinstance(new_obs[actor_index], actor.actor_class.observation_space)
+        snapshots[actor_index] = isinstance(
+            new_obs[actor_index], actor.actor_class.observation_space)
 
     # dupping time
     seen_observations = {}
@@ -81,7 +84,6 @@ async def write_initial_observations(context, env_session):
     reply = EnvStartReply()
     reply.observation_set.tick_id = 0
 
-
     pack_observations(env_session, observations, reply)
 
     reply.observation_set.timestamp = int(time() * 1000000000)
@@ -100,7 +102,6 @@ async def write_observations(context, env_session):
 
         reply.end_trial = env_session.end_trial
         reply.observation_set.tick_id = env_session.trial.tick_id
-
 
         pack_observations(env_session, observations, reply)
 
@@ -194,7 +195,8 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         loop = asyncio.get_running_loop()
         reader_task = loop.create_task(
             read_actions(request_iterator, env_session))
-        writer_task = loop.create_task(write_observations(context, env_session))
+        writer_task = loop.create_task(
+            write_observations(context, env_session))
 
         await env_session._task
 
@@ -214,7 +216,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         return EnvOnMessageReply()
 
-
     async def End(self, request, context):
         metadata = dict(context.invocation_metadata())
 
@@ -230,5 +231,3 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         self.__env_sessions.clear()
 
         atexit.unregister(self.__cleanup)
-
-

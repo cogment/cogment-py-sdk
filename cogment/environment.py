@@ -1,13 +1,17 @@
 import asyncio
 import importlib
 
+
 class EnvClass:
+
     def __init__(self, id_, config_type):
         self.id_ = id_
         self.config_type = config_type
 
+
 class Env:
     # def __init__(self, actor_id, trial):
+
     def __init__(self):
 
         self.env_id = -1
@@ -75,7 +79,6 @@ class EnvironmentSession:
 
         if self.on_message:
             self.on_message(message.sender_id, user_data)
-
 
     async def _run(self):
         await self.__impl(self, self.trial)

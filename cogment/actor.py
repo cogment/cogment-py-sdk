@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 
+
 class Actor:
 
     def __init__(self, actor_class, name):
@@ -132,7 +133,6 @@ class ActorSession:
 
         if self.on_message:
             self.on_message(message.sender_id, user_data)
-
 
     async def _run(self):
         await self.__impl(self, self.trial)

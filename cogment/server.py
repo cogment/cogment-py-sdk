@@ -34,9 +34,10 @@ def _add_actor_service(grpc_server, impls, service_names, cog_project):
 
 
 def _add_env_service(grpc_server, impls, cog_project):
-    servicer = EnvironmentServicer(env_impls=impls,cog_project=cog_project)
+    servicer = EnvironmentServicer(env_impls=impls, cog_project=cog_project)
     add_EnvironmentEndpointServicer_to_server(servicer, grpc_server)
     # is service_names used for anything in add_actor_service
+
 
 def _add_prehook_service(grpc_server, impls, cog_project):
     # TODO
@@ -71,14 +72,14 @@ class Server:
                                                         actor_class=actor_class)
 
     def register_environment(self,
-                       impl: Callable[[ActorSession, Trial], Awaitable[None]],
-                       impl_name: str,
-                       env_class: EnvClass):
+                             impl: Callable[[ActorSession, Trial], Awaitable[None]],
+                             impl_name: str,
+                             env_class: EnvClass):
         assert impl_name not in self.__env_impls
         assert self.__grpc_server is None
 
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl,
-                                                        env_class=env_class)
+                                                      env_class=env_class)
 
     def register_prehook(self, impl, impl_name: str):
         assert impl_name not in self.__prehook_impls
