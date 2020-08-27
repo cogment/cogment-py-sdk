@@ -54,7 +54,8 @@ def pack_observations(env_session, observations, reply):
     snapshots = [True] * len(env_session.trial.actors)
 
     for actor_index, actor in enumerate(env_session.trial.actors):
-        if new_obs[actor_index] == None:
+        # if new_obs[actor_index] == None:
+        if not new_obs[actor_index]:
             raise Exception("An actor is missing an observation")
         snapshots[actor_index] = isinstance(
             new_obs[actor_index], actor.actor_class.observation_space)
