@@ -8,12 +8,18 @@ import grpc
 import grpc.experimental.aio
 
 from cogment.actor import ActorSession, ActorClass
+from cogment.environment import EnvironmentSession, EnvClass
 from cogment.trial import Trial
 
 # Agent
 from cogment.agent_service import AgentServicer
 from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_endpoint_descriptor
 from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
+
+# Environment
+from cogment.env_service import EnvironmentServicer
+from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_server
+
 
 DEFAULT_PORT = 9000
 DEFAULT_MAX_WORKERS = 1
@@ -28,11 +34,11 @@ def _add_actor_service(grpc_server, impls, service_names, cog_project):
 
 
 def _add_env_service(grpc_server, impls, cog_project):
-    # TODO
-    pass
+    servicer = EnvironmentServicer(env_impls=impls,cog_project=cog_project)
+    add_EnvironmentEndpointServicer_to_server(servicer, grpc_server)
+    # is service_names used for anything in add_actor_service
 
-
-def _add_env_service(grpc_server, impls, cog_project):
+def _add_prehook_service(grpc_server, impls, cog_project):
     # TODO
     pass
 
@@ -64,11 +70,15 @@ class Server:
         self.__actor_impls[impl_name] = SimpleNamespace(impl=impl,
                                                         actor_class=actor_class)
 
-    def register_environment(self, impl, impl_name: str):
-        assert impl_name not in self.__env_impl
+    def register_environment(self,
+                       impl: Callable[[ActorSession, Trial], Awaitable[None]],
+                       impl_name: str,
+                       env_class: EnvClass):
+        assert impl_name not in self.__env_impls
         assert self.__grpc_server is None
 
-        self.__env_impl = impl
+        self.__env_impls[impl_name] = SimpleNamespace(impl=impl,
+                                                        env_class=env_class)
 
     def register_prehook(self, impl, impl_name: str):
         assert impl_name not in self.__prehook_impls
@@ -92,8 +102,8 @@ class Server:
                 self.__grpc_server, self.__actor_impls, service_names, self.__cog_project)
 
         if self.__env_impls:
-            _add_env_service(self.__grpc_server,
-                             self.__env_impls, self.__cog_project)
+            _add_env_service(
+                self.__grpc_server, self.__env_impls, self.__cog_project)
 
         if self.__prehook_impls:
             _add_env_service(self.__grpc_server,

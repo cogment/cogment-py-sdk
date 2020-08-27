@@ -24,7 +24,8 @@ async def my_agent(actor, trial):
         if actor.name == 'Joe':
             # trial.actors[1].add_feedback(value=3,confidence=1)
             # trial.actors[0].add_feedback(value=3,confidence=1)
-            trial.add_feedback(to=[0,'Jack'],value=3,confidence=1)
+            # trial.add_feedback(to=['*'],value=3,confidence=1)
+            pass
         else:
             pass
             # trial.actors[1].add_feedback(value=3,confidence=1)
