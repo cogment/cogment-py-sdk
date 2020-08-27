@@ -4,8 +4,8 @@ import signal
 import threading
 
 from cogment.hooks_service import HooksService, TrialHooks
-from cogment.agent_service import AgentService, Agent
-from cogment.env_service import EnvService, Environment
+# from cogment.agent_service import AgentService, Agent
+# from cogment.env_service import EnvService, Environment
 from cogment.utils import list_versions
 
 from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
@@ -16,7 +16,7 @@ from cogment.api.environment_pb2 import _ENVIRONMENTENDPOINT as env_descriptor
 from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_descriptor
 from cogment.api.hooks_pb2 import _TRIALHOOKS as hooks_descriptor
 
-from cogment.errors import ConfigError
+# from cogment.errors import ConfigError
 from cogment.reloader import run_with_reloader
 
 from grpc_reflection.v1alpha import reflection

@@ -1,5 +1,5 @@
 from threading import Thread
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Dict
 from types import ModuleType
 import os
 import asyncio
@@ -54,10 +54,10 @@ class Server:
     def __init__(self,
                  cog_project: ModuleType,
                  port: int = DEFAULT_PORT):
-        self.__actor_impls = {}
-        self.__env_impls = {}
-        self.__prehook_impls = {}
-        self.__datalog_impls = {}
+        self.__actor_impls: Dict[str, SimpleNamespace] = {}
+        self.__env_impls: Dict[str, SimpleNamespace] = {}
+        self.__prehook_impls: Dict[str, SimpleNamespace] = {}
+        self.__datalog_impls: Dict[str, SimpleNamespace] = {}
         self.__grpc_server = None
         self.__port = port
         self.__cog_project = cog_project
