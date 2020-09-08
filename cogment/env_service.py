@@ -149,7 +149,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         logging.info("Environment Service started")
 
     async def Start(self, request, context):
-
         metadata = dict(context.invocation_metadata())
 
         trial_id = metadata["trial-id"]
@@ -199,6 +198,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         await write_initial_observations(context, env_session)
 
     async def Update(self, request_iterator, context):
+
         metadata = dict(context.invocation_metadata())
 
         trial_id = metadata["trial-id"]

@@ -24,8 +24,14 @@ message Action {
   int32 value = 1;
 }
 
-message TrialConfig {}
-message EnvConfig {}
+message TrialConfig {
+	EnvConfig env_config = 1;
+}
+
+message EnvConfig {
+	int32 num_agents = 1;
+	string str_test = 2;
+}
 
 message MessageTest {
 	string name = 1;
