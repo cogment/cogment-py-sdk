@@ -1,20 +1,17 @@
-from abc import ABC
 import traceback
 
 from types import SimpleNamespace
 from typing import Dict
 
 from cogment.api.hooks_pb2_grpc import TrialHooksServicer as Servicer
+from cogment.api.hooks_pb2_grpc import TrialHooksServicer
 from cogment.api.hooks_pb2 import TrialContext
 from cogment.api.common_pb2 import TrialParams
 from cogment.utils import list_versions
 
-
-class TrialHooks(ABC):
-    VERSIONS: Dict[str, str]
-
-    def before(self, trial_id, user_id, trial_params):
-        pass
+import atexit
+import logging
+import asyncio
 
 
 def _raw_params_to_user_params(params, settings):
@@ -84,35 +81,38 @@ def _user_params_to_raw_params(params, settings):
     return result
 
 
-class HooksService(Servicer):
-    def __init__(self, hooks_class, settings):
-        self._hooks_class = hooks_class
-        self.settings = settings
-        self._hooks = hooks_class()
+class PrehookServicer(TrialHooksServicer):
 
-    def PreTrial(self, request, context):
-        try:
-            print(request)
-            result = TrialContext()
-            result.CopyFrom(request)
+    def __init__(self, prehook_impls, cog_project):
 
-            user_params = _raw_params_to_user_params(request.params,
-                                                     self.settings)
-            user_params = self._hooks.pre_trial(request.trial_id,
-                                                request.user_id,
-                                                user_params)
+        self.__impls = prehook_impls
+        self.__prehook_sessions = {}
+        self.__cog_project = cog_project
+        atexit.register(self.__cleanup)
 
-            result.params.CopyFrom(_user_params_to_raw_params(user_params,
-                                                              self.settings))
+        logging.info("Prehook Service started")
 
-            return result
-        except Exception:
-            traceback.print_exc()
-            raise
+    async def PreTrial(self, request, context):
 
-    def Version(self, request, context):
-        try:
-            return list_versions(self._hooks_class)
-        except Exception:
-            traceback.print_exc()
-            raise
+        user_params = _raw_params_to_user_params(request.params,
+                                                 self.__cog_project)
+
+        for impl in self.__impls:
+
+            user_params = await impl(user_params)
+
+        reply = TrialContext()
+        reply.CopyFrom(request)
+
+        reply.params.CopyFrom(_user_params_to_raw_params(user_params,
+                                                         self.__cog_project))
+
+        return reply
+
+    def __cleanup(self):
+        for data in self.__prehook_sessions.values():
+            pass
+
+        self.__prehook_sessions.clear()
+
+        atexit.unregister(self.__cleanup)

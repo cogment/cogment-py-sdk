@@ -1,5 +1,5 @@
 from threading import Thread
-from typing import Callable, Awaitable, Dict
+from typing import Callable, Awaitable, Dict, List
 from types import ModuleType
 import os
 import asyncio
@@ -10,6 +10,7 @@ import grpc.experimental.aio
 from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession, EnvClass
 from cogment.trial import Trial
+# from cogment.prehook import PrehookSession
 
 # Agent
 from cogment.agent_service import AgentServicer
@@ -20,6 +21,9 @@ from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
 from cogment.env_service import EnvironmentServicer
 from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_server
 
+# Prehook
+from cogment.hooks_service import PrehookServicer
+from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
 
 DEFAULT_PORT = 9000
 DEFAULT_MAX_WORKERS = 1
@@ -40,8 +44,8 @@ def _add_env_service(grpc_server, impls, cog_project):
 
 
 def _add_prehook_service(grpc_server, impls, cog_project):
-    # TODO
-    pass
+    servicer = PrehookServicer(prehook_impls=impls, cog_project=cog_project)
+    add_TrialHooksServicer_to_server(servicer, grpc_server)
 
 
 def _add_datalog_service(grpc_server, impls, cog_project):
@@ -56,7 +60,8 @@ class Server:
                  port: int = DEFAULT_PORT):
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
-        self.__prehook_impls: Dict[str, SimpleNamespace] = {}
+        # self.__prehook_impls = []
+        self.__prehook_impls: List[Callable[[SimpleNamespace], Awaitable[SimpleNamespace]]] = []
         self.__datalog_impls: Dict[str, SimpleNamespace] = {}
         self.__grpc_server = None
         self.__port = port
@@ -72,7 +77,7 @@ class Server:
                                                         actor_class=actor_class)
 
     def register_environment(self,
-                             impl: Callable[[ActorSession, Trial], Awaitable[None]],
+                             impl: Callable[[EnvironmentSession, Trial], Awaitable[None]],
                              impl_name: str,
                              env_class: EnvClass):
         assert impl_name not in self.__env_impls
@@ -81,11 +86,11 @@ class Server:
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl,
                                                       env_class=env_class)
 
-    def register_prehook(self, impl, impl_name: str):
-        assert impl_name not in self.__prehook_impls
+    def register_prehook(self,
+                         impl: Callable[[SimpleNamespace], Awaitable[SimpleNamespace]]):
         assert self.__grpc_server is None
 
-        self.__prehook_impls = impl
+        self.__prehook_impls.append(impl)
 
     def register_datalog(self, impl, impl_name: str):
         assert impl_name not in self.__datalog_impls
@@ -107,8 +112,8 @@ class Server:
                 self.__grpc_server, self.__env_impls, self.__cog_project)
 
         if self.__prehook_impls:
-            _add_env_service(self.__grpc_server,
-                             self.__prehook_impls, self.__cog_project)
+            _add_prehook_service(self.__grpc_server,
+                                 self.__prehook_impls, self.__cog_project)
 
         if self.__datalog_impls:
             _add_datalog_service(self.__grpc_server,

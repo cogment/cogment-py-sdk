@@ -25,9 +25,9 @@ async def my_environment(env, trial):
 
     for count in range(5):
 
-        # trial.actors[0].add_feedback(value=2,confidence=1)
-        # trial.actors[1].add_feedback(value=3,confidence=1)
-        trial.add_feedback(to=['*'],value=3+count,confidence=1)
+        trial.actors[0].add_feedback(value=2,confidence=1)
+        trial.actors[1].add_feedback(value=3,confidence=1)
+        # trial.add_feedback(to=['*'],value=3+count,confidence=1)
 
         obs_1 =  data_pb2.Observation(value=count+55)
         obs_2 =  data_pb2.Observation(value=count+66)

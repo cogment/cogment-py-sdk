@@ -3,7 +3,7 @@ import atexit
 import signal
 import threading
 
-from cogment.hooks_service import HooksService, TrialHooks
+# from cogment.hooks_service import HooksService, TrialHooks
 # from cogment.agent_service import AgentService, Agent
 # from cogment.env_service import EnvService, Environment
 from cogment.utils import list_versions

@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0ftest/data.proto\x12\x06mytest\"\x1c\n\x0bObservation\x12\r\n\x05value\x18\x01 \x01(\x05\"\x17\n\x06\x41\x63tion\x12\r\n\x05value\x18\x01 \x01(\x05\"\r\n\x0bTrialConfig\"\x0b\n\tEnvConfig\"\x1b\n\x0bMessageTest\x12\x0c\n\x04name\x18\x01 \x01(\tb\x06proto3'
+  serialized_pb=b'\n\x0ftest/data.proto\x12\x06mytest\"\x1c\n\x0bObservation\x12\r\n\x05value\x18\x01 \x01(\x05\"\x17\n\x06\x41\x63tion\x12\r\n\x05value\x18\x01 \x01(\x05\"4\n\x0bTrialConfig\x12%\n\nenv_config\x18\x01 \x01(\x0b\x32\x11.mytest.EnvConfig\"1\n\tEnvConfig\x12\x12\n\nnum_agents\x18\x01 \x01(\x05\x12\x10\n\x08str_test\x18\x02 \x01(\t\"\x1b\n\x0bMessageTest\x12\x0c\n\x04name\x18\x01 \x01(\tb\x06proto3'
 )
 
 
@@ -97,6 +97,13 @@ _TRIALCONFIG = _descriptor.Descriptor(
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
+    _descriptor.FieldDescriptor(
+      name='env_config', full_name='mytest.TrialConfig.env_config', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -110,7 +117,7 @@ _TRIALCONFIG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=82,
-  serialized_end=95,
+  serialized_end=134,
 )
 
 
@@ -122,6 +129,20 @@ _ENVCONFIG = _descriptor.Descriptor(
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
+    _descriptor.FieldDescriptor(
+      name='num_agents', full_name='mytest.EnvConfig.num_agents', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='str_test', full_name='mytest.EnvConfig.str_test', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -134,8 +155,8 @@ _ENVCONFIG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=97,
-  serialized_end=108,
+  serialized_start=136,
+  serialized_end=185,
 )
 
 
@@ -166,10 +187,11 @@ _MESSAGETEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=110,
-  serialized_end=137,
+  serialized_start=187,
+  serialized_end=214,
 )
 
+_TRIALCONFIG.fields_by_name['env_config'].message_type = _ENVCONFIG
 DESCRIPTOR.message_types_by_name['Observation'] = _OBSERVATION
 DESCRIPTOR.message_types_by_name['Action'] = _ACTION
 DESCRIPTOR.message_types_by_name['TrialConfig'] = _TRIALCONFIG

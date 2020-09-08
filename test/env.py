@@ -4,7 +4,6 @@ import cog_settings
 import data_pb2
 import asyncio
 
-AS_SERVER = True
 
 async def my_environment(env, trial):
     obs_1 =  data_pb2.Observation(value=22)
@@ -50,6 +49,8 @@ async def main():
         impl=my_environment, impl_name="debug", env_class="dummy")
 
     await server.run()
+
+
    
 
 asyncio.run(main())
