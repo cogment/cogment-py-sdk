@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# used to double check that routines using ActionsTable work
+
 import cogment as _cog
 from types import SimpleNamespace
 from typing import List

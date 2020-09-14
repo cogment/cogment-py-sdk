@@ -40,6 +40,11 @@ from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_
 from cogment.hooks_service import PrehookServicer
 from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
 
+# Log Exporter
+from cogment.log_exporter_service import LogExporterService
+from cogment.api.data_pb2_grpc import add_LogExporterServicer_to_server
+
+
 DEFAULT_PORT = 9000
 DEFAULT_MAX_WORKERS = 1
 ENABLE_REFLECTION_VAR_NAME = "COGMENT_GRPC_REFLECTION"
@@ -64,19 +69,19 @@ def _add_prehook_service(grpc_server, impls, cog_project):
 
 
 def _add_datalog_service(grpc_server, impls, cog_project):
-    # TODO
-    pass
+    servicer = LogExporterService(datalog_impls=impls, cog_project=cog_project)
+    add_LogExporterServicer_to_server(servicer, grpc_server)
+    # pass
 
 
 class Server:
     def __init__(self, cog_project: ModuleType, port: int = DEFAULT_PORT):
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
-        # self.__prehook_impls = []
         self.__prehook_impls: List[
             Callable[[SimpleNamespace], Awaitable[SimpleNamespace]]
         ] = []
-        self.__datalog_impls: Dict[str, SimpleNamespace] = {}
+        self.__datalog_impls = None
         self.__grpc_server = None
         self.__port = port
         self.__cog_project = cog_project
@@ -111,9 +116,9 @@ class Server:
 
         self.__prehook_impls.append(impl)
 
-    def register_datalog(self, impl, impl_name: str):
-        assert impl_name not in self.__datalog_impls
+    def register_datalog(self, impl):
         assert self.__grpc_server is None
+        assert self.__datalog_impls is None
 
         self.__datalog_impls = impl
 
