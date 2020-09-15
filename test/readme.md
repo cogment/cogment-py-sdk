@@ -19,7 +19,7 @@ The following table outlines the usage examples, pseudo orchestrator instances, 
 
 <sub><sup>Notes - <br> \* Data will be written to a ".csv" file
                     <br>\*\* Data will be written to a postgreSQL database
-                	<br>\+ Environment variables for db, host & csv filenames (run first: source env_var
+                	<br>\+ Environment variables for db, host & csv filenames (run first: source env_var)
                     <br>\+\+ Contains python dependencies for postgres example (run first: pip install -r requirements.txt)
                 </sup></sub>
 
