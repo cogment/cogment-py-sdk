@@ -4,6 +4,7 @@ from cogment.delta_encoding import DecodeObservationData
 
 from types import SimpleNamespace
 
+import importlib
 import grpc
 
 
@@ -105,4 +106,18 @@ class DecodeData():
         for rwd in sample.rewards:
             reward_list.append((rwd.value, rwd.confidence))
 
-        return self.last_obs, action_list, reward_list
+        message_list = []
+        for messages in sample.messages:
+            sub_msg_list = []
+            for message in messages.messages:
+
+                class_type = message.payload.type_url.split('.')
+                user_data = getattr(importlib.import_module(
+                    self.__cog_project.protolib), class_type[-1])()
+                message.payload.Unpack(user_data)
+
+                sub_msg_list.append((message.sender_id, user_data))
+
+            message_list.append(sub_msg_list)
+
+        return self.last_obs, action_list, reward_list, message_list

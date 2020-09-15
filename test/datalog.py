@@ -14,8 +14,9 @@ async def my_datalog(data, trial_params, trial_id):
 
     async for sample in data:
 
-        observations, actions, rewards = decode_all.decode_datasample(sample)
-        print(f"trial_id - {trial_id}\n obs - {observations}\n actions - {actions}\n rewards {rewards}")
+        observations, actions, rewards, messages = decode_all.decode_datasample(sample)
+        print(f"\ntrial_id: {trial_id}\nobs: {observations}\nactions: {actions}\nrewards: {rewards}\nmessages: {messages}")
+
 
 async def main():
     server = cogment.Server(cog_project=cog_settings, port=9001)

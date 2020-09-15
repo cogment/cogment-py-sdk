@@ -97,9 +97,11 @@ def send_datalogsample_req(user_id, obs_value_list, act_value_list):
     data_sample.rewards.append(reward)
 
     # Messages
+    msg_test = data_pb2.MessageTest(name="Doctor Zhivago")
     message = Message(sender_id=0,
         receiver_id=1
         )
+    message.payload.Pack(msg_test)
     message_collection = MessageCollection()
     message_collection.messages.append(message)
     message_collection.messages.append(message)
