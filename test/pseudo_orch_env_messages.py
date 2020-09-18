@@ -102,10 +102,14 @@ async def main():
                   metadata=(("trial-id", "abc"),)
                 )
 
+        await update_conn.done_writing()
 
         end_conn = stub.End(
             EnvEndRequest(),
             metadata=(("trial-id", "abc"),)
         )
+
+        await end_conn
+
 
 asyncio.run(main())

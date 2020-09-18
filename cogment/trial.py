@@ -45,13 +45,16 @@ class Trial:
                 if class_member.id_ == actor.actor_class.id_:
                     self.actor_counts[class_index] += 1
 
-    def get_receivers(self, pattern):
+    def get_receivers(self, pattern, env=False):
         if isinstance(pattern, int) or isinstance(pattern, str):
             pattern_list = [pattern]
         elif isinstance(pattern, list):
             pattern_list = pattern
         receiver_list = []
-        all_receivers = self.actors + [self.env]
+        if env:
+            all_receivers = self.actors + [self.env]
+        else:
+            all_receivers = self.actors
         for target in pattern_list:
             for receiver_index, receiver in enumerate(all_receivers, -1):
                 if target == "*" or target == "*.*":
@@ -74,7 +77,7 @@ class Trial:
         return receiver_list
 
     def add_feedback(self, to, value, confidence):
-        for d in self.get_receivers(pattern=to):
+        for d in self.get_receivers(pattern=to, env=False):
             d.add_feedback(value=value, confidence=confidence)
 
     def _gather_all_feedback(self):
@@ -95,7 +98,7 @@ class Trial:
                 yield re
 
     def send_message(self, to, user_data):
-        for d in self.get_receivers(pattern=to):
+        for d in self.get_receivers(pattern=to, env=True):
             d.send_message(user_data=user_data)
 
     def _gather_all_messages(self, source_id):

@@ -29,6 +29,8 @@ from cogment.environment import _ServedEnvironmentSession
 
 from cogment.trial import Trial
 
+from prometheus_client import Summary, Counter
+
 import traceback
 import atexit
 import logging
@@ -68,7 +70,6 @@ def pack_observations(env_session, observations, reply):
     snapshots = [True] * len(env_session.trial.actors)
 
     for actor_index, actor in enumerate(env_session.trial.actors):
-        # if new_obs[actor_index] == None:
         if not new_obs[actor_index]:
             raise Exception("An actor is missing an observation")
         snapshots[actor_index] = isinstance(
@@ -144,6 +145,18 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         self.__impls = env_impls
         self.__env_sessions = {}
         self.__cog_project = cog_project
+
+        self.UPDATE_REQUEST_TIME = Summary(
+            'environment_update_processing_seconds', 'Times spend by an environment on the update function')
+        self.TRAINING_DURATION = Summary(
+            'environment_trial_duration', 'Trial duration', ['trial_actor'])
+        self.TRIALS_STARTED = Counter(
+            'environment_trials_started', 'Number of trial starts')
+        self.TRIALS_ENDED = Counter(
+            'environment_trials_ended', 'Number of trial ends')
+        self.MESSAGES_RECEIVED = Counter(
+            'environment_received_messages', 'Number of messages received')
+
         atexit.register(self.__cleanup)
 
         logging.info("Environment Service started")
@@ -163,6 +176,8 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         if key in self.__env_sessions:
             raise InvalidRequestError(
                 message="Environment already exists", request=request)
+
+        self.TRIALS_STARTED.inc()
 
         trial_config = None
         if request.HasField("trial_config"):
@@ -206,18 +221,19 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         env_session = self.__env_sessions[key]
 
-        env_session.trial.tick_id += 1
+        with self.UPDATE_REQUEST_TIME.time():
+            env_session.trial.tick_id += 1
 
-        loop = asyncio.get_running_loop()
-        reader_task = loop.create_task(
-            read_actions(request_iterator, env_session))
-        writer_task = loop.create_task(
-            write_observations(context, env_session))
+            loop = asyncio.get_running_loop()
+            reader_task = loop.create_task(
+                read_actions(request_iterator, env_session))
+            writer_task = loop.create_task(
+                write_observations(context, env_session))
 
-        await env_session._task
+            await env_session._task
 
-        reader_task.cancel()
-        writer_task.cancel()
+            reader_task.cancel()
+            writer_task.cancel()
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
@@ -228,15 +244,29 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         env_session = self.__env_sessions[key]
 
         for message in request.messages:
+            self.MESSAGES_RECEIVED.inc()
             env_session._new_message(message)
 
         return EnvOnMessageReply()
 
     async def End(self, request, context):
+
         metadata = dict(context.invocation_metadata())
 
         trial_id = metadata["trial-id"]
         key = trial_id
+
+        env_session = self.__env_sessions[key]
+
+        for idx, actor in enumerate(env_session.trial.actors):
+            self.TRAINING_DURATION.labels(actor.name).observe(
+                env_session.trial.tick_id)
+
+        await env_session.end()
+
+        self.TRIALS_ENDED.inc()
+
+        self.__env_sessions.pop(key, None)
 
         return EnvEndReply()
 

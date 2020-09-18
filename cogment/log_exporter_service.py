@@ -16,7 +16,6 @@ from cogment.api.data_pb2_grpc import LogExporterServicer
 
 from cogment.api.data_pb2 import LogReply
 
-# from cogment.hooks_service import _raw_params_to_user_params
 from cogment.utils import raw_params_to_user_params
 
 from cogment.errors import InvalidRequestError
@@ -26,6 +25,7 @@ import atexit
 import logging
 import typing
 import asyncio
+import prometheus_client as prom
 
 import sys
 

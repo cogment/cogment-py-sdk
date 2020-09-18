@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import grpc
-from cogment.api.agent_pb2 import AgentStartRequest, AgentDataRequest, AgentActionReply, AgentRewardRequest, Reward
+from cogment.api.agent_pb2 import AgentEndRequest, AgentStartRequest, AgentDataRequest, AgentActionReply, AgentRewardRequest, Reward
 import cogment.api.agent_pb2_grpc
 from cogment.api.common_pb2 import TrialActor
 import data_pb2
@@ -147,5 +147,30 @@ async def main():
         mytest = await abc1_decide_conn.read()
         await abc0_decide_conn.write(make_req(2, True))
         mytest = await abc0_decide_conn.read()
+
+
+        await abc0_decide_conn.done_writing()
+        await abc1_decide_conn.done_writing()
+ 
+        end_abc0_conn = stub.End(
+            AgentEndRequest(),
+            metadata=(("trial-id", "abc"),("actor-id", "0"))
+        )
+
+        end_abc1_conn = stub.End(
+            AgentEndRequest(),
+            metadata=(("trial-id", "abc"),("actor-id", "1"))
+        )
+
+        end_def0_conn = stub.End(
+            AgentEndRequest(),
+            metadata=(("trial-id", "def"),("actor-id", "0"))
+        )
+
+
+        await end_abc0_conn
+        await end_abc1_conn
+        await end_def0_conn
+
 
 asyncio.run(main())

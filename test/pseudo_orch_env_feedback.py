@@ -75,10 +75,15 @@ async def main():
             for feedback in tmp.feedbacks:
                 print(f"Feedback sent to Actor {feedback.actor_id} is {feedback.value}")
 
- 
+        await update_conn.done_writing()
+
+
         end_conn = stub.End(
             EnvEndRequest(),
             metadata=(("trial-id", "abc"),)
         )
+
+        await end_conn
+
 
 asyncio.run(main())

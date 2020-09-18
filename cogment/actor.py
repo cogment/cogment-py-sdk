@@ -76,6 +76,7 @@ class ActorSession:
         self.actor_class = actor_class
         self.trial = trial
         self.name = name
+        self.end_trial = False
         # Callbacks
         self.on_observation = None
         self.on_reward = None
@@ -100,6 +101,11 @@ class ActorSession:
         # Wait until the initial observation is available
         self.__obs_future = asyncio.get_running_loop().create_future()
         return await self.__obs_future
+
+    async def end(self):
+        self.end_trial = True
+        if self.on_trial_over:
+            self.on_trial_over()
 
     def start_nowait(self):
         assert not self.__started

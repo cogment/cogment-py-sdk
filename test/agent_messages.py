@@ -21,6 +21,12 @@ import asyncio
 AS_SERVER = True
 
 async def my_agent(actor, trial):
+
+    def on_trial_over():
+        print(f"Trial has ended!")
+
+    actor.on_trial_over = on_trial_over
+
     def on_reward_joe(r):
         print("Joe bring on the rewards! \n",r)
     def on_reward_jack(r):
