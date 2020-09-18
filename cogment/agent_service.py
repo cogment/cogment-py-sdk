@@ -11,17 +11,12 @@ from cogment.delta_encoding import DecodeObservationData
 from cogment.actor import _ServedActorSession
 
 from prometheus_client import Summary, Counter, Gauge
-# from prometheus_async.aio import time as asynctime
 
 import traceback
 import atexit
 import logging
 import typing
 import asyncio
-
-
-DECIDE_REQUEST_TIME = Summary('actor_decide_processing_seconds',
-                              'Time spent by an actor on the decide function', ['name'])
 
 
 def _trial_key(trial_id, actor_id):
@@ -67,6 +62,8 @@ class AgentServicer(AgentEndpointServicer):
         self.__cog_project = cog_project
         atexit.register(self.__cleanup)
 
+        self.DECIDE_REQUEST_TIME = Summary(
+            'actor_decide_processing_seconds', 'Time spent by an actor on the decide function', ['name'])
         self.ACTORS_STARTED = Counter(
             'actors_started', 'Number of actors created', ['impl'])
         self.ACTORS_ENDED = Counter(
@@ -131,8 +128,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.ACTORS_ENDED.labels(agent_session.name).inc()
 
-        # keep this for now - used if rerunning pseudo orch but not restarting service
-        # self.__agent_sessions.pop(key, None)
+        self.__agent_sessions.pop(key, None)
 
         return AgentEndReply()
 
@@ -142,7 +138,7 @@ class AgentServicer(AgentEndpointServicer):
                          metadata["actor-id"])
         agent_session = self.__agent_sessions[key]
 
-        with DECIDE_REQUEST_TIME.labels(agent_session.name).time():
+        with self.DECIDE_REQUEST_TIME.labels(agent_session.name).time():
 
             loop = asyncio.get_running_loop()
             reader_task = loop.create_task(

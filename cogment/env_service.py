@@ -16,7 +16,6 @@ from cogment.environment import _ServedEnvironmentSession
 from cogment.trial import Trial
 
 from prometheus_client import Summary, Counter
-# from prometheus_async.aio import time as asynctime
 
 import traceback
 import atexit
@@ -24,11 +23,6 @@ import logging
 import typing
 import asyncio
 from time import time
-
-UPDATE_REQUEST_TIME = Summary('environment_update_processing_seconds',
-                              'Times spend by an environment on the update function')
-TRAINING_DURATION = Summary(
-    'environment_trial_duration', 'Trial duration', ['trial_actor'])
 
 
 def new_actions_table(settings, trial):
@@ -62,7 +56,6 @@ def pack_observations(env_session, observations, reply):
     snapshots = [True] * len(env_session.trial.actors)
 
     for actor_index, actor in enumerate(env_session.trial.actors):
-        # if new_obs[actor_index] == None:
         if not new_obs[actor_index]:
             raise Exception("An actor is missing an observation")
         snapshots[actor_index] = isinstance(
@@ -139,6 +132,10 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         self.__env_sessions = {}
         self.__cog_project = cog_project
 
+        self.UPDATE_REQUEST_TIME = Summary(
+            'environment_update_processing_seconds', 'Times spend by an environment on the update function')
+        self.TRAINING_DURATION = Summary(
+            'environment_trial_duration', 'Trial duration', ['trial_actor'])
         self.TRIALS_STARTED = Counter(
             'environment_trials_started', 'Number of trial starts')
         self.TRIALS_ENDED = Counter(
@@ -201,7 +198,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         await write_initial_observations(context, env_session)
 
-    # @asynctime(UPDATE_REQUEST_TIME)
     async def Update(self, request_iterator, context):
 
         metadata = dict(context.invocation_metadata())
@@ -211,7 +207,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         env_session = self.__env_sessions[key]
 
-        with UPDATE_REQUEST_TIME.time():
+        with self.UPDATE_REQUEST_TIME.time():
             env_session.trial.tick_id += 1
 
             loop = asyncio.get_running_loop()
@@ -249,15 +245,14 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         env_session = self.__env_sessions[key]
 
         for idx, actor in enumerate(env_session.trial.actors):
-            TRAINING_DURATION.labels(actor.name).observe(
+            self.TRAINING_DURATION.labels(actor.name).observe(
                 env_session.trial.tick_id)
 
         await env_session.end()
 
         self.TRIALS_ENDED.inc()
 
-        # keep this for now - used if rerunning pseudo orch but not restarting service
-        # self.__env_sessions.pop(key, None)
+        self.__env_sessions.pop(key, None)
 
         return EnvEndReply()
 

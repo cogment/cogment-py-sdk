@@ -11,7 +11,6 @@ from prometheus_client import start_http_server
 from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession, EnvClass
 from cogment.trial import Trial
-# from cogment.prehook import PrehookSession
 
 # Agent
 from cogment.agent_service import AgentServicer
