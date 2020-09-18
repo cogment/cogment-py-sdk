@@ -68,7 +68,8 @@ setup(name='cogment',
       install_requires=[
           'grpcio>=1.19',
           'grpcio-reflection>=1.19',
-          'protobuf>=3.7'
+          'protobuf>=3.7',
+          'prometheus_client'
       ],
       setup_requires=['grpcio-tools>=1.19'],
       cmdclass={

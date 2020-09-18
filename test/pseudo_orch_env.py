@@ -58,10 +58,15 @@ async def main():
                 obs = data_pb2.Observation()
                 obs.ParseFromString(observation_data.content)
                 print(f"Observation for actor {actor_index}: {obs}")
+
+        await update_conn.done_writing()
  
         end_conn = stub.End(
             EnvEndRequest(),
             metadata=(("trial-id", "abc"),)
         )
+
+        await end_conn
+
 
 asyncio.run(main())

@@ -60,6 +60,11 @@ class EnvironmentSession:
 
         return await self.__actions_future
 
+    async def end(self):
+        self.end_trial = True
+        if self.on_trial_over:
+            self.on_trial_over()
+
     def _new_action(self, actions):
         self.latest_actions = actions
 

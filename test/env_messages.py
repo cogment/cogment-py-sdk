@@ -8,6 +8,12 @@ AS_SERVER = True
 
 async def my_environment(env, trial):
 
+    def on_trial_over():
+        print(f"Trial has ended!")
+
+    env.on_trial_over = on_trial_over
+
+
     def on_message(sender, msg):
         print(f"Joe received message {msg.name} from agent {sender}!")
 

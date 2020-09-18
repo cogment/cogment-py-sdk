@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 import grpc
 import grpc.experimental.aio
+from prometheus_client import start_http_server
 
 from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession, EnvClass
@@ -34,6 +35,7 @@ DEFAULT_PORT = 9000
 DEFAULT_MAX_WORKERS = 1
 ENABLE_REFLECTION_VAR_NAME = 'COGMENT_GRPC_REFLECTION'
 DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, 'false')
+DEFAULT_PROMETHEUS_PORT = 8000
 
 
 def _add_actor_service(grpc_server, impls, service_names, cog_project):
@@ -63,7 +65,8 @@ class Server:
 
     def __init__(self,
                  cog_project: ModuleType,
-                 port: int = DEFAULT_PORT):
+                 port: int = DEFAULT_PORT,
+                 prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[SimpleNamespace], Awaitable[SimpleNamespace]]] = []
@@ -71,6 +74,7 @@ class Server:
         self.__grpc_server = None
         self.__port = port
         self.__cog_project = cog_project
+        self.__prometheus_port = prometheus_port
 
     def register_actor(self,
                        impl: Callable[[ActorSession, Trial], Awaitable[None]],
@@ -104,6 +108,8 @@ class Server:
         self.__datalog_impls = impl
 
     async def run(self):
+        start_http_server(8000)
+
         self.__grpc_server = grpc.experimental.aio.server()
 
         service_names = []

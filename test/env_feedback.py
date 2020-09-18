@@ -7,6 +7,13 @@ import asyncio
 AS_SERVER = True
 
 async def my_environment(env, trial):
+
+    def on_trial_over():
+        print(f"Trial has ended!")
+
+    env.on_trial_over = on_trial_over
+
+    
     obs_1 =  data_pb2.Observation(value=22)
     obs_2 =  data_pb2.Observation(value=33)
     

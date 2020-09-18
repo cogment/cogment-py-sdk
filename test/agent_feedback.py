@@ -7,6 +7,12 @@ import asyncio
 AS_SERVER = True
 
 async def my_agent(actor, trial):
+
+    def on_trial_over():
+        print(f"Trial has ended!")
+
+    actor.on_trial_over = on_trial_over
+
     def on_reward_joe(r):
         print("Joe bring on the rewards! \n",r)
     def on_reward_jack(r):
@@ -24,11 +30,11 @@ async def my_agent(actor, trial):
         if actor.name == 'Joe':
             # trial.actors[1].add_feedback(value=3,confidence=1)
             # trial.actors[0].add_feedback(value=3,confidence=1)
-            # trial.add_feedback(to=['*'],value=3,confidence=1)
+            trial.add_feedback(to=['*'],value=3,confidence=1)
             pass
         else:
             pass
-            # trial.actors[1].add_feedback(value=3,confidence=1)
+            # trial.actors[1].add_feedback(value=-3,confidence=1)
             # trial.actors[0].add_feedback(value=4,confidence=1)
             # trial.add_feedback(to="*",value=2,confidence=1)
             # trial.add_feedback(to=["*.Joe","*.Jack"],value=2,confidence=1)
@@ -42,7 +48,6 @@ async def my_agent(actor, trial):
 
 async def main():
     if AS_SERVER:
-        print("This is first")
         server = cogment.Server(cog_project=cog_settings, port=9001)
         server.register_actor(
             impl=my_agent, impl_name="blearg", actor_class="player")
