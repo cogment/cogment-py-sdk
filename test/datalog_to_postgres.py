@@ -25,8 +25,8 @@ import pandas as pd
 from sqlalchemy import create_engine
 from google.protobuf.json_format import MessageToJson
 
-table_name = os.getenv('POSTGRES_TABLENAME')
-postgres_engine = os.getenv('POSTGRES_ENGINE')
+table_name = os.getenv('POSTGRES_TABLENAME').rstrip()
+postgres_engine = os.getenv('POSTGRES_ENGINE').rstrip()
 
 engine = create_engine(postgres_engine, echo=False)
 

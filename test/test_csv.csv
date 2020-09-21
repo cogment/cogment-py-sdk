@@ -1,0 +1,313 @@
+trial_id,tick_id,timestamp,trial_config,player_0_observation,player_0_action,player_0_reward_value,player_0_reward_confidence,player_0_message_messages,player_1_observation,player_1_action,player_1_reward_value,player_1_reward_confidence,player_1_message_messages
+abc,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 22
+}","{
+  ""content"": ""CCE=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 23
+}","{
+  ""content"": ""CCI=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"
+def,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 44
+}","{
+  ""content"": ""CDc=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 45
+}","{
+  ""content"": ""CDg=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"
+abc,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 23
+}","{
+  ""content"": ""CCI=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 24
+}","{
+  ""content"": ""CCM=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"
+def,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 45
+}","{
+  ""content"": ""CDg=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 46
+}","{
+  ""content"": ""CDk=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"
+abc,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 24
+}","{
+  ""content"": ""CCM=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 25
+}","{
+  ""content"": ""CCQ=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"
+def,0,0.0,"{
+  ""envConfig"": {
+    ""numAgents"": 4,
+    ""strTest"": ""Weekend!""
+  }
+}","{
+  ""value"": 46
+}","{
+  ""content"": ""CDk=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}","{
+  ""value"": 47
+}","{
+  ""content"": ""CDo=""
+}",0.5,1.0,"{
+  ""messages"": [
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    },
+    {
+      ""receiverId"": 1,
+      ""payload"": {
+        ""@type"": ""type.googleapis.com/mytest.MessageTest"",
+        ""name"": ""Doctor Zhivago""
+      },
+      ""senderId"": 0
+    }
+  ]
+}"

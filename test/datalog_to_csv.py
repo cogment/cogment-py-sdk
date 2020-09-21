@@ -24,7 +24,7 @@ from cogment.delta_encoding import DecodeObservationData
 
 from google.protobuf.json_format import MessageToJson
 
-csv_filename = os.getenv('CSV_FILENAME')
+csv_filename = os.getenv('CSV_FILENAME').rstrip()
 
 async def write_it(line, mode):
     file = open(csv_filename, mode, newline ='') 
