@@ -42,7 +42,7 @@ async def my_agent(actor, trial):
 
         if actor.name == 'Joe':
             # trial.env.send_message(msg_test)
-            # trial.send_message(to=['*'],user_data=msg_test)
+            trial.send_message(to=['*'],user_data=msg_test)
             # trial.actors[1].send_message(user_data=msg_test)
             # trial.actors[0].send_message(user_data=msg_test)
             # trial.actors[1].add_feedback(value=3,confidence=1)
