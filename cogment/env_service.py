@@ -147,15 +147,16 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         self.__cog_project = cog_project
 
         self.UPDATE_REQUEST_TIME = Summary(
-            'environment_update_processing_seconds', 'Times spend by an environment on the update function')
+            'environment_update_processing_seconds', 'Times spend by an environment on the update function',
+            ['impl_name'])
         self.TRAINING_DURATION = Summary(
             'environment_trial_duration', 'Trial duration', ['trial_actor'])
         self.TRIALS_STARTED = Counter(
-            'environment_trials_started', 'Number of trial starts')
+            'environment_trials_started', 'Number of trial starts', ['impl_name'])
         self.TRIALS_ENDED = Counter(
-            'environment_trials_ended', 'Number of trial ends')
+            'environment_trials_ended', 'Number of trial ends', ['impl_name'])
         self.MESSAGES_RECEIVED = Counter(
-            'environment_received_messages', 'Number of messages received')
+            'environment_received_messages', 'Number of messages received', ['impl_name'])
 
         atexit.register(self.__cleanup)
 
@@ -177,7 +178,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             raise InvalidRequestError(
                 message="Environment already exists", request=request)
 
-        self.TRIALS_STARTED.inc()
+        self.TRIALS_STARTED.labels(request.impl_name).inc()
 
         trial_config = None
         if request.HasField("trial_config"):
@@ -202,7 +203,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         trial.actions_by_actor_id = actions_by_actor_id
 
         new_session = _ServedEnvironmentSession(
-            impl.impl, env_class, trial)
+            impl.impl, env_class, trial, request.impl_name)
         self.__env_sessions[key] = new_session
 
         env_session = self.__env_sessions[key]
@@ -221,7 +222,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         env_session = self.__env_sessions[key]
 
-        with self.UPDATE_REQUEST_TIME.time():
+        with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
             env_session.trial.tick_id += 1
 
             loop = asyncio.get_running_loop()
@@ -244,7 +245,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         env_session = self.__env_sessions[key]
 
         for message in request.messages:
-            self.MESSAGES_RECEIVED.inc()
+            self.MESSAGES_RECEIVED.labels(env_session.impl_name).inc()
             env_session._new_message(message)
 
         return EnvOnMessageReply()
@@ -264,7 +265,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         await env_session.end()
 
-        self.TRIALS_ENDED.inc()
+        self.TRIALS_ENDED.labels(env_session.impl_name).inc()
 
         self.__env_sessions.pop(key, None)
 

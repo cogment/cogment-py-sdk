@@ -89,9 +89,11 @@ class AgentServicer(AgentEndpointServicer):
             ["name"],
         )
         self.ACTORS_STARTED = Counter(
-            "actors_started", "Number of actors created", ["impl"]
+            "actors_started", "Number of actors created", ["impl_name"]
         )
-        self.ACTORS_ENDED = Counter("actors_ended", "Number of actors ended", ["name"])
+        self.ACTORS_ENDED = Counter(
+            "actors_ended", "Number of actors ended", ["impl_name"]
+        )
         self.MESSAGES_RECEIVED = Counter(
             "actor_received_messages", "Number of messages received", ["name"]
         )
@@ -140,7 +142,9 @@ class AgentServicer(AgentEndpointServicer):
         trial._add_actors(request.actors_in_trial)
         trial._add_env()
 
-        new_session = _ServedActorSession(impl.impl, actor_class, trial, self_info.name)
+        new_session = _ServedActorSession(
+            impl.impl, actor_class, trial, self_info.name, request.impl_name
+        )
         self.__agent_sessions[key] = new_session
 
         loop = asyncio.get_running_loop()
@@ -155,7 +159,7 @@ class AgentServicer(AgentEndpointServicer):
 
         await agent_session.end()
 
-        self.ACTORS_ENDED.labels(agent_session.name).inc()
+        self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
 
         self.__agent_sessions.pop(key, None)
 

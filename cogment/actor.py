@@ -72,11 +72,12 @@ class ActorClassList:
 class ActorSession:
     """This represents an actor being performed locally."""
 
-    def __init__(self, impl, actor_class, trial, name):
+    def __init__(self, impl, actor_class, trial, name, impl_name):
         self.actor_class = actor_class
         self.trial = trial
         self.name = name
         self.end_trial = False
+        self.impl_name = impl_name
         # Callbacks
         self.on_observation = None
         self.on_reward = None
@@ -161,8 +162,8 @@ class ActorSession:
 class _ServedActorSession(ActorSession):
     """An actor session that is served from an agent service."""
 
-    def __init__(self, impl, actor_class, trial, name):
-        super().__init__(impl, actor_class, trial, name)
+    def __init__(self, impl, actor_class, trial, name, impl_name):
+        super().__init__(impl, actor_class, trial, name, impl_name)
         self._action_queue = asyncio.Queue()
 
     async def _consume_action(self, action):
