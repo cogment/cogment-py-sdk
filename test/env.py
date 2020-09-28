@@ -50,10 +50,10 @@ async def main():
     server = cogment.Server(cog_project=cog_settings, port=9001)
 
     server.register_environment(
-        impl=my_environment, impl_name="release", env_class="dummy")
+        impl=my_environment, impl_name="release")
 
     server.register_environment(
-        impl=my_environment, impl_name="debug", env_class="dummy")
+        impl=my_environment, impl_name="debug")
 
     await server.run()
 

@@ -1,7 +1,8 @@
 import grpc
 
-from cogment.api.orchestrator_pb2_grpc import AgentEndpointServicer, TrialStartRequest
-
+from cogment.api.orchestrator_pb2_grpc import TrialLifecycleStub, ActorEndpointStub
+from cogment.api.orchestrator_pb2 import TrialStartRequest
+from cogment.trial import TrialLifecycle
 
 class Connection:
     def __init__(self, cog_project, endpoint):
@@ -14,13 +15,13 @@ class Connection:
 
     async def start_trial(self, trial_config, user_id):
         req = TrialStartRequest()
-        # TrialStartRequest req
-        req.config.data = trial_config.SerializeToString()
+        req.config.content = trial_config.SerializeToString()
         req.user_id = user_id
 
         rep = await self.__lifecycle_stub.StartTrial(req)
 
-        return TrialLifecycle(rep.trial_id, rep.actor_class_idx, rep.actor_names)
+        return TrialLifecycle(rep.trial_id, self.cog_project, rep.actors_in_trial)
+
 
     def join_trial(self, trial_id, actor_id, actor_class, impl):
         pass

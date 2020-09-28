@@ -1,14 +1,6 @@
 import asyncio
 import importlib
 
-
-class EnvClass:
-
-    def __init__(self, id_, config_type):
-        self.id_ = id_
-        self.config_type = config_type
-
-
 class Env:
     # def __init__(self, actor_id, trial):
 
@@ -27,8 +19,7 @@ class Env:
 class EnvironmentSession:
     """This represents the environment being performed locally."""
 
-    def __init__(self, impl, actor_class, trial, impl_name):
-        self.actor_class = actor_class
+    def __init__(self, impl, trial, impl_name):
         self.trial = trial
         self.end_trial = False
         self.impl_name = impl_name
@@ -93,8 +84,8 @@ class EnvironmentSession:
 class _ServedEnvironmentSession(EnvironmentSession):
     """An environment session that is served from an environment service."""
 
-    def __init__(self, impl, env_class, trial, impl_name):
-        super().__init__(impl, env_class, trial, impl_name)
+    def __init__(self, impl, trial, impl_name):
+        super().__init__(impl, trial, impl_name)
         self._obs_queue = asyncio.Queue()
 
     # maybe needs to be consume observation

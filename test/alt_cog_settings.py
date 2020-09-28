@@ -34,11 +34,6 @@ actor_classes = _cog.ActorClassList(
     _goober_class,
 )
 
-env_class = _cog.EnvClass(
-    id_='env',
-    config_type=None,
-)
-
 trial = SimpleNamespace(
     config_type=data_pb.TrialConfig,
 )

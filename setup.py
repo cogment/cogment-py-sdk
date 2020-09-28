@@ -28,6 +28,7 @@ class BuildProtos(Command):
         pass
 
     def run(self):
+        print("******************** building protos...")
         # due to limitations of the proto generator, we require that only *one*
         # directory is provided as an 'include' directory. We assume it's the '' key
         # to `self.distribution.package_dir` (and get a key error if it's not

@@ -5,7 +5,7 @@ from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer
 
 from cogment.api.environment_pb2 import (EnvStartRequest, EnvStartReply,
                                          EnvUpdateReply, EnvEndReply, ObservationSet, EnvOnMessageReply)
-from cogment.api.common_pb2 import Feedback, ObservationData
+from cogment.api.common_pb2 import Feedback, ObservationData, Observation
 from cogment.utils import list_versions
 
 from types import SimpleNamespace, ModuleType
@@ -32,7 +32,9 @@ def new_actions_table(settings, trial):
     return actions_by_actor_class, actions_by_actor_id
 
 
-def pack_observations(env_session, observations, reply):
+def pack_observations(env_session, observations, reply, tick_id):
+    timestamp = int(time() * 1000000000)
+    
     new_obs = [None] * len(env_session.trial.actors)
 
     for tgt, obs in observations:
@@ -70,28 +72,20 @@ def pack_observations(env_session, observations, reply):
         if obs_key is None:
             obs_key = len(reply.observation_set.observations)
 
-            reply.observation_set.observations.append(ObservationData(
+            observation_data = ObservationData(
                 content=new_obs[actor_index].SerializeToString(),
                 snapshot=snapshots[actor_index]
+            )
+
+            reply.observation_set.observations.append(Observation(
+                tick_id=tick_id,
+                timestamp=timestamp,
+                data=observation_data
             ))
 
             seen_observations[obs_id] = obs_key
 
         reply.observation_set.actors_map.append(obs_key)
-
-
-async def write_initial_observations(context, env_session):
-    observations = await env_session._obs_queue.get()
-
-    reply = EnvStartReply()
-    reply.observation_set.tick_id = 0
-
-    pack_observations(env_session, observations, reply)
-
-    reply.observation_set.timestamp = int(time() * 1000000000)
-
-    await context.write(reply)
-
 
 async def write_observations(context, env_session):
     while True:
@@ -103,11 +97,7 @@ async def write_observations(context, env_session):
         reply.messages.extend(env_session.trial._gather_all_messages(-1))
 
         reply.end_trial = env_session.end_trial
-        reply.observation_set.tick_id = env_session.trial.tick_id
-
-        pack_observations(env_session, observations, reply)
-
-        reply.observation_set.timestamp = int(time() * 1000000000)
+        pack_observations(env_session, observations, reply, env_session.trial.tick_id)
 
         await context.write(reply)
 
@@ -154,11 +144,13 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         trial_id = metadata["trial-id"]
         key = trial_id
 
-        if request.impl_name not in self.__impls:
-            raise InvalidRequestError(message=f"Unknown agent impl: {request.impl_name}", request=request)
-        impl = self.__impls[request.impl_name]
+        target_impl = request.impl_name
+        if not target_impl:
+            target_impl = "default"
 
-        env_class = self.__cog_project.env_class
+        if target_impl not in self.__impls:
+            raise InvalidRequestError(message=f"Unknown env impl: {target_impl}", request=request)
+        impl = self.__impls[target_impl]
 
         if key in self.__env_sessions:
             raise InvalidRequestError(
@@ -188,8 +180,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         trial.actions = actions_by_actor_class
         trial.actions_by_actor_id = actions_by_actor_id
 
-        new_session = _ServedEnvironmentSession(
-            impl.impl, env_class, trial, request.impl_name)
+        new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl)
         self.__env_sessions[key] = new_session
 
         env_session = self.__env_sessions[key]
@@ -197,7 +188,12 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        await write_initial_observations(context, env_session)
+        observations = await env_session._obs_queue.get()
+
+        reply = EnvStartReply()
+        pack_observations(env_session, observations, reply, 0)
+
+        return reply
 
     async def Update(self, request_iterator, context):
 

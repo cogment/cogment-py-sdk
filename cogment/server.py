@@ -9,7 +9,7 @@ import grpc.experimental.aio
 from prometheus_client import start_http_server
 
 from cogment.actor import ActorSession, ActorClass
-from cogment.environment import EnvironmentSession, EnvClass
+from cogment.environment import EnvironmentSession
 from cogment.trial import Trial
 
 # Agent
@@ -86,13 +86,11 @@ class Server:
 
     def register_environment(self,
                              impl: Callable[[EnvironmentSession, Trial], Awaitable[None]],
-                             impl_name: str,
-                             env_class: EnvClass):
+                             impl_name: str = "default"):
         assert impl_name not in self.__env_impls
         assert self.__grpc_server is None
 
-        self.__env_impls[impl_name] = SimpleNamespace(impl=impl,
-                                                      env_class=env_class)
+        self.__env_impls[impl_name] = SimpleNamespace(impl=impl)
 
     def register_prehook(self,
                          impl: Callable[[SimpleNamespace], Awaitable[SimpleNamespace]]):

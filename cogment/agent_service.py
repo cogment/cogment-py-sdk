@@ -31,14 +31,16 @@ def _impl_can_serve_actor_class(impl, actor_class):
 
 
 async def read_observations(request_iterator, agent_session):
+    print("read_observations begin")
     async for request in request_iterator:
+        print("request: ", _new_observation)
         obs = DecodeObservationData(
             agent_session.actor_class,
             request.observation.data,
             agent_session.latest_observation
         )
         agent_session._new_observation(obs, request.final)
-
+    print("read_observations end")
 
 async def write_actions(context, agent_session):
     while True:
@@ -133,6 +135,8 @@ class AgentServicer(AgentEndpointServicer):
         return AgentEndReply()
 
     async def Decide(self, request_iterator, context):
+        print("Decide")
+        await context.send_initial_metadata([])
         metadata = dict(context.invocation_metadata())
         key = _trial_key(metadata["trial-id"],
                          metadata["actor-id"])
@@ -147,6 +151,8 @@ class AgentServicer(AgentEndpointServicer):
                 write_actions(context, agent_session))
 
             await agent_session._task
+
+            print("agent task terminating")
 
             reader_task.cancel()
             writer_task.cancel()
