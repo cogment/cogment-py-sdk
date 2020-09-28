@@ -87,10 +87,7 @@ class Trial:
 
             for fb in a_fb:
                 re = Feedback(
-                    actor_id=actor_index,
-                    tick_id=fb[0],
-                    value=fb[1],
-                    confidence=fb[2]
+                    actor_id=actor_index, tick_id=fb[0], value=fb[1], confidence=fb[2]
                 )
                 if fb[3] is not None:
                     re.content = fb[3].SerializeToString()
@@ -107,10 +104,7 @@ class Trial:
             actor._message = []
 
             for msg in a_msg:
-                re = Message(
-                    sender_id=source_id,
-                    receiver_id=actor_index
-                )
+                re = Message(sender_id=source_id, receiver_id=actor_index)
                 if msg is not None:
                     re.payload.Pack(msg)
                 yield re
@@ -118,10 +112,7 @@ class Trial:
         e_msg = self.env._message
         self.env._message = []
         for msg in e_msg:
-            re = Message(
-                sender_id=source_id,
-                receiver_id=-1
-            )
+            re = Message(sender_id=source_id, receiver_id=-1)
 
             if msg is not None:
                 re.payload.Pack(msg)
@@ -130,6 +121,6 @@ class Trial:
 
 # A trial, from the perspective of the lifetime manager
 class TrialLifecycle(Trial):
-    def __init__(self, id_, cog_project, trial_config, actor_class_idx, actor_names):
+    def __init__(self, id_, cog_project, trial_config, actors_in_trial):
         super().__init__(id_, cog_project, trial_config)
-        self._add_actors(actor_class_idx, actor_names)
+        self._add_actors(actors_in_trial)

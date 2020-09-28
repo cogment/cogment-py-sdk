@@ -1,4 +1,4 @@
-FROM python:3.8.3-slim-buster
+FROM python:3.7-slim
 
 RUN apt-get update && apt-get install -y curl build-essential
 
@@ -22,3 +22,5 @@ RUN poetry install --no-root
 COPY . ./
 # Install the cogment-py-sdk package
 RUN poetry install
+
+WORKDIR /app

@@ -16,13 +16,6 @@ import asyncio
 import importlib
 
 
-class EnvClass:
-
-    def __init__(self, id_, config_type):
-        self.id_ = id_
-        self.config_type = config_type
-
-
 class Env:
     # def __init__(self, actor_id, trial):
 
@@ -41,8 +34,7 @@ class Env:
 class EnvironmentSession:
     """This represents the environment being performed locally."""
 
-    def __init__(self, impl, actor_class, trial, impl_name):
-        self.actor_class = actor_class
+    def __init__(self, impl, trial, impl_name):
         self.trial = trial
         self.end_trial = False
         self.impl_name = impl_name
@@ -58,25 +50,32 @@ class EnvironmentSession:
         self.__impl = impl
         self.__started = False
         self.__actions_future = None
+        self._ignore_incoming_actions = False
 
-    async def start(self, observations):
+    def start(self, observations):
         assert not self.__started
         self.__started = True
 
-        await self._consume_obs(observations)
+        self._consume_obs(observations, False)
 
-    async def update(self, observations):
-
+    async def gather_actions(self):
         assert self.__started
 
+        if self.latest_actions:
+            result = self.latest_actions
+            self.latest_actions = None
+            return result
+
         self.__actions_future = asyncio.get_running_loop().create_future()
-
-        await self._consume_obs(observations)
-
         return await self.__actions_future
 
-    async def end(self):
+    def produce_observations(self, observations):
+        assert self.__started
+        self._consume_obs(observations, False)
+
+    def end(self, final_observations):
         self.end_trial = True
+        self._consume_obs(final_observations, True)
         if self.on_trial_over:
             self.on_trial_over()
 
@@ -88,13 +87,15 @@ class EnvironmentSession:
 
         if self.__actions_future:
             self.__actions_future.set_result(actions)
+            self.__actions_future = None
 
     def _new_message(self, message):
         self.latest_message = message
 
-        class_type = message.payload.type_url.split('.')
-        user_data = getattr(importlib.import_module(
-            self.trial.cog_project.protolib), class_type[-1])()
+        class_type = message.payload.type_url.split(".")
+        user_data = getattr(
+            importlib.import_module(self.trial.cog_project.protolib), class_type[-1]
+        )()
         message.payload.Unpack(user_data)
 
         if self.on_message:
@@ -107,10 +108,10 @@ class EnvironmentSession:
 class _ServedEnvironmentSession(EnvironmentSession):
     """An environment session that is served from an environment service."""
 
-    def __init__(self, impl, env_class, trial, impl_name):
-        super().__init__(impl, env_class, trial, impl_name)
+    def __init__(self, impl, trial, impl_name):
+        super().__init__(impl, trial, impl_name)
         self._obs_queue = asyncio.Queue()
 
     # maybe needs to be consume observation
-    async def _consume_obs(self, observations):
-        await self._obs_queue.put(observations)
+    def _consume_obs(self, observations, final):
+        self._obs_queue.put_nowait((observations, final))

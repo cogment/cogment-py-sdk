@@ -20,8 +20,8 @@
 
 from cogment.version import __version__
 
+from cogment.client import Connection
 from cogment.server import Server
 from cogment.actor import ActorClass, ActorClassList
-from cogment.environment import EnvClass
 import cogment.delta_encoding
 from cogment.utils import DecodeData

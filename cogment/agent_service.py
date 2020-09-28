@@ -49,13 +49,15 @@ def _impl_can_serve_actor_class(impl, actor_class):
     return impl.actor_class == "*" or impl.actor_class == actor_class.id_
 
 
-async def read_observations(request_iterator, agent_session):
-    async for request in request_iterator:
+async def read_observations(context, agent_session):
+    while True:
+        request = await context.read()
         obs = DecodeObservationData(
             agent_session.actor_class,
             request.observation.data,
             agent_session.latest_observation,
         )
+        print(request)
         agent_session._new_observation(obs, request.final)
 
 
@@ -168,20 +170,22 @@ class AgentServicer(AgentEndpointServicer):
     async def Decide(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
         key = _trial_key(metadata["trial-id"], metadata["actor-id"])
+
         agent_session = self.__agent_sessions[key]
 
         with self.DECIDE_REQUEST_TIME.labels(agent_session.name).time():
-
             loop = asyncio.get_running_loop()
-            reader_task = loop.create_task(
-                read_observations(request_iterator, agent_session)
-            )
+
+            reader_task = loop.create_task(read_observations(context, agent_session))
             writer_task = loop.create_task(write_actions(context, agent_session))
 
             await agent_session._task
 
+            print("actor main task over")
             reader_task.cancel()
             writer_task.cancel()
+
+            del self.__agent_sessions[key]
 
     async def Reward(self, request, context):
         metadata = dict(context.invocation_metadata())

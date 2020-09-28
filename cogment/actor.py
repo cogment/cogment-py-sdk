@@ -118,8 +118,6 @@ class ActorSession:
         self.__obs_future = asyncio.get_running_loop().create_future()
         await self._consume_action(action)
 
-        # Wait until the next observation is available
-        #
         return await self.__obs_future
 
     def do_action_nowait(self, action):
