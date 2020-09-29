@@ -67,8 +67,8 @@ setup(name='cogment',
       include_package_data=True,
       tests_require=['pytest'],
       install_requires=[
-          'grpcio>=1.19',
-          'grpcio-reflection>=1.19',
+          'grpcio==1.30.0',
+          'grpcio-reflection==1.30.0',
           'protobuf>=3.7',
           'prometheus_client'
       ],

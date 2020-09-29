@@ -10,6 +10,7 @@ from cogment.utils import list_versions
 
 from types import SimpleNamespace, ModuleType
 from typing import Any, Dict, Tuple
+import grpc.experimental.aio
 
 from cogment.environment import _ServedEnvironmentSession
 
@@ -89,23 +90,35 @@ def pack_observations(env_session, observations, reply, tick_id):
 
 async def write_observations(context, env_session):
     while True:
-        observations = await env_session._obs_queue.get()
+        observations, final = await env_session._obs_queue.get()
 
-        reply = EnvUpdateReply()
+        reply = EnvUpdateReply(end_trial=final)
 
         reply.feedbacks.extend(env_session.trial._gather_all_feedback())
         reply.messages.extend(env_session.trial._gather_all_messages(-1))
 
-        reply.end_trial = env_session.end_trial
         pack_observations(env_session, observations, reply, env_session.trial.tick_id)
 
         await context.write(reply)
 
+        if final:
+            break
 
-async def read_actions(request_iterator, env_session):
-    async for request in request_iterator:
+
+async def read_actions(context, env_session):
+    while True:
+        request = await context.read()
+
+        if request == grpc.experimental.aio.EOF:
+            break
+
+        if env_session._ignore_incoming_actions:
+            # This is just leftover inflight actions after the trial has ended. 
+            continue
+
         len_actions = len(request.action_set.actions)
         len_actors = len(env_session.trial.actions_by_actor_id)
+
         if len_actions != len_actors:
             raise Exception(f"Received {len_actions} actions but have {len_actors} actors")
 
@@ -188,7 +201,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        observations = await env_session._obs_queue.get()
+        observations, final = await env_session._obs_queue.get()
 
         reply = EnvStartReply()
         pack_observations(env_session, observations, reply, 0)
@@ -207,16 +220,28 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
             env_session.trial.tick_id += 1
 
+            # We are going to have three concurrent coroutines:
+            # - One that reads actions from the orchestrator
+            # - One that sends observations to the orchestrator
+            # - The environment's main (which will be the current coroutine)
             loop = asyncio.get_running_loop()
             reader_task = loop.create_task(
-                read_actions(request_iterator, env_session))
+                read_actions(context, env_session))
             writer_task = loop.create_task(
                 write_observations(context, env_session))
 
             await env_session._task
+            
+            if not env_session.end_trial:
+                del self.__env_sessions[key]
+                raise Exception("Trial was never ended")
 
-            reader_task.cancel()
-            writer_task.cancel()
+            env_session._ignore_incoming_actions = True
+
+            await writer_task
+            await reader_task
+
+            del self.__env_sessions[key]
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())

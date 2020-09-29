@@ -85,7 +85,6 @@ class ActorSession:
         if self.latest_observation:
             return self.latest_observation
 
-        print("Waiting for initial observation")
         # Wait until the initial observation is available
         self.__obs_future = asyncio.get_running_loop().create_future()
         return await self.__obs_future
@@ -113,7 +112,6 @@ class ActorSession:
         self._consume_action(action)
 
     def _new_observation(self, obs, final):
-        print("_new_observation")
         self.trial.over = final
 
         self.latest_observation = obs

@@ -35,25 +35,32 @@ class EnvironmentSession:
         self.__impl = impl
         self.__started = False
         self.__actions_future = None
+        self._ignore_incoming_actions = False
 
-    async def start(self, observations):
+    def start(self, observations):
         assert not self.__started
         self.__started = True
 
-        await self._consume_obs(observations)
+        self._consume_obs(observations, False)
 
-    async def update(self, observations):
-
+    async def gather_actions(self):
         assert self.__started
 
+        if self.latest_actions:
+            result = self.latest_actions
+            self.latest_actions = None
+            return result
+        
         self.__actions_future = asyncio.get_running_loop().create_future()
-
-        await self._consume_obs(observations)
-
         return await self.__actions_future
 
-    async def end(self):
+    def produce_observations(self, observations):
+        assert self.__started
+        self._consume_obs(observations, False)
+
+    def end(self, final_observations):
         self.end_trial = True
+        self._consume_obs(final_observations, True)
         if self.on_trial_over:
             self.on_trial_over()
 
@@ -65,6 +72,7 @@ class EnvironmentSession:
 
         if self.__actions_future:
             self.__actions_future.set_result(actions)
+            self.__actions_future = None
 
     def _new_message(self, message):
         self.latest_message = message
@@ -89,5 +97,5 @@ class _ServedEnvironmentSession(EnvironmentSession):
         self._obs_queue = asyncio.Queue()
 
     # maybe needs to be consume observation
-    async def _consume_obs(self, observations):
-        await self._obs_queue.put(observations)
+    def _consume_obs(self, observations, final):
+        self._obs_queue.put_nowait((observations, final))
