@@ -35,7 +35,7 @@ def new_actions_table(settings, trial):
 
 def pack_observations(env_session, observations, reply, tick_id):
     timestamp = int(time() * 1000000000)
-    
+
     new_obs = [None] * len(env_session.trial.actors)
 
     for tgt, obs in observations:
@@ -88,6 +88,7 @@ def pack_observations(env_session, observations, reply, tick_id):
 
         reply.observation_set.actors_map.append(obs_key)
 
+
 async def write_observations(context, env_session):
     while True:
         observations, final = await env_session._obs_queue.get()
@@ -97,7 +98,8 @@ async def write_observations(context, env_session):
         reply.feedbacks.extend(env_session.trial._gather_all_feedback())
         reply.messages.extend(env_session.trial._gather_all_messages(-1))
 
-        pack_observations(env_session, observations, reply, env_session.trial.tick_id)
+        pack_observations(env_session, observations,
+                          reply, env_session.trial.tick_id)
 
         await context.write(reply)
 
@@ -113,7 +115,7 @@ async def read_actions(context, env_session):
             break
 
         if env_session._ignore_incoming_actions:
-            # This is just leftover inflight actions after the trial has ended. 
+            # This is just leftover inflight actions after the trial has ended.
             continue
 
         len_actions = len(request.action_set.actions)
@@ -231,7 +233,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 write_observations(context, env_session))
 
             await env_session._task
-            
+
             if not env_session.end_trial:
                 del self.__env_sessions[key]
                 raise Exception("Trial was never ended")

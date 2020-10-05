@@ -118,6 +118,11 @@ class Trial:
 # A trial, from the perspective of the lifetime manager
 class TrialLifecycle(Trial):
 
-    def __init__(self, id_, cog_project, trial_config, actors_in_trial):
-        super().__init__(id_, cog_project, trial_config)
+    # trial config added for now
+    def __init__(self, id_, trial_config, actors_in_trial, conn):
+        super().__init__(id_, conn.cog_project, trial_config)
         self._add_actors(actors_in_trial)
+        self._conn = conn
+
+    async def terminate(self):
+        await self._conn.terminate(trial_id=self.id_)

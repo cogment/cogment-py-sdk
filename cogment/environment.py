@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 
+
 class Env:
     # def __init__(self, actor_id, trial):
 
@@ -50,7 +51,7 @@ class EnvironmentSession:
             result = self.latest_actions
             self.latest_actions = None
             return result
-        
+
         self.__actions_future = asyncio.get_running_loop().create_future()
         return await self.__actions_future
 

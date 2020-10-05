@@ -40,7 +40,8 @@ async def read_observations(context, agent_session):
         )
         print(request)
         agent_session._new_observation(obs, request.final)
- 
+
+
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
@@ -153,7 +154,6 @@ class AgentServicer(AgentEndpointServicer):
             print("actor main task over")
             reader_task.cancel()
             writer_task.cancel()
-
 
             del self.__agent_sessions[key]
 
