@@ -117,7 +117,8 @@ async def write_observations(context, env_session):
         reply.feedbacks.extend(env_session.trial._gather_all_feedback())
         reply.messages.extend(env_session.trial._gather_all_messages(-1))
 
-        pack_observations(env_session, observations, reply, env_session.trial.tick_id)
+        pack_observations(env_session, observations,
+                          reply, env_session.trial.tick_id)
 
         await context.write(reply)
 
