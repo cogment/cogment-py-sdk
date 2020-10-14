@@ -54,7 +54,8 @@ async def read_observations(client_session, actor_stub):
 async def write_actions(client_session, actor_stub, actor_id):
     while True:
 
-        action_conn = actor_stub.ActionStream()
+        action_conn = actor_stub.ActionStream(
+            metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
 
         act = await client_session._action_queue.get()
         action_req = TrialActionRequest()
@@ -64,12 +65,14 @@ async def write_actions(client_session, actor_stub, actor_id):
         feedback_req = TrialFeedbackRequest()
         feedback_req.feedbacks.extend(
             client_session.trial._gather_all_feedback())
-        await actor_stub.GiveFeedback(feedback_req)
+        await actor_stub.GiveFeedback(feedback_req,
+                                      metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
 
         message_req = TrialMessageRequest()
         message_req.messages.extend(
             client_session.trial._gather_all_messages(actor_id))
-        await actor_stub.SendChanMessage(message_req)
+        await actor_stub.SendChanMessage(message_req,
+                                         metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
 
 
 class Connection:
