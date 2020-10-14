@@ -29,6 +29,13 @@ async def read_observations(client_session, actor_stub):
 
         client_session._new_observation(obs, request.trial_is_over)
 
+        if request.messages:
+            for message in request.messages:
+                client_session._new_message(message)
+
+        if request.reward:
+            client_session._new_reward(request.reward)
+
 
 async def write_actions(client_session, actor_stub, actor_id):
     while True:

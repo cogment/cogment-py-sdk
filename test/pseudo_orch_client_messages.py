@@ -1,7 +1,7 @@
 import grpc
 from cogment.api.orchestrator_pb2 import TrialStartReply, TrialJoinReply, TrialActionReply, TrialFeedbackReply, TrialMessageReply
 from cogment.api.orchestrator_pb2_grpc import TrialLifecycleServicer, ActorEndpointServicer, add_TrialLifecycleServicer_to_server, add_ActorEndpointServicer_to_server
-from cogment.api.common_pb2 import TrialActor, Observation
+from cogment.api.common_pb2 import TrialActor, Observation, Message
 import data_pb2
 import time
 import grpc.experimental.aio
@@ -9,15 +9,18 @@ import asyncio
 # from queue import Queue
 
 
-def fill_reply(val, trial_is_over=False):
+def fill_reply(val, trial_is_over=False, msg=None):
     obs = data_pb2.Observation(value=val)
     req = TrialActionReply()
     req.observation.data.snapshot = True
     req.observation.data.content = obs.SerializeToString()
     req.observation.tick_id = 12
-
     req.trial_is_over = trial_is_over
+    if msg:
+        req.messages.extend(msg)
+
     return req
+
 
 class TrialLifecycle(TrialLifecycleServicer):
 
@@ -57,9 +60,28 @@ class ActorEndpoint(ActorEndpointServicer):
     async def ActionStream(self, request, context):
 
         if self.count >= 3:
-            await context.write(fill_reply(51 + self.count, True))
+            await context.write(fill_reply(51 + self.count, True, None))
         else:
-            await context.write(fill_reply(51 + self.count))
+            msg_list = []
+
+            msg_test = data_pb2.MessageTest(name='test msg 1')
+            msg = Message(
+                sender_id=0,
+                receiver_id=2
+            )
+            msg.payload.Pack(msg_test)
+            msg_list.append(msg)
+
+            msg_test = data_pb2.MessageTest(name='test msg 2')
+            msg = Message(
+                sender_id=1,
+                receiver_id=2
+            )
+            msg.payload.Pack(msg_test)
+            msg_list.append(msg)
+
+            await context.write(fill_reply(51 + self.count, False, msg_list))
+            # await context.write(fill_reply(51 + self.count, False, None))
 
         rec_action = await context.read()
         action = data_pb2.Action()
@@ -68,16 +90,17 @@ class ActorEndpoint(ActorEndpointServicer):
 
         self.count += 1
 
-
     async def GiveFeedback(self, request, context):
 
-        print("Here's the feedback:", request.feedbacks)
+        if request.feedbacks:
+            print("Here's the feedback:", request.feedbacks)
 
         return TrialFeedbackReply()
 
     async def SendChanMessage(self, request, context):
 
-        print("Here's the messages:", request.messages)
+        if request.messages:
+            print("Here's the messages:", request.messages)
 
         return TrialMessageReply()
 

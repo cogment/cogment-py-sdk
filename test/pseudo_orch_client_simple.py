@@ -1,5 +1,5 @@
 import grpc
-from cogment.api.orchestrator_pb2 import TrialStartReply, TrialJoinReply, TrialActionReply, TrialFeedbackReply
+from cogment.api.orchestrator_pb2 import TrialStartReply, TrialJoinReply, TrialActionReply, TrialFeedbackReply, TrialMessageReply
 from cogment.api.orchestrator_pb2_grpc import TrialLifecycleServicer, ActorEndpointServicer, add_TrialLifecycleServicer_to_server, add_ActorEndpointServicer_to_server
 from cogment.api.common_pb2 import TrialActor, Observation
 import data_pb2
@@ -69,12 +69,18 @@ class ActorEndpoint(ActorEndpointServicer):
 
         self.count += 1
 
-
     async def GiveFeedback(self, request, context):
-
-        # print('RRRRRRRRRRR', request.feedbacks)
+        if request.feedbacks:
+            print("Here's the feedback:", request.feedbacks)
 
         return TrialFeedbackReply()
+
+    async def SendChanMessage(self, request, context):
+        if request.messages:
+            print("Here's the messages:", request.messages)
+
+        return TrialMessageReply()
+
 
 async def main():
 

@@ -3,20 +3,27 @@ import cog_settings
 
 import data_pb2
 import asyncio
-import time
 
 async def my_client(actor, trial):
+
+
+    def on_reward(r):
+        print("Bring on the rewards! \n",r)
+
+    actor.on_reward = on_reward
+
+
     observation = await actor.start()
     print(f"First observation from {actor.name} is {observation}")
 
     # while not trial.over:
     for count in range(5):
-        time.sleep(0.5)
         observation = await actor.do_action(data_pb2.Action(value=12 + count))
         print(f"{actor.name} has observed {observation}")
 
         # send feedback here
-        trial.add_feedback(to=['*'],value=77+count,confidence=1)
+        # trial.add_feedback(to=['*'],value=77+count,confidence=1)
+        trial.actors[1].add_feedback(value=72+count,confidence=1)
 
     print(f"{actor.name}'s trial is over...")
 
