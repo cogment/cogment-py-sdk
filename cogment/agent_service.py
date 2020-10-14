@@ -57,7 +57,6 @@ async def read_observations(context, agent_session):
             request.observation.data,
             agent_session.latest_observation,
         )
-        print(request)
         agent_session._new_observation(obs, request.final)
 
 

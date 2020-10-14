@@ -59,15 +59,16 @@ async def main():
             metadata=(("trial-id", "abc"), ("actor-id", "1")),
         )
 
-        await stub.Start(
-            AgentStartRequest(
-                impl_name="blearg",
-                actors_in_trial=[TrialActor(actor_class="player", name="Joe")],
-            ),
-            metadata=(("trial-id", "def"), ("actor-id", "0")),
-        )
+        # await stub.Start(
+        #   AgentStartRequest( 
+        #       impl_name="blearg",
+        #       actors_in_trial=[
+        #         TrialActor(actor_class="player", name="Joe")           
+        #       ]), 
+        #   metadata=(("trial-id", "def"), ("actor-id", "0"))
+        # )
 
-        def0_decide_conn = stub.Decide(metadata=(("trial-id", "def"), ("actor-id", "0")))
+        # def0_decide_conn = stub.Decide(metadata=(("trial-id", "def"), ("actor-id", "0")))
         abc0_decide_conn = stub.Decide(metadata=(("trial-id", "abc"), ("actor-id", "0")))
         abc1_decide_conn = stub.Decide(metadata=(("trial-id", "abc"), ("actor-id", "1")))
 
@@ -106,8 +107,8 @@ async def main():
                 feedback_list1.append(feedback)
                 values1.append(feedback.value)
 
-            print("FFFF0000", feedback_list0) #, 'VVV000', new_value0)
-            print("FFFF1111", feedback_list1) #, 'VVV000', new_value1)
+            # print("FFFF0000", feedback_list0) #, 'VVV000', new_value0)
+            # print("FFFF1111", feedback_list1) #, 'VVV000', new_value1)
 
             if feedback_list0:
                 new_value0 = sum(values0)/float(len(values0))
@@ -142,15 +143,16 @@ async def main():
                   metadata=(("trial-id", "abc"), ("actor-id", "1"))
                 )
 
-
         await abc1_decide_conn.write(make_req(2, True))
         mytest = await abc1_decide_conn.read()
         await abc0_decide_conn.write(make_req(2, True))
         mytest = await abc0_decide_conn.read()
 
 
+
         await abc0_decide_conn.done_writing()
         await abc1_decide_conn.done_writing()
+
  
         end_abc0_conn = stub.End(
             AgentEndRequest(),
@@ -162,15 +164,15 @@ async def main():
             metadata=(("trial-id", "abc"),("actor-id", "1"))
         )
 
-        end_def0_conn = stub.End(
-            AgentEndRequest(),
-            metadata=(("trial-id", "def"),("actor-id", "0"))
-        )
+        # end_def0_conn = stub.End(
+        #     AgentEndRequest(),
+        #     metadata=(("trial-id", "def"),("actor-id", "0"))
+        # )
 
 
         await end_abc0_conn
         await end_abc1_conn
-        await end_def0_conn
+        # await end_def0_conn
 
 
 asyncio.run(main())
