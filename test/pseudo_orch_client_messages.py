@@ -67,7 +67,7 @@ class ActorEndpoint(ActorEndpointServicer):
             msg_test = data_pb2.MessageTest(name='test msg 1')
             msg = Message(
                 sender_id=0,
-                receiver_id=2
+                receiver_id=1
             )
             msg.payload.Pack(msg_test)
             msg_list.append(msg)
@@ -75,7 +75,7 @@ class ActorEndpoint(ActorEndpointServicer):
             msg_test = data_pb2.MessageTest(name='test msg 2')
             msg = Message(
                 sender_id=1,
-                receiver_id=2
+                receiver_id=1
             )
             msg.payload.Pack(msg_test)
             msg_list.append(msg)
