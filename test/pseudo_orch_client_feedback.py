@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import grpc
-from cogment.api.orchestrator_pb2 import TrialStartReply, TrialJoinReply, TrialActionReply, TrialFeedbackReply
+from cogment.api.orchestrator_pb2 import TrialStartReply, TrialJoinReply, TrialActionReply, TrialFeedbackReply, TrialMessageReply
 from cogment.api.orchestrator_pb2_grpc import TrialLifecycleServicer, ActorEndpointServicer, add_TrialLifecycleServicer_to_server, add_ActorEndpointServicer_to_server
 from cogment.api.common_pb2 import TrialActor, Observation
+from cogment.api.agent_pb2 import Reward
 import data_pb2
 import time
 import grpc.experimental.aio
@@ -23,7 +24,7 @@ import asyncio
 # from queue import Queue
 
 
-def fill_reply(val, trial_is_over=False):
+def fill_reply(val, trial_is_over=False, reward = None):
     obs = data_pb2.Observation(value=val)
     req = TrialActionReply()
     req.observation.data.snapshot = True
@@ -31,6 +32,10 @@ def fill_reply(val, trial_is_over=False):
     req.observation.tick_id = 12
 
     req.trial_is_over = trial_is_over
+
+    if reward:
+        req.reward.CopyFrom(reward)
+
     return req
 
 class TrialLifecycle(TrialLifecycleServicer):
@@ -71,9 +76,15 @@ class ActorEndpoint(ActorEndpointServicer):
     async def ActionStream(self, request, context):
 
         if self.count >= 3:
-            await context.write(fill_reply(51 + self.count, True))
+            await context.write(fill_reply(51 + self.count, True, None))
         else:
-            await context.write(fill_reply(51 + self.count))
+
+            rwd = Reward(value=3.7,
+                confidence=1.0
+                )
+
+
+            await context.write(fill_reply(51 + self.count, False, rwd))
 
         rec_action = await context.read()
         action = data_pb2.Action()
@@ -82,12 +93,17 @@ class ActorEndpoint(ActorEndpointServicer):
 
         self.count += 1
 
-
     async def GiveFeedback(self, request, context):
-
-        print('RRRRRRRRRRR', request.feedbacks)
+        if request.feedbacks:
+            print("Here's the feedback:", request.feedbacks)
 
         return TrialFeedbackReply()
+
+    async def SendChanMessage(self, request, context):
+        if request.messages:
+            print("Here's the messages:", request.messages)
+
+        return TrialMessageReply()
 
 async def main():
 
