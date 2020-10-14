@@ -152,3 +152,14 @@ class _ServedActorSession(ActorSession):
 
     async def _consume_action(self, action):
         await self._action_queue.put(action)
+
+
+class _ClientActorSession(ActorSession):
+    """An actor session that is served from client."""
+
+    def __init__(self, impl, actor_class, trial, name, impl_name):
+        super().__init__(impl, actor_class, trial, name, impl_name)
+        self._action_queue = asyncio.Queue()
+
+    async def _consume_action(self, action):
+        await self._action_queue.put(action)

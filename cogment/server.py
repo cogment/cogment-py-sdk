@@ -105,7 +105,7 @@ class Server:
         self.__datalog_impls = impl
 
     async def run(self):
-        start_http_server(8000)
+        start_http_server(DEFAULT_PROMETHEUS_PORT)
 
         self.__grpc_server = grpc.experimental.aio.server()
 
