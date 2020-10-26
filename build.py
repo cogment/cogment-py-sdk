@@ -19,7 +19,48 @@ from setuptools.command.sdist import sdist as _sdist
 
 from distutils import log
 from string import Template
-from os import path
+from os import path, makedirs
+from datetime import datetime
+from urllib.request import urlretrieve
+from shutil import unpack_archive, rmtree
+
+
+DEFAULT_COGMENT_API_VERSION = "latest"
+
+
+def retrieve_cogment_api(package_dir):
+    cogment_api_version = DEFAULT_COGMENT_API_VERSION
+    try:
+        from yaml import load
+
+        fh = open(path.join(package_dir, ".cogment-api.yml"), "r")
+        cogment_api_version = load(fh).get(
+            "cogment_api_version", DEFAULT_COGMENT_API_VERSION
+        )
+    except Exception as e:
+        pass
+
+    url = "https://cogment.github.io/cogment-api/{cogment_api_version}/cogment-api-{cogment_api_version}.tar.gz".format(
+        cogment_api_version=cogment_api_version
+    )
+    protos_dir = path.join(package_dir, "cogment/api")
+    log.info("downloading the cogment api from '{}' to '{}'".format(url, protos_dir))
+
+    # Download the archive to a temp file, will fail if the version doesn't exist or the network
+    # is down thus keeping what was alredy downloaded.
+    temp_local_filename, _ = urlretrieve(url)
+
+    rmtree(protos_dir, ignore_errors=True)
+
+    makedirs(protos_dir, exist_ok=True)
+
+    unpack_archive(temp_local_filename, protos_dir, "gztar")
+
+    with open(path.join(protos_dir, "cogment-api-retrieval.log"), "wb") as fh:
+        data = "cogment api retrieved from {} at {}".format(url, datetime.now())
+        data = data.encode("utf-8")
+        fh.write(data)
+        fh.close()
 
 
 def build_protos(package_dir):
@@ -43,9 +84,9 @@ def build_version_dot_py(package_dir, version):
         template = Template(fh.read())
 
     data = template.substitute({"version": version})
-    data = data.encode("utf-8")
 
     with open(filename, "wb") as fh:
+        data = data.encode("utf-8")
         fh.write(data)
         fh.close()
 
@@ -54,9 +95,10 @@ class sdist(_sdist):
     def run(self):
         # honor the --dry-run flag
         if not self.dry_run:
+            package_dir = path.abspath(self.distribution.package_dir[""])
+            retrieve_cogment_api(package_dir)
             build_version_dot_py(
-                path.abspath(self.distribution.package_dir[""]),
-                self.distribution.get_version(),
+                package_dir, self.distribution.get_version(),
             )
         super().run()
 
@@ -66,17 +108,19 @@ class build_py(_build_py):
         super().run()
         # honor the --dry-run flag
         if not self.dry_run:
-            build_protos(path.abspath(self.build_lib))
+            package_dir = path.abspath(self.build_lib)
+            build_protos(package_dir)
 
 
 class develop(_develop):
     def run(self):
         # honor the --dry-run flag
         if not self.dry_run:
-            build_protos(path.abspath(self.distribution.package_dir[""]))
+            package_dir = path.abspath(self.distribution.package_dir[""])
+            retrieve_cogment_api(package_dir)
+            build_protos(package_dir)
             build_version_dot_py(
-                path.abspath(self.distribution.package_dir[""]),
-                self.distribution.get_version(),
+                package_dir, self.distribution.get_version(),
             )
         super().run()
 

@@ -7,5 +7,6 @@ eggs/
 build/
 dist
 
-# Generated version file
+# Generated/Downloaded files
 /cogment/version.py
+/cogment/api
