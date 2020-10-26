@@ -1,3 +1,0 @@
-[submodule "cogment/api"]
-	path = cogment/api
-	url = ../cogment-api.git
