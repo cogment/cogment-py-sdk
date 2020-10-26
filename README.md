@@ -10,7 +10,31 @@ For further Cogment information, check out the documentation at <https://docs.co
 
 ## Developers
 
-### Building
+### Testing and building locally
+
+Make sure you have the following installed:
+  - [Python](https://www.python.org) (any version >3.8 should work),
+  - [Poetry](https://python-poetry.org).
+
+Install the dependencies by navigate to the python SDK directory and run the following
+
+```
+poetry install
+```
+
+Run the linter using
+
+```
+poetry run task lint
+```
+
+Build the source package (this step will only be succesfull if `poetry install` succeeded)
+
+```
+poetry build -f sdist
+```
+
+### Building a Docker image
 
 Navigate to the python SDK directory and run the following in order to create an image that can be used by a cogment project:
 

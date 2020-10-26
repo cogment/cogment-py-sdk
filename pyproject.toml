@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "cogment"
+version = "0.3.0-alpha3"
+description = "Cogment python SDK"
+authors = ["Artificial Intelligence Redefined <dev+cogment@ai-r.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://cogment.ai"
+repository = "https://gitlab.com/cogment/cogment"
+# Customized build.py to customize commands.
+build="build.py"
+include = ["./cogment/version.py"]
+exclude = [
+  "./cogment/version.py.in",
+  "./cogment/api/*.py"
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+grpcio = ">=1.19"
+grpcio-reflection = ">=1.19"
+protobuf = ">=3.7"
+
+[tool.poetry.dev-dependencies]
+taskipy = "^1.4.0"
+pycodestyle = "^2.6.0"
+mypy = "^0.790"
+pytest = "^6.1.1"
+
+[tool.taskipy.tasks]
+lint = "task lint_pycodestyle && task lint_mypy"
+lint_pycodestyle = "pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/"
+lint_mypy = "mypy --config-file mypy.ini cogment/"

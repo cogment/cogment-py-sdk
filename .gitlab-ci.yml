@@ -1,11 +1,20 @@
 stages:
   - lint
+  - build
 
-python_lint:
+default:
+  image: python:3.8
+  before_script:
+    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+    - source $HOME/.poetry/env
+    - poetry install
+
+lint:
   stage: lint
-  image: python:3.7
   script:
-    - python setup.py build_py
-    - pip install pycodestyle mypy
-    - pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/
-    - mypy --config-file mypy.ini cogment/
+    - poetry run task lint
+
+test_build:
+  stage: build
+  script:
+    - poetry build -f sdist

@@ -5,3 +5,7 @@ sdist/
 eggs/
 .eggs/
 build/
+dist
+
+# Generated version file
+/cogment/version.py
