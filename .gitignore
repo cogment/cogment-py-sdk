@@ -10,3 +10,6 @@ dist
 # Generated/Downloaded files
 /cogment/version.py
 /cogment/api
+
+# Backup of "sed-ed" files
+*.bak
