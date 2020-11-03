@@ -88,6 +88,9 @@ def pack_observations(env_session, observations, reply, tick_id):
     # dupping time
     seen_observations = {}
 
+    reply.observation_set.tick_id = tick_id
+    reply.observation_set.timestamp = timestamp
+
     for actor_index, actor in enumerate(env_session.trial.actors):
         obs_id = id(new_obs[actor_index])
         obs_key = seen_observations.get(obs_id)
@@ -99,9 +102,7 @@ def pack_observations(env_session, observations, reply, tick_id):
                 snapshot=snapshots[actor_index],
             )
 
-            reply.observation_set.observations.append(
-                Observation(tick_id=tick_id, timestamp=timestamp, data=observation_data)
-            )
+            reply.observation_set.observations.append(observation_data)
 
             seen_observations[obs_id] = obs_key
 
