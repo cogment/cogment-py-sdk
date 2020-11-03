@@ -1,3 +1,0 @@
-export CSV_FILENAME="test_csv.csv"
-export POSTGRES_ENGINE="postgres://postgres:postgres@192.168.2.15:5432/postgres"
-export POSTGRES_TABLENAME="test"
