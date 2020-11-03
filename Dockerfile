@@ -15,12 +15,10 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 # Download and install poetry
 RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
 
-WORKDIR /app/cogment-py-sdk
+WORKDIR /cogment-py-sdk
 COPY pyproject.toml poetry.lock ./
 # Install dependencies
 RUN poetry install --no-root
 COPY . ./
 # Install the cogment-py-sdk package
 RUN poetry install
-
-WORKDIR /app
