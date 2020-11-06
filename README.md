@@ -36,7 +36,13 @@ poetry build -f sdist
 
 ### Used Cogment protobuf API
 
-The version of the used cogment protobuf API is defined in the `.cogment-api.yml` file at the root of the repository.
+The version of the used cogment protobuf API is defined in the `.cogment-api.yaml` file at the root of the repository. The following can be defined:
+
+- `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
+- `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
+- `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
+
+> ⚠️ when building a docker image, `cogment_api_path` needs to exists in the docker file system. In practice it means it should be a subdirectory of the current directory.
 
 ### Building a Docker image
 

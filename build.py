@@ -22,55 +22,69 @@ from string import Template
 from os import path, makedirs
 from datetime import datetime
 from urllib.request import urlretrieve
-from shutil import unpack_archive, rmtree
+from shutil import unpack_archive, rmtree, copytree
 
 
 DEFAULT_COGMENT_API_VERSION = "latest"
 
 
 def retrieve_cogment_api(package_dir):
+    from yaml import load
+
     cogment_api_version = DEFAULT_COGMENT_API_VERSION
-    try:
-        from yaml import load
+    cogment_api_path = None
+    # In a lot of context the logs are not displayed,
+    # putting everything in a string to be able to create a file output
+    retrieve_cogment_api_logs = ""
 
-        fh = open(path.join(package_dir, ".cogment-api.yml"), "r")
-        cogment_api_version = load(fh).get(
-            "cogment_api_version", DEFAULT_COGMENT_API_VERSION
-        )
-    except Exception as e:
-        pass
+    fh = open(path.join(package_dir, ".cogment-api.yaml"), "r")
+    cogment_api_cfg = load(fh)
 
-    url = "https://cogment.github.io/cogment-api/{cogment_api_version}/cogment-api-{cogment_api_version}.tar.gz".format(
-        cogment_api_version=cogment_api_version
+    cogment_api_version = cogment_api_cfg.get(
+        "cogment_api_version", DEFAULT_COGMENT_API_VERSION
     )
+    cogment_api_path = cogment_api_cfg.get("cogment_api_path")
+
     protos_dir = path.join(package_dir, "cogment/api")
-    log.info("downloading the cogment api from '{}' to '{}'".format(url, protos_dir))
-
-    # Download the archive to a temp file, will fail if the version doesn't exist or the network
-    # is down thus keeping what was alredy downloaded.
-    temp_local_filename, _ = urlretrieve(url)
-
     rmtree(protos_dir, ignore_errors=True)
-
     makedirs(protos_dir, exist_ok=True)
 
-    unpack_archive(temp_local_filename, protos_dir, "gztar")
+    if cogment_api_path:
+        cogment_api_absolute_path = path.normpath(
+            path.join(package_dir, cogment_api_path)
+        )
+        copytree(cogment_api_absolute_path, protos_dir, dirs_exist_ok=True)
+        retrieve_cogment_api_logs += (
+            f"cogment api copied from '{cogment_api_absolute_path}'\n"
+        )
+    else:
+        url = "https://cogment.github.io/cogment-api/{cogment_api_version}/cogment-api-{cogment_api_version}.tar.gz".format(
+            cogment_api_version=cogment_api_version
+        )
 
+        # Download the archive to a temp file, will fail if the version doesn't exist
+        # or if the network is down thus keeping what was alredy downloaded.
+        temp_local_filename, _ = urlretrieve(url)
+
+        rmtree(protos_dir, ignore_errors=True)
+
+        makedirs(protos_dir, exist_ok=True)
+
+        unpack_archive(temp_local_filename, protos_dir, "gztar")
+
+        retrieve_cogment_api_logs += (
+            f"cogment api version '{cogment_api_version}', downloaded from '{url}'\n"
+        )
+
+    log.info(retrieve_cogment_api_logs)
     with open(path.join(protos_dir, "cogment-api-retrieval.log"), "wb") as fh:
-        data = "cogment api retrieved from {} at {}".format(url, datetime.now())
-        data = data.encode("utf-8")
-        fh.write(data)
-        fh.close()
+        fh.write(retrieve_cogment_api_logs.encode("utf-8"))
 
 
 def build_protos(package_dir):
     from grpc.tools import command
 
-    log.info(
-        "generating python implementation of the proto files in '{}'".format(
-            package_dir
-        )
-    )
+    log.info(f"generating python implementation of the proto files in '{package_dir}'")
     command.build_package_protos(package_dir)
 
 
@@ -78,7 +92,7 @@ def build_version_dot_py(package_dir, version):
     template_filename = path.join(package_dir, "cogment/version.py.in")
     filename = path.join(package_dir, "cogment/version.py")
 
-    log.info("generating version specification file at '{}'".format(filename))
+    log.info(f"generating version specification file at '{filename}'")
 
     with open(template_filename, "r") as fh:
         template = Template(fh.read())
