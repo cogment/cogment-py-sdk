@@ -28,51 +28,30 @@ from cogment.api.common_pb2 import TrialActor
 import asyncio
 
 
-async def read_observations(client_session, actor_stub):
+async def read_observations(client_session, action_conn):
     while True:
-
-        action_conn = actor_stub.ActionStream()
-
         request = await action_conn.read()
-
         obs = DecodeObservationData(
             client_session.actor_class,
             request.observation.data,
             client_session.latest_observation
         )
-
-        client_session._new_observation(obs, request.trial_is_over)
+        client_session._new_observation(obs, request.final)
 
         if request.messages:
             for message in request.messages:
                 client_session._new_message(message)
 
-        if request.reward:
-            client_session._new_reward(request.reward)
+        if request.feedbacks:
+            client_session._new_reward(request.feedbacks)
 
 
-async def write_actions(client_session, actor_stub, actor_id):
+async def write_actions(client_session, action_conn, actor_stub, actor_id):
     while True:
-
-        action_conn = actor_stub.ActionStream(
-            metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
-
         act = await client_session._action_queue.get()
         action_req = TrialActionRequest()
         action_req.action.content = act.SerializeToString()
         await action_conn.write(action_req)
-
-        feedback_req = TrialFeedbackRequest()
-        feedback_req.feedbacks.extend(
-            client_session.trial._gather_all_feedback())
-        await actor_stub.GiveFeedback(feedback_req,
-                                      metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
-
-        message_req = TrialMessageRequest()
-        message_req.messages.extend(
-            client_session.trial._gather_all_messages(actor_id))
-        await actor_stub.SendChanMessage(message_req,
-                                         metadata=(("trial-id", client_session.trial.id_), ("actor-id", str(actor_id))))
 
 
 class Connection:
@@ -90,7 +69,6 @@ class Connection:
         req.user_id = user_id
 
         rep = await self.__lifecycle_stub.StartTrial(req)
-
         # added trial_config to following and in trial.py TrialLifecycle
         return TrialLifecycle(rep.trial_id, trial_config, rep.actors_in_trial, self)
 
@@ -127,10 +105,13 @@ class Connection:
 
         loop = asyncio.get_running_loop()
 
+        action_conn = self.__actor_stub.ActionStream(
+            metadata=(("trial-id", reply.trial_id), ("actor-id", str(reply.actor_id))))
+
         reader_task = loop.create_task(
-            read_observations(client_session, self.__actor_stub))
+            read_observations(client_session, action_conn))
         writer_task = loop.create_task(
-            write_actions(client_session, self.__actor_stub, reply.actor_id))
+            write_actions(client_session, action_conn, self.__actor_stub, reply.actor_id))
 
         await impl(client_session, trial)
 

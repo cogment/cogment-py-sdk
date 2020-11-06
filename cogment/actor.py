@@ -126,6 +126,7 @@ class ActorSession:
         self._consume_action(action)
 
     def _new_observation(self, obs, final):
+        print("_new_observation")
         self.trial.over = final
 
         self.latest_observation = obs
@@ -134,6 +135,7 @@ class ActorSession:
             self.on_observation(obs)
 
         if self.__obs_future:
+            print("self.__obs_future:")
             self.__obs_future.set_result(obs)
 
     def _new_reward(self, reward):
