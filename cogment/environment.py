@@ -16,7 +16,7 @@ import asyncio
 import importlib
 
 
-class Env:
+class Environment:
     # def __init__(self, actor_id, trial):
 
     def __init__(self):
@@ -40,12 +40,10 @@ class EnvironmentSession:
         self.impl_name = impl_name
         # Callbacks
         self.on_actions = None
-        self.on_reward = None
         self.on_message = None
         self.on_trial_over = None
 
         self.latest_actions = None
-        self.latest_reward = None
         self.latest_message = None
         self.__impl = impl
         self.__started = False
@@ -73,16 +71,16 @@ class EnvironmentSession:
         assert self.__started
         self._consume_obs(observations, False)
 
-    def end(self, final_observations):
+    def end(self, observations):
         self.end_trial = True
-        self._consume_obs(final_observations, True)
-        if self.on_trial_over:
+        self._consume_obs(observations, True)
+        if self.on_trial_over is not None:
             self.on_trial_over()
 
     def _new_action(self, actions):
         self.latest_actions = actions
 
-        if self.on_actions:
+        if self.on_actions is not None:
             self.on_actions(actions)
 
         if self.__actions_future:
@@ -98,7 +96,7 @@ class EnvironmentSession:
         )()
         message.payload.Unpack(user_data)
 
-        if self.on_message:
+        if self.on_message is not None:
             self.on_message(message.sender_id, user_data)
 
     async def _run(self):

@@ -139,17 +139,17 @@ async def read_actions(context, env_session):
             continue
 
         len_actions = len(request.action_set.actions)
-        len_actors = len(env_session.trial.actions_by_actor_id)
+        len_actors = len(env_session.trial._actions_by_actor_id)
 
         if len_actions != len_actors:
             raise Exception(
                 f"Received {len_actions} actions but have {len_actors} actors"
             )
 
-        for i, action in enumerate(env_session.trial.actions_by_actor_id):
+        for i, action in enumerate(env_session.trial._actions_by_actor_id):
             action.ParseFromString(request.action_set.actions[i])
 
-        env_session._new_action(env_session.trial.actions)
+        env_session._new_action(env_session.trial._actions)
 
 
 class EnvironmentServicer(EnvironmentEndpointServicer):
@@ -227,8 +227,8 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             self.__cog_project, trial
         )
 
-        trial.actions = actions_by_actor_class
-        trial.actions_by_actor_id = actions_by_actor_id
+        trial._actions = actions_by_actor_class
+        trial._actions_by_actor_id = actions_by_actor_id
 
         new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl)
         self.__env_sessions[key] = new_session
@@ -238,7 +238,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        observations, final = await env_session._obs_queue.get()
+        observations, _ = await env_session._obs_queue.get()
 
         reply = EnvStartReply()
         pack_observations(env_session, observations, reply, 0)
@@ -301,7 +301,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         env_session = self.__env_sessions[key]
 
-        for idx, actor in enumerate(env_session.trial.actors):
+        for actor in env_session.trial.actors:
             self.TRAINING_DURATION.labels(actor.name).observe(env_session.trial.tick_id)
 
         await env_session.end()
@@ -313,9 +313,5 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         return EnvEndReply()
 
     def __cleanup(self):
-        for data in self.__env_sessions.values():
-            pass
-
         self.__env_sessions.clear()
-
         atexit.unregister(self.__cleanup)

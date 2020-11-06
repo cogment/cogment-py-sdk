@@ -105,7 +105,7 @@ class ActorSession:
 
     async def end(self):
         self.end_trial = True
-        if self.on_trial_over:
+        if self.on_trial_over is not None:
             self.on_trial_over()
 
     def start_nowait(self):
@@ -130,7 +130,7 @@ class ActorSession:
 
         self.latest_observation = obs
 
-        if self.on_observation:
+        if self.on_observation is not None:
             self.on_observation(obs)
 
         if self.__obs_future:
@@ -139,7 +139,7 @@ class ActorSession:
     def _new_reward(self, reward):
         self.latest_reward = reward
 
-        if self.on_reward:
+        if self.on_reward is not None:
             self.on_reward(reward)
 
     def _new_message(self, message):
@@ -150,7 +150,7 @@ class ActorSession:
             self.trial.cog_project.protolib), class_type[-1])()
         message.payload.Unpack(user_data)
 
-        if self.on_message:
+        if self.on_message is not None:
             self.on_message(message.sender_id, user_data)
 
     async def _run(self):

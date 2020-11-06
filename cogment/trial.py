@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cogment.actor import Actor
-from cogment.environment import Env
+from cogment.environment import Environment
 from cogment.api.common_pb2 import Feedback, Message
 
 
@@ -25,10 +25,13 @@ class Trial:
         self.actors = []
         self.tick_id = 0
 
+        self._actions = None  # Managed externally
+        self._actions_by_actor_id = None  # Managed externally
+
         self.__actor_by_name = {}
 
     def _add_env(self):
-        self.env = Env()
+        self.env = Environment()
 
     def _add_actors(self, actors_in_trial):
 
