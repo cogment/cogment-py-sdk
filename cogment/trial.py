@@ -34,10 +34,10 @@ class Trial:
         self.env = Environment()
 
     def _add_actors(self, actors_in_trial):
-
-        for actor in actors_in_trial:
-            actor_class = self.cog_project.actor_classes[actor.actor_class]
-            actor = Actor(actor_class, actor.name)
+        for actor_in_trial in actors_in_trial:
+            # TODO, handle what happens when the class is not found.
+            actor_class = self.cog_project.actor_classes[actor_in_trial.actor_class]
+            actor = Actor(actor_class, actor_in_trial.name)
             self.actors.append(actor)
 
     def _add_actor_counts(self):
