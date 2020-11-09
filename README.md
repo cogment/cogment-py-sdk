@@ -10,7 +10,7 @@ For further Cogment information, check out the documentation at <https://docs.co
 
 ## Developers
 
-### Testing and building locally
+### Local setup
 
 Make sure you have the following installed:
   - [Python](https://www.python.org) (any version >3.8 should work),
@@ -22,19 +22,7 @@ Install the dependencies, including downloading and building the cogment protobu
 poetry install
 ```
 
-Run the linter using
-
-```
-poetry run task lint
-```
-
-Build the source package (this step will only be succesfull if `poetry install` succeeded)
-
-```
-poetry build -f sdist
-```
-
-### Used Cogment protobuf API
+### Define used Cogment protobuf API
 
 The version of the used cogment protobuf API is defined in the `.cogment-api.yaml` file at the root of the repository. The following can be defined:
 
@@ -44,10 +32,36 @@ The version of the used cogment protobuf API is defined in the `.cogment-api.yam
 
 > ⚠️ when building a docker image, `cogment_api_path` needs to exists in the docker file system. In practice it means it should be a subdirectory of the current directory.
 
-### Building a Docker image
+### Tests
+
+A test cogment app is defined in `./tests/test_cogment_app`. To make things easier, generated files are versioned in the repository. To get a fresh/updated generation, simply run
+
+```
+COGMENT_PATH=/path/to/your/cogment poetry run task generate_test_cogment_app
+```
+
+### Lint
+
+Run the linter using
+
+```
+poetry run task lint
+```
+
+### Build the source package
+
+Build the source package (this step will only be succesfull if `poetry install` succeeded)
+
+```
+poetry build -f sdist
+```
+
+### Build a Docker image
 
 Navigate to the python SDK directory and run the following in order to create an image that can be used by a cogment project:
 
 ```
 docker build -t image_name .
 ```
+
+

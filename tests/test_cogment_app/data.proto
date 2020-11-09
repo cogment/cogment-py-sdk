@@ -1,0 +1,19 @@
+
+syntax = "proto3";
+
+package test_cogment_app;
+
+message EnvConfig {
+}
+
+message TrialConfig {
+	EnvConfig env_config = 1;
+}
+
+message Observation {}
+message My_actor_classAction {}
+
+message My_agent_class_1Action {}
+
+message My_agent_class_2Action {}
+

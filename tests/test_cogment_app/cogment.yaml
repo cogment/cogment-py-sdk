@@ -1,0 +1,48 @@
+
+import:
+  proto:
+    - data.proto
+
+environment:
+  config_type: test_cogment_app.EnvConfig
+
+trial:
+  config_type: test_cogment_app.TrialConfig
+
+
+# Static configuration
+actor_classes:
+  - id: my_actor_class
+    action:
+      space: test_cogment_app.My_actor_classAction
+    observation:
+      space: test_cogment_app.Observation
+
+  - id: my_agent_class_1
+    action:
+      space: test_cogment_app.My_agent_class_1Action
+    observation:
+      space: test_cogment_app.Observation
+
+  - id: my_agent_class_2
+    action:
+      space: test_cogment_app.My_agent_class_2Action
+    observation:
+      space: test_cogment_app.Observation
+
+# Dynamic configuration (could be changed by a pre-hook)
+trial_params:
+  #max_inactivity: 2
+  environment:
+    endpoint: grpc://env:9000
+    #config: {}
+
+  actors:
+    - actor_class: my_actor_class
+      endpoint: human
+
+    - actor_class: my_agent_class_1
+      endpoint: grpc://my-agent-class-1:9000
+
+    - actor_class: my_agent_class_2
+      endpoint: grpc://my-agent-class-2:9000
