@@ -18,10 +18,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This is the main import module for the cogment (https://gitlab.com/cogment/cogment) AI
+framework python SDK by AI Redefined Inc.
+"""
+
 from cogment.version import __version__
 
 from cogment.client import Connection
 from cogment.server import Server
+
+# Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList
 import cogment.delta_encoding
-from cogment.utils import DecodeData

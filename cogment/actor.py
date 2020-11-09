@@ -14,6 +14,9 @@
 
 import asyncio
 import importlib
+import logging
+from abc import ABC, abstractmethod
+from cogment.session import Session
 
 
 class Actor:
@@ -24,13 +27,10 @@ class Actor:
         self._feedback = []
         self._message = []
 
-    def add_feedback(self, value=None, confidence=None, tick_id=None, user_data=None):
-        if tick_id is None:
-            tick_id = -1
-
+    def add_feedback(self, value, confidence, tick_id, user_data):
         self._feedback.append((tick_id, value, confidence, user_data))
 
-    def send_message(self, user_data=None):
+    def send_message(self, user_data):
         self._message.append(user_data)
 
 
@@ -45,7 +45,7 @@ class ActorClass:
         observation_delta_apply_fn,
         feedback_space,
     ):
-        self.id_ = id
+        self.id = id
         self.config_type = config_type
         self.action_space = action_space
         self.observation_space = observation_space
@@ -59,7 +59,7 @@ class ActorClassList:
         self._actor_classes_list = list(args)
 
         for a_c in args:
-            setattr(self, a_c.id_, a_c)
+            setattr(self, a_c.id, a_c)
 
     def __iter__(self):
         return iter(self._actor_classes_list)
@@ -74,14 +74,13 @@ class ActorClassList:
         return self._actor_classes_list[index]
 
 
-class ActorSession:
+class ActorSession(Session):
     """This represents an actor being performed locally."""
 
     def __init__(self, impl, actor_class, trial, name, impl_name):
+        super().__init__(trial)
         self.actor_class = actor_class
-        self.trial = trial
         self.name = name
-        self.end_trial = False
         self.impl_name = impl_name
         # Callbacks
         self.on_observation = None
@@ -89,80 +88,79 @@ class ActorSession:
         self.on_message = None
         self.on_trial_over = None
 
-        self.latest_observation = None
-        self.latest_reward = None
-        self.latest_message = None
+        self._latest_observation = None
         self.__impl = impl
         self.__started = False
         self.__obs_future = None
+        self._task = None
 
-    async def start(self):
+    @abstractmethod
+    async def _consume_action(self, action):
+        pass
+
+    def start(self):
         assert not self.__started
         self.__started = True
 
-        # We may have already received an observation
-        if self.latest_observation:
-            return self.latest_observation
-
-        # Wait until the initial observation is available
-        self.__obs_future = asyncio.get_running_loop().create_future()
-        return await self.__obs_future
-
-    async def end(self):
-        self.end_trial = True
+    async def _end(self):
         if self.on_trial_over is not None:
             self.on_trial_over()
+        self.__obs_future = None
 
-    def start_nowait(self):
-        assert not self.__started
-        self.__started = True
-
-    async def do_action(self, action):
+    async def get_observation(self):
         assert self.__started
+        assert self.on_observation is None
+
+        if self.is_trial_over():
+            return None
 
         self.__obs_future = asyncio.get_running_loop().create_future()
-        await self._consume_action(action)
-
         return await self.__obs_future
 
-    def do_action_nowait(self, action):
-        assert self.__started
+    async def get_all_observations(self):
+        while not self.is_trial_over():
+            obs = await self.get_observation()
+            if obs is None:
+                break
+            action = yield obs
+            if action:
+                self.do_action(action)
 
+    def do_action(self, action):
+        assert self.__started
         self._consume_action(action)
 
     def _new_observation(self, obs, final):
-        print("_new_observation")
-        self.trial.over = final
-
-        self.latest_observation = obs
+        self._trial.over = final
+        self._latest_observation = obs
 
         if self.on_observation is not None:
             self.on_observation(obs)
-
-        if self.__obs_future:
-            print("self.__obs_future:")
+            self.__obs_future = None
+        elif self.__obs_future is not None:
             self.__obs_future.set_result(obs)
+            self.__obs_future = None
+        elif self.__started:
+            logging.warning("An observation was missed")
 
     def _new_reward(self, reward):
-        self.latest_reward = reward
-
         if self.on_reward is not None:
             self.on_reward(reward)
+        elif self.__started:
+            logging.warning("A reward arived but was not handled.")
 
     def _new_message(self, message):
-        self.latest_message = message
-
-        class_type = message.payload.type_url.split(".")
-        user_data = getattr(
-            importlib.import_module(self.trial.cog_project.protolib), class_type[-1]
-        )()
-        message.payload.Unpack(user_data)
-
         if self.on_message is not None:
+            class_type = message.payload.type_url.split(".")
+            user_data = getattr(importlib.import_module(
+                self._trial.cog_project.protolib), class_type[-1])()
+            message.payload.Unpack(user_data)
             self.on_message(message.sender_id, user_data)
+        elif self.__started:
+            logging.info("A message arived but was not handled.")
 
     async def _run(self):
-        await self.__impl(self, self.trial)
+        await self.__impl(self)
 
 
 class _ServedActorSession(ActorSession):

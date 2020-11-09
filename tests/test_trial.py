@@ -13,11 +13,7 @@ from test_cogment_app.data_pb2 import EnvConfig, TrialConfig
 @pytest.fixture(scope="module")
 def trial():
     # Mimicking what's done by EnvironmentServicer::Start, it seems like the most complete example
-    trial = Trial(
-        id_="test",
-        cog_project=cog_settings,
-        trial_config=TrialConfig(env_config=EnvConfig()),
-    )
+    trial = Trial("test", cog_settings)
     trial._add_actors(
         [
             TrialActor(actor_class="my_agent_class_1", name="agent_1"),
@@ -80,3 +76,4 @@ class TestTrial:
 
         actors_c = trial.get_actors(pattern=4)
         assert len(actors_c) == 0
+

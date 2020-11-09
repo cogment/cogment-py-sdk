@@ -13,48 +13,42 @@
 # limitations under the License.
 
 from cogment.api.data_pb2_grpc import LogExporterServicer
-
 from cogment.api.data_pb2 import LogReply
-
+from cogment.trial import Trial
+from cogment.datalog import _ServedDatalogSession
 from cogment.utils import raw_params_to_user_params
-
-from cogment.errors import InvalidRequestError
-
-import traceback
-import atexit
 import logging
-import typing
 import asyncio
-import prometheus_client as prom
-
-import sys
 
 
 class LogExporterService(LogExporterServicer):
 
-    def __init__(self, datalog_impls, cog_project):
-        self.__impls = datalog_impls
+    def __init__(self, impl, cog_project):
+        self.__impl = impl
         self.__cog_project = cog_project
-
         logging.info("Log Exporter Service started")
 
     async def Log(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
-
         trial_id = metadata["trial-id"]
+        trial = Trial(trial_id, self.__cog_project)
 
         msg = await request_iterator.__anext__()
         assert msg.HasField("trial_params")
-        trial_params = raw_params_to_user_params(
-            msg.trial_params, self.__cog_project)
+        trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_project)
 
-        async def extract_samples(req):
-            async for msg in req:
-                assert msg.HasField("sample")
-                yield msg.sample
+        session = _ServedDatalogSession(self.__impl, trial, trial_params)
+        loop = asyncio.get_running_loop()
+        session._task = loop.create_task(session._run())
 
-        samples = extract_samples(request_iterator)
+        # TODO: Wait for session._started
+        async for msg in request_iterator:
+            if session._task.done():
+                break
+            assert msg.HasField("sample")
+            session._new_sample(msg.sample)
 
-        await self.__impls(samples, trial_params, trial_id)
+        if not session._task.done():
+            session._end()
 
         return LogReply()

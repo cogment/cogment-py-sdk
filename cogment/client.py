@@ -20,9 +20,19 @@ from cogment.actor import _ClientActorSession
 from cogment.api.common_pb2 import TrialActor
 from cogment.api.orchestrator_pb2_grpc import TrialLifecycleStub, ActorEndpointStub
 from cogment.delta_encoding import DecodeObservationData
-from cogment.trial import Trial, TrialLifecycle
+from cogment.trial import Trial
+from cogment.session import Session
 
 import asyncio
+
+
+class ClientSession(Session):
+    def __init__(self, trial, connection):
+        super().__init__(trial)
+        self._connection = connection
+
+    async def terminate(self):
+        await self._connection.terminate(self.get_trial_id())
 
 
 async def read_observations(client_session, action_conn):
@@ -31,7 +41,7 @@ async def read_observations(client_session, action_conn):
         obs = DecodeObservationData(
             client_session.actor_class,
             request.observation.data,
-            client_session.latest_observation,
+            client_session._latest_observation
         )
         client_session._new_observation(obs, request.final)
 
@@ -66,8 +76,10 @@ class Connection:
         req.user_id = user_id
 
         rep = await self.__lifecycle_stub.StartTrial(req)
-        # added trial_config to following and in trial.py TrialLifecycle
-        return TrialLifecycle(rep.trial_id, trial_config, rep.actors_in_trial, self)
+        trial = Trial(rep.trial_id, self.cog_project)
+        trial._add_actors(rep.actors_in_trial)
+
+        return ClientSession(trial, self)
 
     async def terminate(self, trial_id):
         req = orchestrator.TerminateTrialRequest()
@@ -78,15 +90,13 @@ class Connection:
 
     async def join_trial(self, trial_id=None, actor_id=-1, actor_class=None, impl=None):
 
-        req = req = orchestrator.TTrialJoinRequest(
+        req = req = orchestrator.TrialJoinRequest(
             trial_id=trial_id, actor_id=actor_id, actor_class=actor_class
         )
 
         reply = await self.__actor_stub.JoinTrial(req)
 
-        trial = Trial(
-            id_=reply.trial_id, cog_project=self.cog_project, trial_config=None
-        )
+        trial = Trial(reply.trial_id, cog_project=self.cog_project)
 
         trial._add_actors(reply.actors_in_trial)
         trial._add_environment()

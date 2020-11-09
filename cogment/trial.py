@@ -18,8 +18,8 @@ from cogment.api.common_pb2 import Feedback, Message
 
 
 class Trial:
-    def __init__(self, id_, cog_project, trial_config):
-        self.id_ = id_
+    def __init__(self, id, cog_project):
+        self.id = id
         self.over = False
         self.cog_project = cog_project
         self.actors = []
@@ -48,7 +48,7 @@ class Trial:
         self.actor_counts = [0] * len(class_list)
         for class_index, class_member in enumerate(class_list):
             for actor in self.actors:
-                if class_member.id_ == actor.actor_class.id_:
+                if class_member.id == actor.actor_class.id:
                     self.actor_counts[class_index] += 1
 
     def get_actors(self, pattern):
@@ -77,15 +77,15 @@ class Trial:
                             matched_actors.append(actor)
                             break
                         elif actor_name == "*":
-                            if actor.actor_class.id_ == class_name:
+                            if actor.actor_class.id == class_name:
                                 matched_actors.append(actor)
                                 break
 
         return matched_actors
 
-    def add_feedback(self, to, value, confidence):
-        for d in self.get_actors(pattern=to):
-            d.add_feedback(value=value, confidence=confidence)
+    def add_feedback(self, value, confidence, to, tick_id, user_data):
+        for actor in self.get_actors(pattern=to):
+            actor.add_feedback(value, confidence, tick_id, user_data)
 
     def _gather_all_feedback(self):
         for actor_index, actor in enumerate(self.actors):
@@ -101,8 +101,8 @@ class Trial:
 
                 yield re
 
-    def send_message(self, user_data, to, environment=False):
-        if environment:
+    def send_message(self, user_data, to, to_environment=False):
+        if to_environment:
             self.environment.send_message(user_data=user_data)
         for d in self.get_actors(pattern=to):
             d.send_message(user_data=user_data)
@@ -126,16 +126,3 @@ class Trial:
             if msg is not None:
                 re.payload.Pack(msg)
             yield re
-
-
-# A trial, from the perspective of the lifetime manager
-class TrialLifecycle(Trial):
-
-    # trial config added for now
-    def __init__(self, id_, trial_config, actors_in_trial, conn):
-        super().__init__(id_, conn.cog_project, trial_config)
-        self._add_actors(actors_in_trial)
-        self._conn = conn
-
-    async def terminate(self):
-        await self._conn.terminate(trial_id=self.id_)

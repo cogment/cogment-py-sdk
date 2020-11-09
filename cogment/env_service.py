@@ -14,6 +14,7 @@
 
 from abc import ABC, abstractmethod
 
+from cogment.errors import InvalidRequestError
 from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer as Servicer
 from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer
 
@@ -73,7 +74,7 @@ def pack_observations(env_session, observations, reply, tick_id):
                     if class_name[1] == actor.name:
                         new_obs[actor_index] = obs
                     elif class_name[1] == "*":
-                        if actor.actor_class.id_ == class_name[0]:
+                        if actor.actor_class.id == class_name[0]:
                             new_obs[actor_index] = obs
 
     snapshots = [True] * len(env_session.trial.actors)
@@ -211,11 +212,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             trial_config = self.__cog_project.trial.config_type()
             trial_config.ParseFromString(request.trial_config.content)
 
-        trial = Trial(
-            id_=metadata["trial-id"],
-            cog_project=self.__cog_project,
-            trial_config=trial_config,
-        )
+        trial = Trial(metadata["trial-id"], self.__cog_project)
 
         trial._add_actors(request.actors_in_trial)
         trial._add_actor_counts()
@@ -266,7 +263,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
             await env_session._task
 
-            if not env_session.end_trial:
+            if not env_session._end_trial:
                 del self.__env_sessions[key]
                 raise Exception("Trial was never ended")
 
@@ -303,7 +300,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         for actor in env_session.trial.actors:
             self.TRAINING_DURATION.labels(actor.name).observe(env_session.trial.tick_id)
 
-        await env_session.end()
+        await env_session._end_request()
 
         self.TRIALS_ENDED.labels(env_session.impl_name).inc()
 

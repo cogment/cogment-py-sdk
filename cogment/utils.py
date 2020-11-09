@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.api.common_pb2 import VersionInfo, ObservationData
+from cogment.api.common_pb2 import VersionInfo, ObservationData, TrialParams
 from cogment.version import __version__
 from cogment.delta_encoding import DecodeObservationData
 
@@ -47,22 +47,20 @@ def raw_params_to_user_params(params, settings):
     )
 
     actors = []
-
-    for a in params.actors:
+    for actor in params.actors:
         actor_config = None
 
-        if a.HasField("config"):
-            a_c = settings.actor_classes.__getattribute__(a.actor_class)
+        if actor.HasField("config"):
+            a_c = settings.actor_classes.__getattribute__(actor.actor_class)
             actor_config = a_c.config_type()
-            actor_config.ParseFromString(a.config.content)
+            actor_config.ParseFromString(actor.config.content)
 
-        actor = SimpleNamespace(
-            actor_class=a.actor_class,
-            endpoint=a.endpoint,
+        actor_data = SimpleNamespace(
+            actor_class=actor.actor_class,
+            endpoint=actor.endpoint,
             config=actor_config
         )
-
-        actors.append(actor)
+        actors.append(actor_data)
 
     return SimpleNamespace(
         trial_config=trial_config,
@@ -73,6 +71,30 @@ def raw_params_to_user_params(params, settings):
     )
 
 
+def user_params_to_raw_params(params, settings):
+    result = TrialParams()
+
+    result.max_steps = params.max_steps
+    result.max_inactivity = params.max_inactivity
+
+    if params.trial_config is not None:
+        result.trial_config.content = params.trial_config.SerializeToString()
+
+    result.environment.endpoint = params.environment.endpoint
+    if params.environment.config is not None:
+        result.environment.config.content = \
+            params.environment.config.SerializeToString()
+
+    for actor_data in params.actors:
+        actor_pb = result.actors.add()
+        actor_pb.actor_class = actor_data.actor_class
+        actor_pb.endpoint = actor_data.endpoint
+        if actor_data.config is not None:
+            actor_pb.config.content = actor_data.config.SerializeToString()
+
+    return result
+
+
 class DecodeData():
 
     def __init__(self, trial_params, cog_project):
@@ -80,7 +102,7 @@ class DecodeData():
         self.last_obs = []
 
         actor_classes_list = [
-            actor.id_ for actor in self.__cog_project.actor_classes]
+            actor.id for actor in self.__cog_project.actor_classes]
         trial_actor_list = [actor.actor_class for actor in trial_params.actors]
         self.actor_counts = [0] * len(actor_classes_list)
         for index, actor_class in enumerate(actor_classes_list):
@@ -95,7 +117,7 @@ class DecodeData():
         actor_id = 0
         for ac_index, actor_class in enumerate(self.__cog_project.actor_classes):
             count = self.actor_counts[ac_index]
-            for j in range(count):
+            for _ in range(count):
                 try:
                     obs_id = sample.observations.actors_map[
                         actor_id]

@@ -44,9 +44,12 @@ def _trial_key(trial_id, actor_id):
 
 def _impl_can_serve_actor_class(impl, actor_class):
     if isinstance(impl.actor_class, typing.List):
-        return any(__impl_can_serve_actor_class(e) for e in impl.actor_class)
+        for ac in impl.actor_class:
+            if ac == actor_class.id:
+                return True
+        return False
 
-    return impl.actor_class == "*" or impl.actor_class == actor_class.id_
+    return impl.actor_class == "*" or impl.actor_class == actor_class.id
 
 
 async def read_observations(context, agent_session):
@@ -55,7 +58,7 @@ async def read_observations(context, agent_session):
         obs = DecodeObservationData(
             agent_session.actor_class,
             request.observation.data,
-            agent_session.latest_observation,
+            agent_session._latest_observation,
         )
         agent_session._new_observation(obs, request.final)
 
@@ -136,9 +139,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.ACTORS_STARTED.labels(request.impl_name).inc()
 
-        trial = Trial(
-            id_=metadata["trial-id"], cog_project=self.__cog_project, trial_config=None
-        )
+        trial = Trial(metadata["trial-id"], self.__cog_project)
 
         trial._add_actors(request.actors_in_trial)
         trial._add_environment()
@@ -158,7 +159,7 @@ class AgentServicer(AgentEndpointServicer):
         key = _trial_key(metadata["trial-id"], metadata["actor-id"])
         agent_session = self.__agent_sessions[key]
 
-        await agent_session.end()
+        await agent_session._end()
 
         self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
 
@@ -229,9 +230,5 @@ class AgentServicer(AgentEndpointServicer):
             raise
 
     def __cleanup(self):
-        for data in self.__agent_sessions.values():
-            pass
-
         self.__agent_sessions.clear()
-
         atexit.unregister(self.__cleanup)
