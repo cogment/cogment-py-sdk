@@ -17,7 +17,6 @@ import importlib
 
 
 class Actor:
-
     def __init__(self, actor_class, name):
         self.actor_class = actor_class
         self.name = name
@@ -36,10 +35,17 @@ class Actor:
 
 
 class ActorClass:
-
-    def __init__(self, id_, config_type, action_space, observation_space,
-                 observation_delta, observation_delta_apply_fn, feedback_space):
-        self.id_ = id_
+    def __init__(
+        self,
+        id,
+        config_type,
+        action_space,
+        observation_space,
+        observation_delta,
+        observation_delta_apply_fn,
+        feedback_space,
+    ):
+        self.id_ = id
         self.config_type = config_type
         self.action_space = action_space
         self.observation_space = observation_space
@@ -49,7 +55,6 @@ class ActorClass:
 
 
 class ActorClassList:
-
     def __init__(self, *args):
         self._actor_classes_list = list(args)
 
@@ -147,9 +152,10 @@ class ActorSession:
     def _new_message(self, message):
         self.latest_message = message
 
-        class_type = message.payload.type_url.split('.')
-        user_data = getattr(importlib.import_module(
-            self.trial.cog_project.protolib), class_type[-1])()
+        class_type = message.payload.type_url.split(".")
+        user_data = getattr(
+            importlib.import_module(self.trial.cog_project.protolib), class_type[-1]
+        )()
         message.payload.Unpack(user_data)
 
         if self.on_message is not None:
