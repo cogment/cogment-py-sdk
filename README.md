@@ -40,6 +40,12 @@ A test cogment app is defined in `./tests/test_cogment_app`. To make things easi
 COGMENT_PATH=/path/to/your/cogment poetry run task generate_test_cogment_app
 ```
 
+To run the test, simply run
+
+```
+poetry run task test
+```
+
 ### Lint
 
 Run the linter using

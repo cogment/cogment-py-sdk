@@ -1,5 +1,6 @@
 stages:
   - lint
+  - test
   - build
 
 default:
@@ -13,6 +14,11 @@ lint:
   stage: lint
   script:
     - poetry run task lint
+
+test:
+  stage: test
+  script:
+    - poetry run task test
 
 test_build:
   stage: build
