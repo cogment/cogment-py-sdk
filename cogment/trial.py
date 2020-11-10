@@ -70,12 +70,12 @@ class Trial:
                         if receiver.name == target:
                             receiver_list.append(receiver)
                     else:
-                        class_name = target.split(".")
-                        if class_name[1] == receiver.name:
+                        [class_name, receiver_name] = target.split(".")
+                        if receiver_name == receiver.name:
                             receiver_list.append(receiver)
-                        elif class_name[1] == "*":
-                            if receiver.actor_class.id_ == class_name[0]:
-                                receiver_list.append(actor)
+                        elif receiver_name == "*":
+                            if receiver.actor_class.id_ == class_name:
+                                receiver_list.append(receiver)
 
         return receiver_list
 
