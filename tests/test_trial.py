@@ -62,14 +62,13 @@ class TestTrial:
         assert receivers[1].name == "agent_3"
 
     def test_get_receivers_by_index(self, trial):
-        # TODO make sure it is the desired behavior to have
-        receivers_a = trial.get_receivers(pattern=-1)
+        receivers_a = trial.get_receivers(pattern=0)
         assert len(receivers_a) == 1
         assert receivers_a[0].name == "agent_1"
 
-        receivers_b = trial.get_receivers(pattern=0)
+        receivers_b = trial.get_receivers(pattern=1)
         assert len(receivers_b) == 1
         assert receivers_b[0].name == "agent_2"
 
-        receivers_c = trial.get_receivers(pattern=3)
+        receivers_c = trial.get_receivers(pattern=4)
         assert len(receivers_c) == 0

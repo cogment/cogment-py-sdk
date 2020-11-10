@@ -59,7 +59,7 @@ class Trial:
         else:
             all_receivers = self.actors
         for target in pattern_list:
-            for receiver_index, receiver in enumerate(all_receivers, -1):
+            for receiver_index, receiver in enumerate(all_receivers):
                 if target == "*" or target == "*.*":
                     receiver_list.append(receiver)
                 elif isinstance(target, int):
