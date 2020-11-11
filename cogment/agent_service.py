@@ -141,7 +141,7 @@ class AgentServicer(AgentEndpointServicer):
         )
 
         trial._add_actors(request.actors_in_trial)
-        trial._add_env()
+        trial._add_environment()
 
         new_session = _ServedActorSession(
             impl.impl, actor_class, trial, self_info.name, request.impl_name

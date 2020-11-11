@@ -30,8 +30,11 @@ class Trial:
 
         self.__actor_by_name = {}
 
-    def _add_env(self):
-        self.env = Environment()
+    def _add_environment(self):
+        self.environment = Environment()
+
+    def get_environment(self):
+        return self.environment
 
     def _add_actors(self, actors_in_trial):
         for actor_in_trial in actors_in_trial:
@@ -48,39 +51,40 @@ class Trial:
                 if class_member.id_ == actor.actor_class.id_:
                     self.actor_counts[class_index] += 1
 
-    def get_receivers(self, pattern, env=False):
-        if isinstance(pattern, int) or isinstance(pattern, str):
-            pattern_list = [pattern]
-        elif isinstance(pattern, list):
+    def get_actors(self, pattern):
+        if isinstance(pattern, list):
             pattern_list = pattern
-        receiver_list = []
-        if env:
-            all_receivers = self.actors + [self.env]
         else:
-            all_receivers = self.actors
-        for target in pattern_list:
-            for receiver_index, receiver in enumerate(all_receivers):
-                if target == "*" or target == "*.*":
-                    receiver_list.append(receiver)
-                elif isinstance(target, int):
-                    if receiver_index == target:
-                        receiver_list.append(receiver)
-                elif isinstance(target, str):
-                    if "." not in target:
-                        if receiver.name == target:
-                            receiver_list.append(receiver)
+            pattern_list = [pattern]
+        matched_actors = []
+        for actor_index, actor in enumerate(self.actors):
+            for single_pattern in pattern_list:
+                if single_pattern == "*" or single_pattern == "*.*":
+                    matched_actors.append(actor)
+                    break
+                elif isinstance(single_pattern, int):
+                    if actor_index == single_pattern:
+                        matched_actors.append(actor)
+                        break
+                elif isinstance(single_pattern, str):
+                    if "." not in single_pattern:
+                        if actor.name == single_pattern:
+                            matched_actors.append(actor)
+                            break
                     else:
-                        [class_name, receiver_name] = target.split(".")
-                        if receiver_name == receiver.name:
-                            receiver_list.append(receiver)
-                        elif receiver_name == "*":
-                            if receiver.actor_class.id_ == class_name:
-                                receiver_list.append(receiver)
+                        [class_name, actor_name] = single_pattern.split(".")
+                        if actor_name == actor.name:
+                            matched_actors.append(actor)
+                            break
+                        elif actor_name == "*":
+                            if actor.actor_class.id_ == class_name:
+                                matched_actors.append(actor)
+                                break
 
-        return receiver_list
+        return matched_actors
 
     def add_feedback(self, to, value, confidence):
-        for d in self.get_receivers(pattern=to, env=False):
+        for d in self.get_actors(pattern=to):
             d.add_feedback(value=value, confidence=confidence)
 
     def _gather_all_feedback(self):
@@ -97,8 +101,10 @@ class Trial:
 
                 yield re
 
-    def send_message(self, to, user_data):
-        for d in self.get_receivers(pattern=to, env=True):
+    def send_message(self, user_data, to, environment=False):
+        if environment:
+            self.environment.send_message(user_data=user_data)
+        for d in self.get_actors(pattern=to):
             d.send_message(user_data=user_data)
 
     def _gather_all_messages(self, source_id):
@@ -112,8 +118,8 @@ class Trial:
                     re.payload.Pack(msg)
                 yield re
 
-        e_msg = self.env._message
-        self.env._message = []
+        e_msg = self.environment._message
+        self.environment._message = []
         for msg in e_msg:
             re = Message(sender_id=source_id, receiver_id=-1)
 

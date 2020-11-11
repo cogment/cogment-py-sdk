@@ -118,8 +118,7 @@ async def write_observations(context, env_session):
         reply.feedbacks.extend(env_session.trial._gather_all_feedback())
         reply.messages.extend(env_session.trial._gather_all_messages(-1))
 
-        pack_observations(env_session, observations,
-                          reply, env_session.trial.tick_id)
+        pack_observations(env_session, observations, reply, env_session.trial.tick_id)
 
         await context.write(reply)
 
@@ -220,7 +219,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         trial._add_actors(request.actors_in_trial)
         trial._add_actor_counts()
-        trial._add_env()
+        trial._add_environment()
 
         # action table time
         actions_by_actor_class, actions_by_actor_id = new_actions_table(
