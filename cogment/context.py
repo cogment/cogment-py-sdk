@@ -73,7 +73,7 @@ def _add_datalog_service(grpc_server, impl, cog_project):
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
 
-class Server:
+class Context:
     def __init__(self,
                  cog_project: ModuleType,
                  port: int = DEFAULT_PORT,
