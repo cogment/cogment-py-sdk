@@ -90,7 +90,7 @@ class Connection:
 
     async def join_trial(self, trial_id=None, actor_id=-1, actor_class=None, impl=None):
 
-        req = req = orchestrator.TrialJoinRequest(
+        req = orchestrator.TrialJoinRequest(
             trial_id=trial_id, actor_id=actor_id, actor_class=actor_class
         )
 

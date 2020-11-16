@@ -108,8 +108,8 @@ class Server:
 
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl)
 
-    def register_prehook(self,
-                         impl: Callable[[PrehookSession], Awaitable[None]]):
+    def register_pre_trial_hook(self,
+                                impl: Callable[[PrehookSession], Awaitable[None]]):
 
         assert self.__grpc_server is None
 
