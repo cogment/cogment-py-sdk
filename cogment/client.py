@@ -24,15 +24,31 @@ from cogment.trial import Trial
 from cogment.session import Session
 
 import asyncio
+from abc import ABC
+from types import SimpleNamespace
 
 
-class ClientSession(Session):
-    def __init__(self, trial, connection):
-        super().__init__(trial)
-        self._connection = connection
+class ControlSession(ABC):
+    def __init__(self, trial, stub):
+        self._trial = trial
+        self._lifecycle_stub = stub
 
-    async def terminate(self):
-        await self._connection.terminate(self.get_trial_id())
+    def get_trial_id(self):
+        return self._trial.id
+
+    def get_configured_actors(self):
+        return [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class)
+                for actor in self._trial.actors]
+
+    async def terminate_trial(self):
+        req = orchestrator.TerminateTrialRequest()
+        await self._lifecycle_stub.TerminateTrial(req, metadata=(("trial-id", self._trial.id)))
+
+
+class _ServedControlSession(ControlSession):
+    def __init__(self, trial, stub):
+        super().__init__(trial, stub)
+
 
 
 async def read_observations(client_session, action_conn):
@@ -61,72 +77,41 @@ async def write_actions(client_session, action_conn, actor_stub, actor_id):
         await action_conn.write(action_req)
 
 
-class Connection:
+class ClientServicer:
     def __init__(self, cog_project, endpoint):
         self.cog_project = cog_project
 
         channel = grpc.experimental.aio.insecure_channel(endpoint)
+        self._actor_stub = ActorEndpointStub(channel)
 
-        self.__lifecycle_stub = TrialLifecycleStub(channel)
-        self.__actor_stub = ActorEndpointStub(channel)
+    async def run(self, trial_id, impl, impl_name, actor_class, actor_id):
+        req = orchestrator.TrialJoinRequest(trial_id, actor_id, actor_class)
+        reply = await self._actor_stub.JoinTrial(req)
 
-    async def start_trial(self, trial_config, user_id):
-        req = orchestrator.TrialStartRequest()
-        req.config.content = trial_config.SerializeToString()
-        req.user_id = user_id
-
-        rep = await self.__lifecycle_stub.StartTrial(req)
-        trial = Trial(rep.trial_id, self.cog_project)
-        trial._add_actors(rep.actors_in_trial)
-
-        return ClientSession(trial, self)
-
-    async def terminate(self, trial_id):
-        req = orchestrator.TerminateTrialRequest()
-
-        await self.__lifecycle_stub.TerminateTrial(
-            req, metadata=(("trial-id", trial_id),)
-        )
-
-    async def join_trial(self, trial_id=None, actor_id=-1, actor_class=None, impl=None):
-
-        req = orchestrator.TrialJoinRequest(
-            trial_id=trial_id, actor_id=actor_id, actor_class=actor_class
-        )
-
-        reply = await self.__actor_stub.JoinTrial(req)
-
-        trial = Trial(reply.trial_id, cog_project=self.cog_project)
-
-        trial._add_actors(reply.actors_in_trial)
-        trial._add_environment()
+        trial = Trial(reply.trial_id, reply.actors_in_trial, self.cog_project)
 
         self_info = reply.actors_in_trial[reply.actor_id]
-        actor_class = self.cog_project.actor_classes[self_info.actor_class]
+        joined_actor_class = self.cog_project.actor_classes[self_info.actor_class]
+        assert joined_actor_class == actor_class
 
         client_session = _ClientActorSession(
-            # should it be reply.impl_name, if yes add to .proto
             impl,
             actor_class,
             trial,
             self_info.name,
-            "impl_name",
+            impl_name,
         )
 
         loop = asyncio.get_running_loop()
 
         action_conn = self.__actor_stub.ActionStream(
-            metadata=(("trial-id", reply.trial_id), ("actor-id", str(reply.actor_id)))
+            metadata=(("trial-id", trial.id), ("actor-id", str(reply.actor_id)))
         )
 
         reader_task = loop.create_task(read_observations(client_session, action_conn))
-        writer_task = loop.create_task(
-            write_actions(
-                client_session, action_conn, self.__actor_stub, reply.actor_id
-            )
-        )
+        writer_task = loop.create_task(write_actions(client_session, action_conn, self.__actor_stub, reply.actor_id))
 
-        await impl(client_session, trial)
+        await impl(client_session)
 
         reader_task.cancel()
         writer_task.cancel()

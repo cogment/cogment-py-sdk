@@ -126,9 +126,9 @@ class ActorSession(Session):
             if action:
                 self.do_action(action)
 
-    def do_action(self, action):
+    async def do_action(self, action):
         assert self.__started
-        self._consume_action(action)
+        await self._consume_action(action)
 
     def _new_observation(self, obs, final):
         self._trial.over = final
@@ -164,8 +164,6 @@ class ActorSession(Session):
 
 
 class _ServedActorSession(ActorSession):
-    """An actor session that is served from an agent service."""
-
     def __init__(self, impl, actor_class, trial, name, impl_name):
         super().__init__(impl, actor_class, trial, name, impl_name)
         self._action_queue = asyncio.Queue()
@@ -175,8 +173,6 @@ class _ServedActorSession(ActorSession):
 
 
 class _ClientActorSession(ActorSession):
-    """An actor session that is served from client."""
-
     def __init__(self, impl, actor_class, trial, name, impl_name):
         super().__init__(impl, actor_class, trial, name, impl_name)
         self._action_queue = asyncio.Queue()

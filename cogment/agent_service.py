@@ -139,10 +139,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.ACTORS_STARTED.labels(request.impl_name).inc()
 
-        trial = Trial(metadata["trial-id"], self.__cog_project)
-
-        trial._add_actors(request.actors_in_trial)
-        trial._add_environment()
+        trial = Trial(metadata["trial-id"], request.actors_in_trial, self.__cog_project)
 
         new_session = _ServedActorSession(
             impl.impl, actor_class, trial, self_info.name, request.impl_name

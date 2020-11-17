@@ -13,17 +13,13 @@ from test_cogment_app.data_pb2 import EnvConfig, TrialConfig
 @pytest.fixture(scope="module")
 def trial():
     # Mimicking what's done by EnvironmentServicer::Start, it seems like the most complete example
-    trial = Trial("test", cog_settings)
-    trial._add_actors(
-        [
-            TrialActor(actor_class="my_agent_class_1", name="agent_1"),
-            TrialActor(actor_class="my_agent_class_2", name="agent_2"),
-            TrialActor(actor_class="my_agent_class_1", name="agent_3"),
-            TrialActor(actor_class="my_agent_class_2", name="agent_4"),
-        ]
-    )
-    trial._add_actor_counts()
-    trial._add_environment()
+    actors = [
+             TrialActor(actor_class="my_agent_class_1", name="agent_1"),
+             TrialActor(actor_class="my_agent_class_2", name="agent_2"),
+             TrialActor(actor_class="my_agent_class_1", name="agent_3"),
+             TrialActor(actor_class="my_agent_class_2", name="agent_4"),
+             ]
+    trial = Trial("test", actors, cog_settings)
     return trial
 
 

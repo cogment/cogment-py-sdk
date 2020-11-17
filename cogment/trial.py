@@ -18,20 +18,22 @@ from cogment.api.common_pb2 import Feedback, Message
 
 
 class Trial:
-    def __init__(self, id, cog_project):
+    def __init__(self, id, actors_in_trial, cog_project):
         self.id = id
         self.over = False
         self.cog_project = cog_project
-        self.actors = []
         self.tick_id = 0
+        self.environment = Environment()
 
         self._actions = None  # Managed externally
         self._actions_by_actor_id = None  # Managed externally
 
         self.__actor_by_name = {}
 
-    def _add_environment(self):
-        self.environment = Environment()
+        self.actors = []
+        self.actor_counts = []
+        self._add_actors(actors_in_trial)
+        self._add_actor_counts()
 
     def get_environment(self):
         return self.environment

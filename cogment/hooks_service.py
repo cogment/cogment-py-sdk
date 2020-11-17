@@ -35,7 +35,7 @@ class PrehookServicer(TrialHooksServicer):
     async def PreTrial(self, request, context):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
-        trial = Trial(trial_id, self.__cog_project)
+        trial = Trial(trial_id, [], self.__cog_project)
 
         user_params = utils.raw_params_to_user_params(request.params, self.__cog_project)
 

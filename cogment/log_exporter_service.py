@@ -31,7 +31,7 @@ class LogExporterService(LogExporterServicer):
     async def Log(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
-        trial = Trial(trial_id, self.__cog_project)
+        trial = Trial(trial_id, [], self.__cog_project)
 
         msg = await request_iterator.__anext__()
         assert msg.HasField("trial_params")

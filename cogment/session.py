@@ -21,20 +21,26 @@ class Session(ABC):
         self._trial = trial
 
     def get_trial_id(self):
+        assert self._trial is not None
         return self._trial.id
 
     def get_tick_id(self):
+        assert self._trial is not None
         return self._trial.tick_id
 
     def is_trial_over(self):
+        assert self._trial is not None
         return self._trial.over
 
     def get_active_actors(self):
+        assert self._trial is not None
         return [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class)
                 for actor in self._trial.actors]
 
     def add_feedback(self, value, confidence, to, tick_id=-1, user_data=None):
+        assert self._trial is not None
         self._trial.add_feedback(value, confidence, to, tick_id, user_data)
 
     def send_message(self, user_data, to, to_environment=False):
+        assert self._trial is not None
         self._trial.send_message(user_data, to, to_environment)

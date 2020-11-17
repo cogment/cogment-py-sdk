@@ -212,11 +212,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             trial_config = self.__cog_project.trial.config_type()
             trial_config.ParseFromString(request.trial_config.content)
 
-        trial = Trial(metadata["trial-id"], self.__cog_project)
-
-        trial._add_actors(request.actors_in_trial)
-        trial._add_actor_counts()
-        trial._add_environment()
+        trial = Trial(metadata["trial-id"], request.actors_in_trial, self.__cog_project)
 
         # action table time
         actions_by_actor_class, actions_by_actor_id = new_actions_table(
