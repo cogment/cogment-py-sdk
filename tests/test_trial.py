@@ -2,7 +2,6 @@ import pytest
 
 from cogment.actor import Actor
 from cogment.api.common_pb2 import TrialActor
-from cogment.client import Connection
 from cogment.environment import Environment
 from cogment.trial import Trial
 

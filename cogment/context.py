@@ -26,12 +26,18 @@ from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession
 from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
-from cogment.client import ControlSession, _ServedControlSession
+from cogment.control import ControlSession
 
 # Agent
 from cogment.agent_service import AgentServicer
 from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_endpoint_descriptor
 from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
+
+# Client
+from cogment.client_service import ClientServicer
+
+# Control
+from cogment.control_service import ControlServicer
 
 # Environment
 from cogment.env_service import EnvironmentServicer
@@ -72,25 +78,26 @@ def _add_datalog_service(grpc_server, impl, cog_project):
     servicer = LogExporterService(impl, cog_project)
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
+
 class Context:
-    def __init__(self, cog_project: ModuleType):
+    def __init__(self, user_id: str, cog_project: ModuleType):
+        self._user_id = user_id
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
-        self.__datalog_impl = None
-        self.__launcher_impl = None
+        self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
         self.__grpc_server = None
         self.__cog_project = cog_project
 
     def register_actor(self,
                        impl: Callable[[ActorSession], Awaitable[None]],
                        impl_name: str,
-                       actor_class: ActorClass):
+                       actor_classes: List[str] = []):
         assert impl_name not in self.__actor_impls
         assert self.__grpc_server is None
 
         self.__actor_impls[impl_name] = SimpleNamespace(
-            impl=impl, actor_class=actor_class
+            impl=impl, actor_classes=actor_classes
         )
 
     def register_environment(self,
@@ -114,20 +121,16 @@ class Context:
 
         self.__datalog_impl = impl
 
-    async def serve_all_registered(self, 
-                 port: int,
-                 prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
+    async def serve_all_registered(self,
+                                   port: int,
+                                   prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
 
         start_http_server(prometheus_port)
 
-        if self.__actor_impls or 
-           self.__env_impls or 
-           self.__prehook_impls or 
-           self.__datalog_impl is not None:
-
+        if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
             self.__grpc_server = grpc.experimental.aio.server()
 
-            service_names = []
+            service_names: List[str] = []
             if self.__actor_impls:
                 _add_actor_service(
                     self.__grpc_server,
@@ -149,28 +152,16 @@ class Context:
             await self.__grpc_server.start()
             await self.__grpc_server.wait_for_termination()
 
-    async def start_trial(self, 
-                          trial_config, 
-                          user_id, 
-                          endpoint, 
+    async def start_trial(self,
+                          trial_config,
+                          endpoint,
                           impl: Callable[[ControlSession], Awaitable[None]]):
-        channel = grpc.experimental.aio.insecure_channel(endpoint)
-        lifecycle_stub = TrialLifecycleStub(channel)
 
-        req = orchestrator.TrialStartRequest()
-        req.config.content = trial_config.SerializeToString()
-        req.user_id = user_id
-
-        rep = await lifecycle_stub.StartTrial(req)
-        trial = Trial(rep.trial_id, rep.actors_in_trial, self.__cog_project)
-
-        await impl(_ServedControlSession(trail, lifecycle_stub))
+        servicer = ControlServicer(self.__cog_project, endpoint)
+        await servicer.run(trial_config, self._user_id, impl)
 
     async def join_trial(self, trial_id, endpoint, impl_name, actor_id=-1):
-
         actor = self.__actor_impls[impl_name]
-        impl = actor.impl
-        actor_class = actor.actor_class
 
         servicer = ClientServicer(self.__cog_project, endpoint)
-        await servicer.run(trial_id, impl, impl_name, actor_class, actor_id):
+        await servicer.run(trial_id, actor.impl, impl_name, actor.actor_classes, actor_id)

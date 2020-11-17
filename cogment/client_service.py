@@ -18,37 +18,11 @@ import grpc.experimental.aio
 import cogment.api.orchestrator_pb2 as orchestrator
 from cogment.actor import _ClientActorSession
 from cogment.api.common_pb2 import TrialActor
-from cogment.api.orchestrator_pb2_grpc import TrialLifecycleStub, ActorEndpointStub
+from cogment.api.orchestrator_pb2_grpc import ActorEndpointStub
 from cogment.delta_encoding import DecodeObservationData
 from cogment.trial import Trial
-from cogment.session import Session
 
 import asyncio
-from abc import ABC
-from types import SimpleNamespace
-
-
-class ControlSession(ABC):
-    def __init__(self, trial, stub):
-        self._trial = trial
-        self._lifecycle_stub = stub
-
-    def get_trial_id(self):
-        return self._trial.id
-
-    def get_configured_actors(self):
-        return [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class)
-                for actor in self._trial.actors]
-
-    async def terminate_trial(self):
-        req = orchestrator.TerminateTrialRequest()
-        await self._lifecycle_stub.TerminateTrial(req, metadata=(("trial-id", self._trial.id)))
-
-
-class _ServedControlSession(ControlSession):
-    def __init__(self, trial, stub):
-        super().__init__(trial, stub)
-
 
 
 async def read_observations(client_session, action_conn):
@@ -84,15 +58,23 @@ class ClientServicer:
         channel = grpc.experimental.aio.insecure_channel(endpoint)
         self._actor_stub = ActorEndpointStub(channel)
 
-    async def run(self, trial_id, impl, impl_name, actor_class, actor_id):
-        req = orchestrator.TrialJoinRequest(trial_id, actor_id, actor_class)
+    async def run(self, trial_id, impl, impl_name, actor_classes, actor_id):
+
+        # TODO: Handle properly the multiple actor classes.  Including "all" classes
+        #       when the list is empty
+        if actor_id == -1:
+            actor_class = actor_classes[0]
+            req = orchestrator.TrialJoinRequest(trial_id, actor_id, actor_class)
+        else:
+            req = orchestrator.TrialJoinRequest(trial_id, actor_id, None)
+
         reply = await self._actor_stub.JoinTrial(req)
 
         trial = Trial(reply.trial_id, reply.actors_in_trial, self.cog_project)
 
         self_info = reply.actors_in_trial[reply.actor_id]
         joined_actor_class = self.cog_project.actor_classes[self_info.actor_class]
-        assert joined_actor_class == actor_class
+        assert not actor_classes or joined_actor_class in actor_classes
 
         client_session = _ClientActorSession(
             impl,
@@ -104,12 +86,12 @@ class ClientServicer:
 
         loop = asyncio.get_running_loop()
 
-        action_conn = self.__actor_stub.ActionStream(
+        action_conn = self._actor_stub.ActionStream(
             metadata=(("trial-id", trial.id), ("actor-id", str(reply.actor_id)))
         )
 
         reader_task = loop.create_task(read_observations(client_session, action_conn))
-        writer_task = loop.create_task(write_actions(client_session, action_conn, self.__actor_stub, reply.actor_id))
+        writer_task = loop.create_task(write_actions(client_session, action_conn, self._actor_stub, reply.actor_id))
 
         await impl(client_session)
 

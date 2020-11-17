@@ -43,13 +43,13 @@ def _trial_key(trial_id, actor_id):
 
 
 def _impl_can_serve_actor_class(impl, actor_class):
-    if isinstance(impl.actor_class, typing.List):
-        for ac in impl.actor_class:
+    if impl.actor_classes:
+        for ac in impl.actor_classes:
             if ac == actor_class.id:
                 return True
         return False
-
-    return impl.actor_class == "*" or impl.actor_class == actor_class.id
+    else:
+        return True
 
 
 async def read_observations(context, agent_session):
