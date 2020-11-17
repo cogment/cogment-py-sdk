@@ -1,5 +1,5 @@
 stages:
-  - lint
+#  - lint
   - test
   - build
 
@@ -10,10 +10,10 @@ default:
     - source $HOME/.poetry/env
     - poetry install
 
-lint:
-  stage: lint
-  script:
-    - poetry run task lint
+#lint:
+#  stage: lint
+#  script:
+#    - poetry run task lint
 
 test:
   stage: test
