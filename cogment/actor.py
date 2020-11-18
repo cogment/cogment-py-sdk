@@ -74,6 +74,33 @@ class ActorClassList:
         return self._actor_classes_list[index]
 
 
+class Reward:
+    def __init__(self):
+        self.tick_id = -1
+        self.value = 0
+        self.confidence = 0
+
+        self._feedbacks = None
+
+    def _set_all(self, reward, tick_id):
+        self.tick_id = tick_id
+        self.value = reward.value
+        self.confidence = reward.confidence
+        self._set_feedbacks(reward.feedbacks)
+
+    def _set_feedbacks(self, feedbacks):
+        self._feedbacks = feedbacks
+        if self.tick_id == -1 and self._feedbacks:
+            self.tick_id = self._feedbacks[0].tick_id
+
+    def all_user_data(self):
+        assert self._feedbacks
+        for fdbk in self._feedbacks:
+            assert fdbk.tick_id == self.tick_id
+            if fdbk.content:
+                yield fdbk.content
+
+
 class ActorSession(Session):
     """This represents an actor being performed locally."""
 

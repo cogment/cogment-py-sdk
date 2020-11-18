@@ -16,7 +16,7 @@ import grpc
 import grpc.experimental.aio
 
 import cogment.api.orchestrator_pb2 as orchestrator
-from cogment.actor import _ClientActorSession
+from cogment.actor import _ClientActorSession, Reward
 from cogment.api.common_pb2 import TrialActor
 from cogment.api.orchestrator_pb2_grpc import ActorEndpointStub
 from cogment.delta_encoding import DecodeObservationData
@@ -27,20 +27,28 @@ import asyncio
 
 async def read_observations(client_session, action_conn):
     while True:
-        request = await action_conn.read()
+        reply = await action_conn.read()
         obs = DecodeObservationData(
             client_session.actor_class,
-            request.observation.data,
+            reply.observation.data,
             client_session._latest_observation
         )
-        client_session._new_observation(obs, request.final)
+        client_session._new_observation(obs, reply.final)
 
-        if request.messages:
-            for message in request.messages:
+        if reply.messages:
+            for message in reply.messages:
                 client_session._new_message(message)
 
-        if request.feedbacks:
-            client_session._new_reward(request.feedbacks)
+        if reply.feedbacks:
+            reward = Reward()
+            reward._set_feedbacks(reply.feedbacks)
+
+            # TODO: Fix this to match formula in Orchestrator
+            #       or update API to return a reward
+            for fdbk in reply.feedbacks:
+                reward.value += fdbk.value * fdbk.confidence
+                reward.confidence += fdbk.confidence
+            client_session._new_reward(reward)
 
 
 async def write_actions(client_session, action_conn, actor_stub, actor_id):

@@ -13,21 +13,14 @@
 # limitations under the License.
 
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
-
-from cogment.api.agent_pb2 import (
-    AgentStartReply,
-    AgentRewardReply,
-    AgentEndReply,
-    AgentActionReply,
-    AgentOnMessageReply,
-)
+import cogment.api.agent_pb2 as agent_api 
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
 
 from cogment.errors import InvalidRequestError
 from cogment.delta_encoding import DecodeObservationData
-from cogment.actor import _ServedActorSession
+from cogment.actor import _ServedActorSession, Reward
 
 from prometheus_client import Summary, Counter, Gauge
 
@@ -66,7 +59,7 @@ async def read_observations(context, agent_session):
 async def write_actions(context, agent_session):
     while True:
         act = await agent_session._action_queue.get()
-        msg = AgentActionReply()
+        msg = agent_api.AgentActionReply()
         msg.action.content = act.SerializeToString()
 
         msg.feedbacks.extend(agent_session.trial._gather_all_feedback())
@@ -149,7 +142,7 @@ class AgentServicer(AgentEndpointServicer):
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        return AgentStartReply()
+        return agent_api.AgentStartReply()
 
     async def End(self, request, context):
         metadata = dict(context.invocation_metadata())
@@ -162,7 +155,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.__agent_sessions.pop(key, None)
 
-        return AgentEndReply()
+        return agent_api.AgentEndReply()
 
     async def Decide(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
@@ -191,18 +184,18 @@ class AgentServicer(AgentEndpointServicer):
         trial_id = metadata["trial-id"]
         key = _trial_key(trial_id, actor_id)
 
+        reward = Reward()
+        reward = reward._set_all(request.reward, request.tick_id)
+
         agent_session = self.__agent_sessions[key]
-
-        agent_session._new_reward(request.reward)
-
-        if request.reward.value < 0.0:
-            self.REWARDS_RECEIVED.labels(agent_session.name).dec(
-                abs(request.reward.value)
-            )
+        if reward.value < 0.0:
+            self.REWARDS_RECEIVED.labels(agent_session.name).dec(abs(reward.value))
         else:
-            self.REWARDS_RECEIVED.labels(agent_session.name).inc(request.reward.value)
+            self.REWARDS_RECEIVED.labels(agent_session.name).inc(reward.value)
 
-        return AgentRewardReply()
+        agent_session._new_reward(reward)
+
+        return agent_api.AgentRewardReply()
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
@@ -217,7 +210,7 @@ class AgentServicer(AgentEndpointServicer):
             agent_session._new_message(message)
             self.MESSAGES_RECEIVED.labels(agent_session.name).inc()
 
-        return AgentOnMessageReply()
+        return agent_api.AgentOnMessageReply()
 
     async def Version(self, request, context):
         try:
