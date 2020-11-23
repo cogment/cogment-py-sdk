@@ -10,6 +10,10 @@ dist
 # Generated/Downloaded files
 /cogment/version.py
 /cogment/api
+/tests/test_cogment_app/cogment-dockerinvm.yaml
+
+# Environment file (used for tests)
+/.env
 
 # Backup of "sed-ed" files
 *.bak

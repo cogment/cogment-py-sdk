@@ -40,10 +40,24 @@ A test cogment app is defined in `./tests/test_cogment_app`. To make things easi
 COGMENT_PATH=/path/to/your/cogment poetry run task generate_test_cogment_app
 ```
 
-To run the test, simply run
+#### Module tests
+
+These tests only rely on the sdk, no connection to an orchestrator is done.
+
+To execute the module tests, simply run
 
 ```
 poetry run task test
+```
+
+#### Integration tests
+
+These tests launch and use an orchestrator they are slower but more in depth. To run them the first step is to configure the way to launch the orchestrator in a `.env` file. You can copy `.env.template` for an example of what's expected.
+
+Then, to execute the integration tests (as well as the module tests), simply run
+
+```
+poetry run task test --launch-orchestrator
 ```
 
 ### Lint

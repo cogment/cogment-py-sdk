@@ -28,6 +28,8 @@ pycodestyle = "^2.6.0"
 mypy = "^0.790"
 pytest = "^6.1.1"
 PyYAML = "^5.3.1"
+pytest-dotenv = "^0.5.2"
+pytest-asyncio = "^0.14.0"
 
 [tool.taskipy.tasks]
 lint = "task lint_pycodestyle && task lint_mypy"
@@ -35,3 +37,6 @@ lint_pycodestyle = "pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/"
 lint_mypy = "mypy --config-file mypy.ini cogment/"
 generate_test_cogment_app = "cd ./tests/test_cogment_app && ${COGMENT_PATH} generate -v --python_dir=."
 test = "pytest"
+
+[tool.pytest.ini_options]
+addopts = "-rfs"

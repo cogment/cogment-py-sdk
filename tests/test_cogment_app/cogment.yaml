@@ -32,17 +32,15 @@ actor_classes:
 
 # Dynamic configuration (could be changed by a pre-hook)
 trial_params:
-  #max_inactivity: 2
   environment:
-    endpoint: grpc://env:9000
-    #config: {}
+    endpoint: grpc://localhost:9001
 
   actors:
     - actor_class: my_actor_class
-      endpoint: human
+      endpoint: grpc://localhost:9001
 
     - actor_class: my_agent_class_1
-      endpoint: grpc://my-agent-class-1:9000
+      endpoint: grpc://localhost:9001
 
     - actor_class: my_agent_class_2
-      endpoint: grpc://my-agent-class-2:9000
+      endpoint: grpc://localhost:9001
