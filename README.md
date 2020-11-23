@@ -60,6 +60,13 @@ Then, to execute the integration tests (as well as the module tests), simply run
 poetry run task test --launch-orchestrator
 ```
 
+These tests can also be launched in a docker image.
+
+```
+docker build -t cogment/cogment-py-sdk-integration-test:latest --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
+docker run --rm cogment/cogment-py-sdk-integration-test:latest
+```
+
 ### Lint
 
 Run the linter using

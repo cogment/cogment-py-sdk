@@ -1,13 +1,22 @@
+# git files
+.git
+.gitignore
+
+# "python" stuffs
+__pycache__
+.eggs
 __pycache__
 *.egg
 *.egg-info/
 sdist/
 eggs/
 .eggs/
-build/
-dist
 .mypy_cache
 .pytest_cache
+
+# local builds
+build/
+dist
 
 # Generated/Downloaded files
 /cogment/version.py
@@ -19,3 +28,11 @@ dist
 
 # Backup of "sed-ed" files
 *.bak
+
+# Docker files
+Dockerfile
+*.dockerfile
+.dockerignore
+
+# Gitlab files
+.gitlab-ci.yml

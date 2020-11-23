@@ -3,24 +3,47 @@ stages:
   - test
   - build
 
-default:
-  image: python:3.8
+.base_poetry:
+  image: python:3.7
   before_script:
     - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
     - source $HOME/.poetry/env
     - poetry install
 
+.base_docker:
+  image: docker:19.03.1
+  services:
+    - docker:19.03.1-dind
+  variables:
+      # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+
 lint:
+  extends: .base_poetry
   stage: lint
   script:
     - poetry run task lint
 
-test:
+module_test:
+  extends: .base_poetry
   stage: test
   script:
     - poetry run task test
 
+integration_test:
+  extends: .base_docker
+  stage: test
+  variables:
+      COGMENT_ORCHESTRATOR_IMAGE: "registry.gitlab.com/ai-r/cogment-orchestrator:latest"
+  script:
+    - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
+    - docker run --rm cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
+
 test_build:
+  extends: .base_poetry
   stage: build
   script:
     - poetry build -f sdist
