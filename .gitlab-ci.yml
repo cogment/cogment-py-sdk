@@ -31,7 +31,11 @@ module_test:
   extends: .base_poetry
   stage: test
   script:
-    - poetry run task test
+    - poetry run task test --junitxml=module_test_report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: module_test_report.xml
 
 integration_test:
   extends: .base_docker
@@ -40,7 +44,11 @@ integration_test:
       COGMENT_ORCHESTRATOR_IMAGE: "registry.gitlab.com/ai-r/cogment-orchestrator:latest"
   script:
     - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
-    - docker run --rm cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
+    - docker run --rm --volume $(pwd):/output cogment/cogment-py-sdk-integration-test:$CI_JOB_ID  --junitxml=/output/integration_test_report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: integration_test_report.xml
 
 test_build:
   extends: .base_poetry

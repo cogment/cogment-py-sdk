@@ -40,3 +40,4 @@ test = "pytest"
 
 [tool.pytest.ini_options]
 addopts = "-rfs"
+junit_suite_name = "cogment_py_sdk_tests"
