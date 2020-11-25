@@ -100,9 +100,9 @@ class ClientServicer:
         #       when the list is empty
         if actor_name is None:
             act_class = actor_classes[0]
-            req = orchestrator.TrialJoinRequest(trial_id, actor_class=act_class)
+            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_class=act_class)
         else:
-            req = orchestrator.TrialJoinRequest(trial_id, actor_name=actor_name)
+            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_name=actor_name)
 
         reply = await self._actor_stub.JoinTrial(req)
 
