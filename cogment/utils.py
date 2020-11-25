@@ -114,23 +114,22 @@ class DecodeData():
 
     def decode_datasample(self, sample):
 
-        actor_id = 0
+        actor_index = 0
         for ac_index, actor_class in enumerate(self.__cog_project.actor_classes):
             count = self.actor_counts[ac_index]
             for _ in range(count):
                 try:
-                    obs_id = sample.observations.actors_map[
-                        actor_id]
+                    obs_id = sample.observations.actors_map[actor_index]
                 except Exception:
                     print(sample)
 
                 obs_data = sample.observations.observations[obs_id]
 
                 obs = DecodeObservationData(
-                    actor_class, obs_data, self.last_obs[actor_id])
-                self.last_obs[actor_id] = obs
+                    actor_class, obs_data, self.last_obs[actor_index])
+                self.last_obs[actor_index] = obs
 
-                actor_id += 1
+                actor_index += 1
 
         action_list = []
         for act_data in sample.actions:
@@ -152,7 +151,7 @@ class DecodeData():
                     self.__cog_project.protolib), class_type[-1])()
                 message.payload.Unpack(user_data)
 
-                sub_msg_list.append((message.sender_id, user_data))
+                sub_msg_list.append((message.sender_name, user_data))
 
             message_list.append(sub_msg_list)
 

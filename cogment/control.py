@@ -32,7 +32,8 @@ class ControlSession(ABC):
 
     async def terminate_trial(self):
         req = orchestrator.TerminateTrialRequest()
-        await self._lifecycle_stub.TerminateTrial(req, metadata=(("trial-id", self._trial.id)))
+        metadata = (("trial-id", self._trial.id))
+        await self._lifecycle_stub.TerminateTrial(req, metadata)
 
 
 class _ServedControlSession(ControlSession):

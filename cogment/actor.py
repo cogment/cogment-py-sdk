@@ -129,9 +129,9 @@ class ActorSession(Session):
         assert not self.__started
         self.__started = True
 
-    async def _end(self):
+    async def _end(self, package):
         if self.on_trial_over is not None:
-            self.on_trial_over()
+            self.on_trial_over(package)
         self.__obs_future = None
 
     async def get_observation(self):
@@ -157,8 +157,7 @@ class ActorSession(Session):
         assert self.__started
         await self._consume_action(action)
 
-    def _new_observation(self, obs, final):
-        self._trial.over = final
+    def _new_observation(self, obs):
         self._latest_observation = obs
 
         if self.on_observation is not None:
@@ -182,7 +181,7 @@ class ActorSession(Session):
             user_data = getattr(importlib.import_module(
                 self._trial.cog_project.protolib), class_type[-1])()
             message.payload.Unpack(user_data)
-            self.on_message(message.sender_id, user_data)
+            self.on_message(message.sender_name, user_data)
         elif self.__started:
             logging.info("A message arived but was not handled.")
 

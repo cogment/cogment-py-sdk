@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cogment.actor import Actor
-from cogment.environment import Environment
+from cogment.environment import Environment, ENVIRONMENT_ACTOR_NAME
 from cogment.api.common_pb2 import Feedback, Message
 
 
@@ -22,7 +22,7 @@ class Trial:
         self.id = id
         self.over = False
         self.cog_project = cog_project
-        self.tick_id = 0
+        self.tick_id = -1
         self.environment = Environment()
 
         self._actions = None  # Managed externally
@@ -53,28 +53,20 @@ class Trial:
                 if class_member.id == actor.actor_class.id:
                     self.actor_counts[class_index] += 1
 
-    def get_actors(self, pattern):
-        if isinstance(pattern, list):
-            pattern_list = pattern
-        else:
-            pattern_list = [pattern]
+    def get_actors(self, pattern_list):
         matched_actors = []
-        for actor_index, actor in enumerate(self.actors):
-            for single_pattern in pattern_list:
-                if single_pattern == "*" or single_pattern == "*.*":
+        for actor in self.actors:
+            for pattern in pattern_list:
+                if pattern == "*":
                     matched_actors.append(actor)
                     break
-                elif isinstance(single_pattern, int):
-                    if actor_index == single_pattern:
-                        matched_actors.append(actor)
-                        break
-                elif isinstance(single_pattern, str):
-                    if "." not in single_pattern:
-                        if actor.name == single_pattern:
+                else:
+                    if "." not in pattern:
+                        if actor.name == pattern:
                             matched_actors.append(actor)
                             break
                     else:
-                        [class_name, actor_name] = single_pattern.split(".")
+                        [class_name, actor_name] = pattern.split(".")
                         if actor_name == actor.name:
                             matched_actors.append(actor)
                             break
@@ -90,14 +82,12 @@ class Trial:
             actor.add_feedback(value, confidence, tick_id, user_data)
 
     def _gather_all_feedback(self):
-        for actor_index, actor in enumerate(self.actors):
+        for actor in self.actors:
             a_fb = actor._feedback
             actor._feedback = []
 
             for fb in a_fb:
-                re = Feedback(
-                    actor_id=actor_index, tick_id=fb[0], value=fb[1], confidence=fb[2]
-                )
+                re = Feedback(actor_name=actor.name, tick_id=fb[0], value=fb[1], confidence=fb[2])
                 if fb[3] is not None:
                     re.content = fb[3].SerializeToString()
 
@@ -109,13 +99,13 @@ class Trial:
         for d in self.get_actors(pattern=to):
             d.send_message(user_data=user_data)
 
-    def _gather_all_messages(self, source_id):
-        for actor_index, actor in enumerate(self.actors):
+    def _gather_all_messages(self, source_name):
+        for actor in self.actors:
             a_msg = actor._message
             actor._message = []
 
             for msg in a_msg:
-                re = Message(sender_id=source_id, receiver_id=actor_index)
+                re = Message(sender_name=source_name, receiver_name=actor.name)
                 if msg is not None:
                     re.payload.Pack(msg)
                 yield re
@@ -123,7 +113,7 @@ class Trial:
         e_msg = self.environment._message
         self.environment._message = []
         for msg in e_msg:
-            re = Message(sender_id=source_id, receiver_id=-1)
+            re = Message(sender_name=source_name, receiver_name=ENVIRONMENT_ACTOR_NAME)
 
             if msg is not None:
                 re.payload.Pack(msg)

@@ -13,10 +13,10 @@
 # limitations under the License.
 
 from cogment.api.data_pb2_grpc import LogExporterServicer
-from cogment.api.data_pb2 import LogReply
+from cogment.api.data_pb2 import LogExporterSampleReply
 from cogment.trial import Trial
 from cogment.datalog import _ServedDatalogSession
-from cogment.utils import raw_params_to_user_params
+from cogment.utils import raw_params_to_user_params, list_versions
 import logging
 import asyncio
 
@@ -28,9 +28,10 @@ class LogExporterService(LogExporterServicer):
         self.__cog_project = cog_project
         logging.info("Log Exporter Service started")
 
-    async def Log(self, request_iterator, context):
+    async def OnLogSample(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
+
         trial = Trial(trial_id, [], self.__cog_project)
 
         msg = await request_iterator.__anext__()
@@ -51,4 +52,11 @@ class LogExporterService(LogExporterServicer):
         if not session._task.done():
             session._end()
 
-        return LogReply()
+        return LogExporterSampleReply()
+
+    async def Version(self, request, context):
+        try:
+            return list_versions()
+        except Exception:
+            traceback.print_exc()
+            raise

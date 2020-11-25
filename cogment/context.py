@@ -86,7 +86,7 @@ class Context:
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
         self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
-        self.__grpc_server = None
+        self.__grpc_server = None  # type: Any
         self.__cog_project = cog_project
 
     def register_actor(self,
@@ -160,8 +160,8 @@ class Context:
         servicer = ControlServicer(self.__cog_project, endpoint)
         await servicer.run(trial_config, self._user_id, impl)
 
-    async def join_trial(self, trial_id, endpoint, impl_name, actor_id=-1):
-        actor = self.__actor_impls[impl_name]
+    async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
+        actor_impl = self.__actor_impls[impl_name]
 
         servicer = ClientServicer(self.__cog_project, endpoint)
-        await servicer.run(trial_id, actor.impl, impl_name, actor.actor_classes, actor_id)
+        await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)

@@ -18,11 +18,13 @@ import logging
 from cogment.session import Session
 from abc import ABC, abstractmethod
 
+ENVIRONMENT_ACTOR_NAME = "env"
+
 
 class Environment:
     def __init__(self):
         self.env_id = -1
-        self.name = "env"
+        self.name = ENVIRONMENT_ACTOR_NAME
 
         self._message = []
 
@@ -39,7 +41,7 @@ class EnvironmentSession(Session):
         # Callbacks
         self.on_actions = None
         self.on_message = None
-        self.on_trial_over = None
+        self.on_end_request = None
 
         self._end_trial = False
         self._ignore_incoming_actions = False
@@ -70,14 +72,23 @@ class EnvironmentSession(Session):
         self._consume_obs(observations, False)
 
     def end(self, observations):
-        self._end_trial = True
-        self._consume_obs(observations, True)
+        if not self._end_trial:
+            self._end_trial = True
+            self._consume_obs(observations, True)
 
-    async def _end_request(self):
-        if self.on_trial_over is not None:
-            self.on_trial_over()
+    async def _end_request(self, actions):
+        rep = None
+        if not self._end_trial:
+            self._end_trial = True
+            if self.on_end_request is not None:
+                rep = await self.on_end_request(actions)
+
+        return rep
 
     def _new_action(self, actions):
+        if self._end_trial:
+            return
+
         if self.on_actions is not None:
             self.on_actions(actions)
             self.__actions_future = None
@@ -94,7 +105,7 @@ class EnvironmentSession(Session):
                 importlib.import_module(self._trial.cog_project.protolib), class_type[-1]
             )()
             message.payload.Unpack(user_data)
-            self.on_message(message.sender_id, user_data)
+            self.on_message(message.sender_name, user_data)
         else:
             logging.info("A message arived but was not handled.")
 

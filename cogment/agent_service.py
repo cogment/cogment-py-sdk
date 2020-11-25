@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from cogment.api.agent_pb2_grpc import AgentEndpointServicer
-import cogment.api.agent_pb2 as agent_api 
+import cogment.api.agent_pb2 as agent_api
 
 from cogment.utils import list_versions
 from cogment.trial import Trial
@@ -24,6 +24,7 @@ from cogment.actor import _ServedActorSession, Reward
 
 from prometheus_client import Summary, Counter, Gauge
 
+from types import SimpleNamespace
 import traceback
 import atexit
 import logging
@@ -31,8 +32,8 @@ import typing
 import asyncio
 
 
-def _trial_key(trial_id, actor_id):
-    return f"{trial_id}_{actor_id}"
+def _trial_key(trial_id, actor_name):
+    return f"{trial_id}_{actor_name}"
 
 
 def _impl_can_serve_actor_class(impl, actor_class):
@@ -48,12 +49,14 @@ def _impl_can_serve_actor_class(impl, actor_class):
 async def read_observations(context, agent_session):
     while True:
         request = await context.read()
+        agent_session._trial.tick_id = request.observation.tick_id
+
         obs = DecodeObservationData(
             agent_session.actor_class,
             request.observation.data,
             agent_session._latest_observation,
         )
-        agent_session._new_observation(obs, request.final)
+        agent_session._new_observation(obs)
 
 
 async def write_actions(context, agent_session):
@@ -64,11 +67,8 @@ async def write_actions(context, agent_session):
 
         msg.feedbacks.extend(agent_session.trial._gather_all_feedback())
 
-        msg.messages.extend(
-            agent_session.trial._gather_all_messages(
-                int(dict(context.invocation_metadata())["actor-id"])
-            )
-        )
+        actor_name = dict(context.invocation_metadata())["actor-name"]
+        msg.messages.extend(agent_session.trial._gather_all_messages(actor_name))
 
         await context.write(msg)
 
@@ -100,12 +100,12 @@ class AgentServicer(AgentEndpointServicer):
 
         logging.info("Agent Service started")
 
-    async def Start(self, request, context):
+    async def OnStart(self, request, context):
         metadata = dict(context.invocation_metadata())
-
-        actor_id = int(metadata["actor-id"])
+        actor_name = str(metadata["actor-name"])
         trial_id = metadata["trial-id"]
-        key = _trial_key(trial_id, actor_id)
+
+        key = _trial_key(trial_id, actor_name)
 
         if request.impl_name not in self.__impls:
             raise InvalidRequestError(
@@ -113,7 +113,13 @@ class AgentServicer(AgentEndpointServicer):
             )
         impl = self.__impls[request.impl_name]
 
-        self_info = request.actors_in_trial[actor_id]
+        self_info = None
+        for info in request.actors_in_trial:
+            if info.name == actor_name:
+                self_info = info
+                break
+        if self_info is None:
+            raise InvalidRequestError(f"Unknown agent name: {actor_name}", request=request)
 
         if self_info.actor_class not in self.__cog_project.actor_classes:
             raise InvalidRequestError(
@@ -132,7 +138,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.ACTORS_STARTED.labels(request.impl_name).inc()
 
-        trial = Trial(metadata["trial-id"], request.actors_in_trial, self.__cog_project)
+        trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
 
         new_session = _ServedActorSession(
             impl.impl, actor_class, trial, self_info.name, request.impl_name
@@ -144,12 +150,28 @@ class AgentServicer(AgentEndpointServicer):
 
         return agent_api.AgentStartReply()
 
-    async def End(self, request, context):
+    async def OnEnd(self, request, context):
         metadata = dict(context.invocation_metadata())
-        key = _trial_key(metadata["trial-id"], metadata["actor-id"])
+        key = _trial_key(metadata["trial-id"], metadata["actor-name"])
         agent_session = self.__agent_sessions[key]
 
-        await agent_session._end()
+        package = SimpleNamespace(observations=[], rewards=[], messages=[])
+        for obs_request in request.observations():
+            obs = DecodeObservationData(
+                agent_session.actor_class,
+                obs_request.data,
+                agent_session._latest_observation)
+            package.observations.append(obs)
+
+        for rew_request in request.rewards():
+            reward = Reward()
+            reward._set_all(rew_request, -1)
+            package.rewards.append(reward)
+
+        for msg_request in request.messages():
+            package.messages.append(msg_request)
+
+        await agent_session._end(package)
 
         self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
 
@@ -157,9 +179,9 @@ class AgentServicer(AgentEndpointServicer):
 
         return agent_api.AgentEndReply()
 
-    async def Decide(self, request_iterator, context):
+    async def OnObservation(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
-        key = _trial_key(metadata["trial-id"], metadata["actor-id"])
+        key = _trial_key(metadata["trial-id"], metadata["actor-name"])
 
         agent_session = self.__agent_sessions[key]
 
@@ -177,15 +199,15 @@ class AgentServicer(AgentEndpointServicer):
 
             del self.__agent_sessions[key]
 
-    async def Reward(self, request, context):
+    async def OnReward(self, request, context):
         metadata = dict(context.invocation_metadata())
-
-        actor_id = int(metadata["actor-id"])
+        actor_name = int(metadata["actor-name"])
         trial_id = metadata["trial-id"]
-        key = _trial_key(trial_id, actor_id)
+
+        key = _trial_key(trial_id, actor_name)
 
         reward = Reward()
-        reward = reward._set_all(request.reward, request.tick_id)
+        reward._set_all(request.reward, request.tick_id)
 
         agent_session = self.__agent_sessions[key]
         if reward.value < 0.0:
@@ -199,10 +221,10 @@ class AgentServicer(AgentEndpointServicer):
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
-
-        actor_id = int(metadata["actor-id"])
+        actor_name = int(metadata["actor-name"])
         trial_id = metadata["trial-id"]
-        key = _trial_key(trial_id, actor_id)
+
+        key = _trial_key(trial_id, actor_name)
 
         agent_session = self.__agent_sessions[key]
 
@@ -210,7 +232,7 @@ class AgentServicer(AgentEndpointServicer):
             agent_session._new_message(message)
             self.MESSAGES_RECEIVED.labels(agent_session.name).inc()
 
-        return agent_api.AgentOnMessageReply()
+        return agent_api.AgentMessageReply()
 
     async def Version(self, request, context):
         try:

@@ -18,14 +18,7 @@ from cogment.errors import InvalidRequestError
 from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer as Servicer
 from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer
 
-from cogment.api.environment_pb2 import (
-    EnvStartRequest,
-    EnvStartReply,
-    EnvUpdateReply,
-    EnvEndReply,
-    ObservationSet,
-    EnvOnMessageReply,
-)
+import cogment.api.environment_pb2 as env_api
 from cogment.api.common_pb2 import Feedback, ObservationData, Observation
 from cogment.utils import list_versions
 
@@ -57,10 +50,10 @@ def new_actions_table(settings, trial):
 def pack_observations(env_session, observations, reply, tick_id):
     timestamp = int(time() * 1000000000)
 
-    new_obs = [None] * len(env_session.trial.actors)
+    new_obs = [None] * len(env_session._trial.actors)
 
     for tgt, obs in observations:
-        for actor_index, actor in enumerate(env_session.trial.actors):
+        for actor_index, actor in enumerate(env_session._trial.actors):
             if isinstance(tgt, int):
                 new_obs[actor_index] = obs
             elif tgt == "*" or tgt == "*.*":
@@ -77,9 +70,9 @@ def pack_observations(env_session, observations, reply, tick_id):
                         if actor.actor_class.id == class_name[0]:
                             new_obs[actor_index] = obs
 
-    snapshots = [True] * len(env_session.trial.actors)
+    snapshots = [True] * len(env_session._trial.actors)
 
-    for actor_index, actor in enumerate(env_session.trial.actors):
+    for actor_index, actor in enumerate(env_session._trial.actors):
         if not new_obs[actor_index]:
             raise Exception("An actor is missing an observation")
         snapshots[actor_index] = isinstance(
@@ -92,7 +85,7 @@ def pack_observations(env_session, observations, reply, tick_id):
     reply.observation_set.tick_id = tick_id
     reply.observation_set.timestamp = timestamp
 
-    for actor_index, actor in enumerate(env_session.trial.actors):
+    for actor_index, actor in enumerate(env_session._trial.actors):
         obs_id = id(new_obs[actor_index])
         obs_key = seen_observations.get(obs_id)
         if obs_key is None:
@@ -110,21 +103,41 @@ def pack_observations(env_session, observations, reply, tick_id):
         reply.observation_set.actors_map.append(obs_key)
 
 
+async def _process_reply(observations, env_session):
+    rep = env_api.EnvUpdateReply()
+
+    rep.feedbacks.extend(env_session._trial._gather_all_feedback())
+    rep.messages.extend(env_session._trial._gather_all_messages(anv_api.ENVIRONMENT_ACTOR_NAME))
+    pack_observations(env_session, observations, rep, env_session._trial.tick_id)
+
+    return rep
+
+
 async def write_observations(context, env_session):
     while True:
         observations, final = await env_session._obs_queue.get()
 
-        reply = EnvUpdateReply(end_trial=final)
-
-        reply.feedbacks.extend(env_session.trial._gather_all_feedback())
-        reply.messages.extend(env_session.trial._gather_all_messages(-1))
-
-        pack_observations(env_session, observations, reply, env_session.trial.tick_id)
-
+        reply = _process_reply(observations, env_session)
+        reply.set_end_trial(final)
         await context.write(reply)
 
         if final:
             break
+
+
+async def _process_actions(request, env_session):
+    len_actions = len(request.action_set.actions)
+    len_actors = len(env_session._trial._actions_by_actor_id)
+
+    if len_actions != len_actors:
+        raise Exception(
+            f"Received {len_actions} actions but have {len_actors} actors"
+        )
+
+    for i, action in enumerate(env_session._trial._actions_by_actor_id):
+        action.ParseFromString(request.action_set.actions[i])
+
+    return env_session._trial._actions
 
 
 async def read_actions(context, env_session):
@@ -138,18 +151,7 @@ async def read_actions(context, env_session):
             # This is just leftover inflight actions after the trial has ended.
             continue
 
-        len_actions = len(request.action_set.actions)
-        len_actors = len(env_session.trial._actions_by_actor_id)
-
-        if len_actions != len_actors:
-            raise Exception(
-                f"Received {len_actions} actions but have {len_actors} actors"
-            )
-
-        for i, action in enumerate(env_session.trial._actions_by_actor_id):
-            action.ParseFromString(request.action_set.actions[i])
-
-        env_session._new_action(env_session.trial._actions)
+        env_session._new_action(_process_actions(request, env_session))
 
 
 class EnvironmentServicer(EnvironmentEndpointServicer):
@@ -182,11 +184,9 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         logging.info("Environment Service started")
 
-    async def Start(self, request, context):
+    async def OnStart(self, request, context):
         metadata = dict(context.invocation_metadata())
-
         trial_id = metadata["trial-id"]
-        key = trial_id
 
         target_impl = request.impl_name
         if not target_impl:
@@ -198,6 +198,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             )
         impl = self.__impls[target_impl]
 
+        key = trial_id
         if key in self.__env_sessions:
             raise InvalidRequestError(
                 message="Environment already exists", request=request
@@ -212,12 +213,11 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             trial_config = self.__cog_project.trial.config_type()
             trial_config.ParseFromString(request.trial_config.content)
 
-        trial = Trial(metadata["trial-id"], request.actors_in_trial, self.__cog_project)
+        trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
+        trial.tick_id = 0
 
         # action table time
-        actions_by_actor_class, actions_by_actor_id = new_actions_table(
-            self.__cog_project, trial
-        )
+        actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_project, trial)
 
         trial._actions = actions_by_actor_class
         trial._actions_by_actor_id = actions_by_actor_id
@@ -232,22 +232,20 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         observations, _ = await env_session._obs_queue.get()
 
-        reply = EnvStartReply()
+        reply = env_api.EnvStartReply()
         pack_observations(env_session, observations, reply, 0)
 
         return reply
 
-    async def Update(self, request_iterator, context):
-
+    async def OnAction(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
-
         trial_id = metadata["trial-id"]
-        key = trial_id
 
+        key = trial_id
         env_session = self.__env_sessions[key]
 
         with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
-            env_session.trial.tick_id += 1
+            env_session._trial.tick_id += 1
 
             # We are going to have three concurrent coroutines:
             # - One that reads actions from the orchestrator
@@ -272,37 +270,39 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
-
         trial_id = metadata["trial-id"]
-        key = trial_id
 
+        key = trial_id
         env_session = self.__env_sessions[key]
 
         for message in request.messages:
             self.MESSAGES_RECEIVED.labels(env_session.impl_name).inc()
             env_session._new_message(message)
 
-        return EnvOnMessageReply()
+        return env_api.EnvMessageReply()
 
-    async def End(self, request, context):
-
+    async def OnEnd(self, request, context):
         metadata = dict(context.invocation_metadata())
-
         trial_id = metadata["trial-id"]
-        key = trial_id
 
+        key = trial_id
         env_session = self.__env_sessions[key]
 
-        for actor in env_session.trial.actors:
-            self.TRAINING_DURATION.labels(actor.name).observe(env_session.trial.tick_id)
+        for actor in env_session._trial.actors:
+            self.TRAINING_DURATION.labels(actor.name).observe(env_session._trial.tick_id)
 
-        await env_session._end_request()
+        obs = await env_session._end_request(_process_actions(request, env_session))
+
+        if obs:
+            reply = _process_reply(obs, env_session)
+        else:
+            reply = env_api.EnvUpdateReply()
+        reply.set_end_trial(True)
 
         self.TRIALS_ENDED.labels(env_session.impl_name).inc()
-
         self.__env_sessions.pop(key, None)
 
-        return EnvEndReply()
+        return reply
 
     def __cleanup(self):
         self.__env_sessions.clear()

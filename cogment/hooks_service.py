@@ -15,7 +15,7 @@
 from types import SimpleNamespace
 
 from cogment.api.hooks_pb2_grpc import TrialHooksServicer
-from cogment.api.hooks_pb2 import TrialContext
+from cogment.api.hooks_pb2 import PreTrialContext
 import cogment.utils as utils
 from cogment.trial import Trial
 from cogment.prehook import _ServedPrehookSession
@@ -32,11 +32,11 @@ class PrehookServicer(TrialHooksServicer):
 
         logging.info("Prehook Service started")
 
-    async def PreTrial(self, request, context):
+    async def OnPreTrial(self, request, context):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
-        trial = Trial(trial_id, [], self.__cog_project)
 
+        trial = Trial(trial_id, [], self.__cog_project)
         user_params = utils.raw_params_to_user_params(request.params, self.__cog_project)
 
         prehook = _ServedPrehookSession(user_params, trial)
@@ -44,7 +44,7 @@ class PrehookServicer(TrialHooksServicer):
             await impl(prehook)
             prehook._recode()
 
-        reply = TrialContext()
+        reply = PreTrialContext()
         reply.CopyFrom(request)
         reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_project))
         return reply
