@@ -20,6 +20,7 @@ from cogment.actor import _ClientActorSession, Reward
 from cogment.api.common_pb2 import TrialActor
 from cogment.api.orchestrator_pb2_grpc import ActorEndpointStub
 from cogment.delta_encoding import DecodeObservationData
+from cogment.errors import InvalidRequestError
 from cogment.trial import Trial
 
 import asyncio
@@ -99,8 +100,8 @@ class ClientServicer:
         # TODO: Handle properly the multiple actor classes.  Including "all" classes
         #       when the list is empty
         if actor_name is None:
-            act_class = actor_classes[0]
-            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_class=act_class)
+            requested_actor_class = actor_classes[0]
+            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_class=requested_actor_class)
         else:
             req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_name=actor_name)
 
@@ -114,17 +115,20 @@ class ClientServicer:
                 self_info = info
                 break
         if self_info is None:
-            raise InvalidRequestError(f"Unknown agent name: {reply.actor_name}", request=reply)
+            raise InvalidRequestError(f"Unknown actor name: {reply.actor_name}", request=reply)
 
-        joined_actor_class = self.cog_project.actor_classes[self_info.actor_class]
-        assert not actor_classes or joined_actor_class in actor_classes
+        actor_class = self.cog_project.actor_classes[self_info.actor_class]
 
-        client_session = _ClientActorSession(
-            impl,
-            actor_class,
-            trial,
-            self_info.name,
-            impl_name,
+        config = None
+        if reply.HasField("config"):
+            if actor_class.config_type is None:
+                raise Exception(
+                    f"Actor [{self_info.name}] received config data of unknown type (was it defined in cogment.yaml)")
+            config = actor_class.config_type()
+            config.ParseFromString(reply.config.content)
+
+        new_session = _ClientActorSession(
+            impl, actor_class, trial, self_info.name, impl_name, config
         )
 
         loop = asyncio.get_running_loop()
@@ -132,10 +136,10 @@ class ClientServicer:
         metadata = (("trial-id", trial.id), ("actor-name", self_info.name))
         action_conn = self._actor_stub.ActionStream(metadata)
 
-        reader_task = loop.create_task(read_observations(client_session, action_conn))
-        writer_task = loop.create_task(write_actions(client_session, action_conn))
+        reader_task = loop.create_task(read_observations(new_session, action_conn))
+        writer_task = loop.create_task(write_actions(new_session, action_conn))
 
-        await impl(client_session)
+        await impl(new_session)
 
         reader_task.cancel()
         writer_task.cancel()

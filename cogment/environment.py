@@ -35,9 +35,11 @@ class Environment:
 class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 
-    def __init__(self, impl, trial, impl_name):
+    def __init__(self, impl, trial, impl_name, config):
         super().__init__(trial)
         self.impl_name = impl_name
+        self.config = config
+
         # Callbacks
         self.on_actions = None
         self.on_message = None
@@ -116,8 +118,8 @@ class EnvironmentSession(Session):
 class _ServedEnvironmentSession(EnvironmentSession):
     """An environment session that is served from an environment service."""
 
-    def __init__(self, impl, trial, impl_name):
-        super().__init__(impl, trial, impl_name)
+    def __init__(self, impl, trial, impl_name, config):
+        super().__init__(impl, trial, impl_name, config)
         self._obs_queue = asyncio.Queue()
 
     # maybe needs to be consume observation

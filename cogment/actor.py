@@ -104,11 +104,13 @@ class Reward:
 class ActorSession(Session):
     """This represents an actor being performed locally."""
 
-    def __init__(self, impl, actor_class, trial, name, impl_name):
+    def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(trial)
         self.actor_class = actor_class
         self.name = name
         self.impl_name = impl_name
+        self.config = config
+
         # Callbacks
         self.on_observation = None
         self.on_reward = None
@@ -190,8 +192,8 @@ class ActorSession(Session):
 
 
 class _ServedActorSession(ActorSession):
-    def __init__(self, impl, actor_class, trial, name, impl_name):
-        super().__init__(impl, actor_class, trial, name, impl_name)
+    def __init__(self, impl, actor_class, trial, name, impl_name, config):
+        super().__init__(impl, actor_class, trial, name, impl_name, config)
         self._action_queue = asyncio.Queue()
 
     async def _consume_action(self, action):
@@ -199,8 +201,8 @@ class _ServedActorSession(ActorSession):
 
 
 class _ClientActorSession(ActorSession):
-    def __init__(self, impl, actor_class, trial, name, impl_name):
-        super().__init__(impl, actor_class, trial, name, impl_name)
+    def __init__(self, impl, actor_class, trial, name, impl_name, config):
+        super().__init__(impl, actor_class, trial, name, impl_name, config)
         self._action_queue = asyncio.Queue()
 
     async def _consume_action(self, action):

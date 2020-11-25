@@ -140,8 +140,16 @@ class AgentServicer(AgentEndpointServicer):
 
         trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
 
+        config = None
+        if request.HasField("config"):
+            if actor_class.config_type is None:
+                raise Exception(
+                        f"Actor [{actor_name}] received config data of unknown type (was it defined in cogment.yaml)")
+            config = actor_class.config_type()
+            config.ParseFromString(request.config.content)
+
         new_session = _ServedActorSession(
-            impl.impl, actor_class, trial, self_info.name, request.impl_name
+            impl.impl, actor_class, trial, self_info.name, request.impl_name, config
         )
         self.__agent_sessions[key] = new_session
 

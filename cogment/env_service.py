@@ -188,30 +188,23 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
 
-        target_impl = request.impl_name
-        if not target_impl:
-            target_impl = "default"
+        target_impl_name = request.impl_name
+        if not target_impl_name:
+            target_impl_name = "default"
 
-        if target_impl not in self.__impls:
+        impl = self.__impls.get(target_impl_name)
+        if impl is None:
             raise InvalidRequestError(
-                message=f"Unknown env impl: {target_impl}", request=request
+                message=f"Unknown environment implementation name [{target_impl_name}]", request=request
             )
-        impl = self.__impls[target_impl]
 
         key = trial_id
         if key in self.__env_sessions:
             raise InvalidRequestError(
-                message="Environment already exists", request=request
+                message=f"Environment already exists for trial [{trial_id}]", request=request
             )
 
-        self.TRIALS_STARTED.labels(request.impl_name).inc()
-
-        trial_config = None
-        if request.HasField("trial_config"):
-            if self.__cog_project.trial.config_type is None:
-                raise Exception("trial config data but no config type")
-            trial_config = self.__cog_project.trial.config_type()
-            trial_config.ParseFromString(request.trial_config.content)
+        self.TRIALS_STARTED.labels(target.impl_name).inc()
 
         trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
         trial.tick_id = 0
@@ -222,7 +215,14 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         trial._actions = actions_by_actor_class
         trial._actions_by_actor_id = actions_by_actor_id
 
-        new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl)
+        config = None
+        if request.HasField("config"):
+            if self.__cog_project.environment.config_type is None:
+                raise Exception("Environment received config data of unknown type (was it defined in cogment.yaml)")
+            config = self.__cog_project.environment.config_type()
+            config.ParseFromString(request.config.content)
+
+        new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl_name, config)
         self.__env_sessions[key] = new_session
 
         env_session = self.__env_sessions[key]
