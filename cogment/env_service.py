@@ -204,7 +204,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 message=f"Environment already exists for trial [{trial_id}]", request=request
             )
 
-        self.TRIALS_STARTED.labels(target.impl_name).inc()
+        self.TRIALS_STARTED.labels(target_impl_name).inc()
 
         trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
         trial.tick_id = 0
