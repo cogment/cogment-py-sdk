@@ -59,9 +59,9 @@ async def read_observations(client_session, action_conn):
             for obs_reply in reply.data.observations():
                 tick_id = obs_reply.tick_id
                 obs = DecodeObservationData(
-                    agent_session.actor_class,
+                    client_session.actor_class,
                     obs_reply.data,
-                    agent_session._latest_observation)
+                    client_session._latest_observation)
                 package.observations.append(obs)
 
             for rew_request in reply.data.rewards():
