@@ -151,8 +151,6 @@ class ActorSession(Session):
         if not self._ended:
             self._ended = True
 
-        # self.__event_queue.join()
-
         if self.__event_queue:
             std_messages = []
             for msg in package.messages:
@@ -160,7 +158,7 @@ class ActorSession(Session):
             package.messages = std_messages
 
             event = {"final_data" : package}
-            self.__event_queue.put_nowait(event)
+            await self.__event_queue.put(event)
         else:
             logging.warning("The actor received final data that it was unable to handle.")
 
@@ -203,11 +201,8 @@ class _ServedActorSession(ActorSession):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
 
     async def _retrieve_action(self):
-        action = None
-        if self._action_queue is not None:
-            action = await self._action_queue.get()
-            self._action_queue.task_done()
-
+        action = await self._action_queue.get()
+        self._action_queue.task_done()
         return action
 
 
@@ -216,9 +211,6 @@ class _ClientActorSession(ActorSession):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
 
     async def _retrieve_action(self):
-        action = None
-        if self._action_queue is not None:
-            action = await self._action_queue.get()
-            self._action_queue.task_done()
-
+        action = await self._action_queue.get()
+        self._action_queue.task_done()
         return action

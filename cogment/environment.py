@@ -91,14 +91,12 @@ class EnvironmentSession(Session):
         if not self.__started:
             return None
 
-        # self.__event_queue.join()
-
         result = None
         if self.__event_queue:
             self.__final_obs_future = asyncio.get_running_loop().create_future()
 
             event = {"final_actions" : actions}
-            self.__event_queue.put_nowait(event)
+            await self.__event_queue.put(event)
 
             result = await self.__final_obs_future()
             self.__final_obs_future = None
@@ -138,9 +136,6 @@ class _ServedEnvironmentSession(EnvironmentSession):
         super().__init__(impl, trial, impl_name, config)
 
     async def _retrieve_obs(self):
-        obs = (None, False)
-        if self._obs_queue is not None:
-            obs = await self._obs_queue.get()
-            self._obs_queue.task_done()
-
+        obs = await self._obs_queue.get()
+        self._obs_queue.task_done()
         return obs
