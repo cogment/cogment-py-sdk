@@ -15,7 +15,6 @@
 from abc import ABC, abstractmethod
 
 from cogment.errors import InvalidRequestError
-from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer as Servicer
 from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer
 
 import cogment.api.environment_pb2 as env_api
@@ -26,7 +25,7 @@ from types import SimpleNamespace, ModuleType
 from typing import Any, Dict, Tuple
 import grpc.experimental.aio
 
-from cogment.environment import _ServedEnvironmentSession
+from cogment.environment import _ServedEnvironmentSession, ENVIRONMENT_ACTOR_NAME
 
 from cogment.trial import Trial
 
@@ -104,10 +103,10 @@ def pack_observations(env_session, observations, reply, tick_id):
 
 
 async def _process_reply(observations, env_session):
-    rep = env_api.EnvUpdateReply()
+    rep = env_api.EnvActionReply()
 
     rep.feedbacks.extend(env_session._trial._gather_all_feedback())
-    rep.messages.extend(env_session._trial._gather_all_messages(anv_api.ENVIRONMENT_ACTOR_NAME))
+    rep.messages.extend(env_session._trial._gather_all_messages(ENVIRONMENT_ACTOR_NAME))
     pack_observations(env_session, observations, rep, env_session._trial.tick_id)
 
     return rep
@@ -115,7 +114,7 @@ async def _process_reply(observations, env_session):
 
 async def write_observations(context, env_session):
     while True:
-        observations, final = await env_session._obs_queue.get()
+        observations, final = await env_session._retrieve_obs()
 
         reply = _process_reply(observations, env_session)
         reply.set_end_trial(final)
@@ -146,10 +145,6 @@ async def read_actions(context, env_session):
 
         if request == grpc.experimental.aio.EOF:
             break
-
-        if env_session._ignore_incoming_actions:
-            # This is just leftover inflight actions after the trial has ended.
-            continue
 
         env_session._new_action(_process_actions(request, env_session))
 
@@ -230,7 +225,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        observations, _ = await env_session._obs_queue.get()
+        observations, _ = await env_session._retrieve_obs()
 
         reply = env_api.EnvStartReply()
         pack_observations(env_session, observations, reply, 0)
@@ -256,12 +251,9 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             writer_task = loop.create_task(write_observations(context, env_session))
 
             await env_session._task
-
-            if not env_session._end_trial:
+            if not env_session._ended:
                 del self.__env_sessions[key]
-                raise Exception("Trial was never ended")
-
-            env_session._ignore_incoming_actions = True
+                raise Exception(f"Trial [{trial_id}] was never ended")
 
             await writer_task
             await reader_task
@@ -296,7 +288,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         if obs:
             reply = _process_reply(obs, env_session)
         else:
-            reply = env_api.EnvUpdateReply()
+            reply = env_api.EnvActionReply()
         reply.set_end_trial(True)
 
         self.TRIALS_ENDED.labels(env_session.impl_name).inc()

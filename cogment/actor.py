@@ -111,81 +111,88 @@ class ActorSession(Session):
         self.impl_name = impl_name
         self.config = config
 
-        # Callbacks
-        self.on_observation = None
-        self.on_reward = None
-        self.on_message = None
-        self.on_trial_over = None
-
+        self._ended = False
+        self._action_queue = asyncio.Queue()
+        self._task = None  # Task used to call _run()
         self._latest_observation = None
+
         self.__impl = impl
         self.__started = False
+        self.__event_queue = None
         self.__obs_future = None
-        self._task = None
 
     @abstractmethod
-    async def _consume_action(self, action):
+    async def _retrieve_action(self):
         pass
 
     def start(self):
         assert not self.__started
+        assert not self._ended
+
+        self.__event_queue = asyncio.Queue()
         self.__started = True
 
+    async def event_loop(self):
+        assert self.__started
+        assert not self._ended
+
+        loop_active = True
+        while loop_active:
+            event = await self.__event_queue.get()
+            keep_looping = yield event
+            self.__event_queue.task_done()
+            loop_active = keep_looping is None or bool(keep_looping)
+
+    def do_action(self, action):
+        assert self.__started
+        self._action_queue.put_nowait(action)
+
     async def _end(self, package):
-        if self.on_trial_over is not None:
-            self.on_trial_over(package)
-        self.__obs_future = None
+        if not self._ended:
+            self._ended = True
 
-    async def get_observation(self):
-        assert self.__started
-        assert self.on_observation is None
+        # self.__event_queue.join()
 
-        if self.is_trial_over():
-            return None
+        if self.__event_queue:
+            std_messages = []
+            for msg in package.messages:
+                std_messages.append((msg.sender_name(), msg.payload()))
+            package.messages = std_messages
 
-        self.__obs_future = asyncio.get_running_loop().create_future()
-        return await self.__obs_future
-
-    async def get_all_observations(self):
-        while not self.is_trial_over():
-            obs = await self.get_observation()
-            if obs is None:
-                break
-            action = yield obs
-            if action:
-                self.do_action(action)
-
-    async def do_action(self, action):
-        assert self.__started
-        await self._consume_action(action)
+            event = {"final_data" : package}
+            self.__event_queue.put_nowait(event)
+        else:
+            logging.warning("The actor received final data that it was unable to handle.")
 
     def _new_observation(self, obs):
-        self._latest_observation = obs
+        if not self.__started or self._ended:
+            return
 
-        if self.on_observation is not None:
-            self.on_observation(obs)
-            self.__obs_future = None
-        elif self.__obs_future is not None:
-            self.__obs_future.set_result(obs)
-            self.__obs_future = None
-        elif self.__started:
-            logging.warning("An observation was missed")
+        if self.__event_queue:
+            event = {"observation" : obs}
+            self.__event_queue.put_nowait(event)
+        else:
+            logging.warning("The actor received an observation that it was unable to handle.")
 
     def _new_reward(self, reward):
-        if self.on_reward is not None:
-            self.on_reward(reward)
-        elif self.__started:
-            logging.warning("A reward arived but was not handled.")
+        if not self.__started or self._ended:
+            return
+
+        if self.__event_queue:
+            event = {"reward" : reward}
+            self.__event_queue.put_nowait(event)
+        else:
+            logging.warning("The actor received a reward that it was unable to handle.")
 
     def _new_message(self, message):
-        if self.on_message is not None:
-            class_type = message.payload.type_url.split(".")
-            user_data = getattr(importlib.import_module(
-                self._trial.cog_project.protolib), class_type[-1])()
-            message.payload.Unpack(user_data)
-            self.on_message(message.sender_name, user_data)
-        elif self.__started:
-            logging.info("A message arived but was not handled.")
+        if not self.__started or self._ended:
+            return
+
+        if self.__event_queue:
+            event = {"message" : (message.sender_name(), message.payload())}
+            self.__event_queue.put_nowait(event)
+        else:
+            logging.warning("The actor received a message that it was unable to handle.")
 
     async def _run(self):
         await self.__impl(self)
@@ -194,16 +201,24 @@ class ActorSession(Session):
 class _ServedActorSession(ActorSession):
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
-        self._action_queue = asyncio.Queue()
 
-    async def _consume_action(self, action):
-        await self._action_queue.put(action)
+    async def _retrieve_action(self):
+        action = None
+        if self._action_queue is not None:
+            action = await self._action_queue.get()
+            self._action_queue.task_done()
+
+        return action
 
 
 class _ClientActorSession(ActorSession):
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
-        self._action_queue = asyncio.Queue()
 
-    async def _consume_action(self, action):
-        await self._action_queue.put(action)
+    async def _retrieve_action(self):
+        action = None
+        if self._action_queue is not None:
+            action = await self._action_queue.get()
+            self._action_queue.task_done()
+
+        return action

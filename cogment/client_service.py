@@ -22,6 +22,7 @@ from cogment.api.orchestrator_pb2_grpc import ActorEndpointStub
 from cogment.delta_encoding import DecodeObservationData
 from cogment.errors import InvalidRequestError
 from cogment.trial import Trial
+from types import SimpleNamespace
 
 import asyncio
 
@@ -38,8 +39,8 @@ async def read_observations(client_session, action_conn):
                 obs = DecodeObservationData(
                     client_session.actor_class,
                     obs_reply.data,
-                    client_session._latest_observation
-                )
+                    client_session._latest_observation)
+                client_session._latest_observation = obs
                 client_session._new_observation(obs)
 
             for rew_request in reply.data.rewards():
@@ -62,6 +63,7 @@ async def read_observations(client_session, action_conn):
                     client_session.actor_class,
                     obs_reply.data,
                     client_session._latest_observation)
+                client_session._latest_observation = obs
                 package.observations.append(obs)
 
             for rew_request in reply.data.rewards():
@@ -82,7 +84,7 @@ async def read_observations(client_session, action_conn):
 
 async def write_actions(client_session, action_conn):
     while True:
-        act = await client_session._action_queue.get()
+        act = await client_session._retrieve_action()
         action_req = orchestrator.TrialActionRequest()
         action_req.action.content = act.SerializeToString()
         await action_conn.write(action_req)

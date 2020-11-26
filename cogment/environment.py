@@ -40,76 +40,92 @@ class EnvironmentSession(Session):
         self.impl_name = impl_name
         self.config = config
 
-        # Callbacks
-        self.on_actions = None
-        self.on_message = None
-        self.on_end_request = None
-
-        self._end_trial = False
-        self._ignore_incoming_actions = False
+        self._ended = False
+        self._obs_queue = asyncio.Queue()
+        self._task = None  # Task used to call _run()
 
         self.__impl = impl
         self.__started = False
-        self.__actions_future = None
+        self.__event_queue = None
+        self.__final_obs_future = None
 
     @abstractmethod
-    def _consume_obs(self, observations, final):
+    async def _retrieve_obs(self):
         pass
 
     def start(self, observations):
         assert not self.__started
+        assert not self._ended
+
+        self.__event_queue = asyncio.Queue()
         self.__started = True
 
-        self._consume_obs(observations, False)
+        self._obs_queue.put_nowait(observations)
 
-    async def gather_actions(self):
+    async def event_loop(self):
         assert self.__started
-        assert self.on_actions is None
+        assert not self._ended
 
-        self.__actions_future = asyncio.get_running_loop().create_future()
-        return await self.__actions_future
+        loop_active = True
+        while loop_active:
+            event = await self.__event_queue.get()
+            keep_looping = yield event
+            self.__event_queue.task_done()
+            loop_active = keep_looping is None or bool(keep_looping)
 
     def produce_observations(self, observations):
         assert self.__started
-        self._consume_obs(observations, False)
+        self._obs_queue.put_nowait((observations, False))
 
     def end(self, observations):
-        if not self._end_trial:
-            self._end_trial = True
-            self._consume_obs(observations, True)
+        if self.__final_obs_future is not None:
+            self.__final_obs_future.set_result(observations)
+        elif not self._ended:
+            self._ended = True
+            self._obs_queue.put_nowait((observations, True))
 
     async def _end_request(self, actions):
-        rep = None
-        if not self._end_trial:
-            self._end_trial = True
-            if self.on_end_request is not None:
-                rep = await self.on_end_request(actions)
+        if self._ended:
+            return None
+        self._ended = True
+        if not self.__started:
+            return None
 
-        return rep
+        # self.__event_queue.join()
+
+        result = None
+        if self.__event_queue:
+            self.__final_obs_future = asyncio.get_running_loop().create_future()
+
+            event = {"final_actions" : actions}
+            self.__event_queue.put_nowait(event)
+
+            result = await self.__final_obs_future()
+            self.__final_obs_future = None
+        else:
+            logging.warning("The environment received an end request that it was unable to handle.")
+
+        return result
 
     def _new_action(self, actions):
-        if self._end_trial:
+        if not self.__started or self._ended:
             return
 
-        if self.on_actions is not None:
-            self.on_actions(actions)
-            self.__actions_future = None
-        elif self.__actions_future:
-            self.__actions_future.set_result(actions)
-            self.__actions_future = None
+        if self.__event_queue:
+            event = {"actions" : actions}
+            self.__event_queue.put_nowait(event)
         else:
             logging.warning("The environment received actions that it was unable to handle.")
 
     def _new_message(self, message):
-        if self.on_message is not None:
-            class_type = message.payload.type_url.split(".")
-            user_data = getattr(
-                importlib.import_module(self._trial.cog_project.protolib), class_type[-1]
-            )()
-            message.payload.Unpack(user_data)
-            self.on_message(message.sender_name, user_data)
+        if not self.__started or self._ended:
+            return
+
+        if self.__event_queue:
+            event = {"message" : (message.sender_name(), message.payload())}
+            self.__event_queue.put_nowait(event)
         else:
-            logging.info("A message arived but was not handled.")
+            logging.warning("The environment received a message that it was unable to handle.")
 
     async def _run(self):
         await self.__impl(self)
@@ -120,8 +136,11 @@ class _ServedEnvironmentSession(EnvironmentSession):
 
     def __init__(self, impl, trial, impl_name, config):
         super().__init__(impl, trial, impl_name, config)
-        self._obs_queue = asyncio.Queue()
 
-    # maybe needs to be consume observation
-    def _consume_obs(self, observations, final):
-        self._obs_queue.put_nowait((observations, final))
+    async def _retrieve_obs(self):
+        obs = (None, False)
+        if self._obs_queue is not None:
+            obs = await self._obs_queue.get()
+            self._obs_queue.task_done()
+
+        return obs

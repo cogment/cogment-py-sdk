@@ -135,10 +135,10 @@ def _get_args_for_reloading():
     # not exist if a setuptools script is installed as an egg. It may be
     # set incorrectly for entry points created with pip on Windows.
     if getattr(__main__, "__package__", None) is None or (
-            os.name == "nt"
-            and __main__.__package__ == ""
-            and not os.path.exists(py_script)
-            and os.path.exists(py_script + ".exe")
+            os.name == "nt" and
+            __main__.__package__ == "" and
+            not os.path.exists(py_script) and
+            os.path.exists(py_script + ".exe")
     ):
         # Executed a file, like "python app.py".
         py_script = os.path.abspath(py_script)
@@ -150,8 +150,8 @@ def _get_args_for_reloading():
                 py_script += ".exe"
 
             if (
-                    os.path.splitext(sys.executable)[1] == ".exe"
-                    and os.path.splitext(py_script)[1] == ".exe"
+                    os.path.splitext(sys.executable)[1] == ".exe" and
+                    os.path.splitext(py_script)[1] == ".exe"
             ):
                 rv.pop(0)
 

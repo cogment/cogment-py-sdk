@@ -56,12 +56,13 @@ async def read_observations(context, agent_session):
             request.observation.data,
             agent_session._latest_observation,
         )
+        agent_session._latest_observation = obs
         agent_session._new_observation(obs)
 
 
 async def write_actions(context, agent_session):
     while True:
-        act = await agent_session._action_queue.get()
+        act = await agent_session._retrieve_action()
         msg = agent_api.AgentActionReply()
         msg.action.content = act.SerializeToString()
 
@@ -144,7 +145,7 @@ class AgentServicer(AgentEndpointServicer):
         if request.HasField("config"):
             if actor_class.config_type is None:
                 raise Exception(
-                        f"Actor [{actor_name}] received config data of unknown type (was it defined in cogment.yaml)")
+                    f"Actor [{actor_name}] received config data of unknown type (was it defined in cogment.yaml)")
             config = actor_class.config_type()
             config.ParseFromString(request.config.content)
 
@@ -169,6 +170,7 @@ class AgentServicer(AgentEndpointServicer):
                 agent_session.actor_class,
                 obs_request.data,
                 agent_session._latest_observation)
+            agent_session._latest_observation = obs
             package.observations.append(obs)
 
         for rew_request in request.rewards():

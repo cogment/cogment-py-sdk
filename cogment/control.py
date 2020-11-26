@@ -18,6 +18,10 @@ from abc import ABC, abstractmethod
 from types import SimpleNamespace
 
 
+# Future functionality:
+#   - Accept/refuse actor connections
+#   - Diconnect actors
+#   - Send messages?
 class ControlSession(ABC):
     def __init__(self, trial, stub):
         self._trial = trial
