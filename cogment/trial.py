@@ -13,8 +13,9 @@
 # limitations under the License.
 
 from cogment.actor import Actor
-from cogment.environment import Environment, ENVIRONMENT_ACTOR_NAME
 from cogment.api.common_pb2 import Feedback, Message
+from cogment.environment import Environment, ENVIRONMENT_ACTOR_NAME
+from cogment.errors import Error
 
 
 class Trial:
@@ -40,7 +41,8 @@ class Trial:
 
     def _add_actors(self, actors_in_trial):
         for actor_in_trial in actors_in_trial:
-            # TODO, handle what happens when the class is not found.
+            if actor_in_trial.actor_class not in self.cog_settings.actor_classes:
+                raise Error(f"class '{actor_in_trial.actor_class}' of actor '{actor_in_trial.name}' can not be found.")
             actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
             actor = Actor(actor_class, actor_in_trial.name)
             self.actors.append(actor)

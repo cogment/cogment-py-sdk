@@ -17,6 +17,7 @@ import pytest
 from cogment.actor import Actor
 from cogment.api.common_pb2 import TrialActor
 from cogment.environment import Environment
+from cogment.errors import Error
 from cogment.trial import Trial
 
 # Works because the `test_cogment_app` directory is added to sys.path in conftest.py
@@ -37,6 +38,13 @@ def trial():
 
 
 class TestTrial:
+    def test_add_actor_with_unknown_class(self):
+        with pytest.raises(Error):
+            Trial("test_add_actor_with_unknown_class", [
+                TrialActor(actor_class="my_actor_class_1", name="agent_1"),
+                TrialActor(actor_class="my_unknown_actor_class", name="agent_2")
+            ], cog_settings)
+
     def test_get_environment(self, trial):
         assert isinstance(trial.get_environment(), Environment)
 
