@@ -60,7 +60,7 @@ class EnvironmentSession(Session):
         self.__event_queue = asyncio.Queue()
         self.__started = True
 
-        self._obs_queue.put_nowait(observations)
+        self._obs_queue.put_nowait((observations, False))
 
     async def event_loop(self):
         assert self.__started

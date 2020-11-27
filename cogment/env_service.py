@@ -220,15 +220,13 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl_name, config)
         self.__env_sessions[key] = new_session
 
-        env_session = self.__env_sessions[key]
-
         loop = asyncio.get_running_loop()
         new_session._task = loop.create_task(new_session._run())
 
-        observations, _ = await env_session._retrieve_obs()
+        observations, _ = await new_session._retrieve_obs()
 
         reply = env_api.EnvStartReply()
-        pack_observations(env_session, observations, reply, 0)
+        pack_observations(new_session, observations, reply, 0)
 
         return reply
 
