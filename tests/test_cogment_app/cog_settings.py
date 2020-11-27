@@ -1,3 +1,4 @@
+
 import cogment as _cog
 from types import SimpleNamespace
 from typing import List
@@ -6,10 +7,10 @@ import data_pb2 as data_pb
 
 protolib = "data_pb2"
 
-_my_actor_class_class = _cog.ActorClass(
-    id="my_actor_class",
+_my_actor_class_1_class = _cog.ActorClass(
+    id='my_actor_class_1',
     config_type=None,
-    action_space=data_pb.My_actor_classAction,
+    action_space=data_pb.Action,
     observation_space=data_pb.Observation,
     observation_delta=data_pb.Observation,
     observation_delta_apply_fn=_cog.delta_encoding._apply_delta_replace,
@@ -18,58 +19,49 @@ _my_actor_class_class = _cog.ActorClass(
     # message_space=None
 )
 
-_my_agent_class_1_class = _cog.ActorClass(
-    id="my_agent_class_1",
+_my_actor_class_2_class = _cog.ActorClass(
+    id='my_actor_class_2',
     config_type=None,
-    action_space=data_pb.My_agent_class_1Action,
+    action_space=data_pb.Action,
     observation_space=data_pb.Observation,
     observation_delta=data_pb.Observation,
     observation_delta_apply_fn=_cog.delta_encoding._apply_delta_replace,
-    feedback_space=None
-    # message_space=None
-)
-
-_my_agent_class_2_class = _cog.ActorClass(
-    id="my_agent_class_2",
-    config_type=None,
-    action_space=data_pb.My_agent_class_2Action,
-    observation_space=data_pb.Observation,
-    observation_delta=data_pb.Observation,
-    observation_delta_apply_fn=_cog.delta_encoding._apply_delta_replace,
-    feedback_space=None
+    feedback_space=None,
+    # TODO remove from the generator
     # message_space=None
 )
 
 
 actor_classes = _cog.ActorClassList(
-    _my_actor_class_class, _my_agent_class_1_class, _my_agent_class_2_class,
+    _my_actor_class_1_class,
+    _my_actor_class_2_class,
 )
 
 # TODO remove from the generator
-# env_class = _cog.EnvClass(id="env", config_type=None, message_space=None)
+# env_class = _cog.EnvClass(
+#     id='env',
+#     config_type=None,
+#     message_space=None
+# )
 
-trial = SimpleNamespace(config_type=data_pb.TrialConfig,)
+trial = SimpleNamespace(
+    config_type=data_pb.TrialConfig,
+)
 
 # Environment
-environment = SimpleNamespace(config_type=data_pb.EnvConfig,)
+environment = SimpleNamespace(
+    config_type=data_pb.EnvConfig,
+)
 
 
 class ActionsTable:
-    my_actor_class: List[data_pb.My_actor_classAction]
-    my_agent_class_1: List[data_pb.My_agent_class_1Action]
-    my_agent_class_2: List[data_pb.My_agent_class_2Action]
+    my_actor_class_1: List[data_pb.Action]
+    my_actor_class_2: List[data_pb.Action]
 
     def __init__(self, trial):
-        self.my_actor_class = [
-            data_pb.My_actor_classAction() for _ in range(trial.actor_counts[0])
-        ]
-        self.my_agent_class_1 = [
-            data_pb.My_agent_class_1Action() for _ in range(trial.actor_counts[1])
-        ]
-        self.my_agent_class_2 = [
-            data_pb.My_agent_class_2Action() for _ in range(trial.actor_counts[2])
-        ]
+        self.my_actor_class_1 = [data_pb.Action() for _ in range(trial.actor_counts[0])]
+        self.my_actor_class_2 = [data_pb.Action() for _ in range(trial.actor_counts[1])]
 
     def all_actions(self):
-        return self.my_actor_class + self.my_agent_class_1 + self.my_agent_class_2
+        return self.my_actor_class_1 + self.my_actor_class_2
 

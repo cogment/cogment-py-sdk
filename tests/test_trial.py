@@ -27,10 +27,10 @@ from data_pb2 import EnvConfig, TrialConfig
 def trial():
     # Mimicking what's done by EnvironmentServicer::OnStart, it seems like the most complete example
     actors = [
-             TrialActor(actor_class="my_agent_class_1", name="agent_1"),
-             TrialActor(actor_class="my_agent_class_2", name="agent_2"),
-             TrialActor(actor_class="my_agent_class_1", name="agent_3"),
-             TrialActor(actor_class="my_agent_class_2", name="agent_4"),
+             TrialActor(actor_class="my_actor_class_1", name="agent_1"),
+             TrialActor(actor_class="my_actor_class_2", name="agent_2"),
+             TrialActor(actor_class="my_actor_class_1", name="agent_3"),
+             TrialActor(actor_class="my_actor_class_2", name="agent_4"),
              ]
     trial = Trial("test", actors, cog_settings)
     return trial
@@ -60,19 +60,19 @@ class TestTrial:
         assert actors[1].name == "agent_3"
 
     def test_get_actors_by_class(self, trial):
-        actors = trial.get_actors(["my_agent_class_1.*"])
+        actors = trial.get_actors(["my_actor_class_1.*"])
         assert len(actors) == 2
         assert actors[0].name == "agent_1"
         assert actors[1].name == "agent_3"
 
     def test_get_actors_by_class_and_by_name1(self, trial):
-        actors = trial.get_actors(["my_agent_class_1.*", "agent_1"])
+        actors = trial.get_actors(["my_actor_class_1.*", "agent_1"])
         assert len(actors) == 2
         assert actors[0].name == "agent_1"
         assert actors[1].name == "agent_3"
 
     def test_get_actors_by_class_and_by_name2(self, trial):
-        actors = trial.get_actors(["my_agent_class_1.*", "agent_2"])
+        actors = trial.get_actors(["my_actor_class_1.*", "agent_2"])
         assert len(actors) == 3
         assert actors[0].name == "agent_1"
         assert actors[1].name == "agent_2"

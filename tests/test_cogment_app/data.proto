@@ -10,10 +10,11 @@ message TrialConfig {
 	EnvConfig env_config = 1;
 }
 
-message Observation {}
-message My_actor_classAction {}
+message Observation {
+  int32 observed_value = 1;
+}
 
-message My_agent_class_1Action {}
-
-message My_agent_class_2Action {}
+message Action {
+  int32 action_value = 1;
+}
 

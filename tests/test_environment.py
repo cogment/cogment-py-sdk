@@ -29,11 +29,12 @@ TEST_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_cogme
 
 @pytest.fixture(scope="function")
 def orchestrator_endpoint():
+    port=9000
     # Launch the orchestrator
-    terminate_orchestrator = launch_orchestrator(TEST_DIR, port=9000)
+    terminate_orchestrator = launch_orchestrator(TEST_DIR, port=port)
 
     # Execute the test
-    yield f"localhost:{9000}"
+    yield f"localhost:{port}"
 
     # Terminate the orchestrator
     terminate_orchestrator()
