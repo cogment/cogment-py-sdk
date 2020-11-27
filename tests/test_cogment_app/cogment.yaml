@@ -32,7 +32,9 @@ trial_params:
     - name: actor_1
       actor_class: my_actor_class_1
       endpoint: grpc://localhost:9001
+      implementation: test
 
     - name: actor_2
       actor_class: my_actor_class_1
       endpoint: grpc://localhost:9001
+      implementation: test
