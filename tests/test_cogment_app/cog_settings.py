@@ -2,10 +2,7 @@ import cogment as _cog
 from types import SimpleNamespace
 from typing import List
 
-# Changed from import data_pb2 as data_pb
-# TODO make sure it's the right move in every cases
-from . import data_pb2 as data_pb
-
+import data_pb2 as data_pb
 
 protolib = "data_pb2"
 

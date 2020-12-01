@@ -13,6 +13,10 @@
 # limitations under the License.
 
 import pytest
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'test_cogment_app'))
 
 def pytest_addoption(parser):
     parser.addoption(

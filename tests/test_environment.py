@@ -19,9 +19,11 @@ import pytest
 
 from cogment import Context
 
-from test_cogment_app import cog_settings
-from test_cogment_app.data_pb2 import TrialConfig, Observation
 from helpers.launch_orchestrator import launch_orchestrator
+
+# Works because the `test_cogment_app` directory is added to sys.path in conftest.py
+import cog_settings
+from data_pb2 import TrialConfig, Observation
 
 TEST_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_cogment_app')
 

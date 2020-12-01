@@ -19,9 +19,9 @@ from cogment.api.common_pb2 import TrialActor
 from cogment.environment import Environment
 from cogment.trial import Trial
 
-from test_cogment_app import cog_settings
-from test_cogment_app.data_pb2 import EnvConfig, TrialConfig
-
+# Works because the `test_cogment_app` directory is added to sys.path in conftest.py
+import cog_settings
+from data_pb2 import EnvConfig, TrialConfig
 
 @pytest.fixture(scope="function")
 def trial():
