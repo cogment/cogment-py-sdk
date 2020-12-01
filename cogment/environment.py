@@ -22,17 +22,6 @@ from traceback import print_exc
 ENVIRONMENT_ACTOR_NAME = "env"
 
 
-class Environment:
-    def __init__(self):
-        self.env_id = -1
-        self.name = ENVIRONMENT_ACTOR_NAME
-
-        self._message = []
-
-    def send_message(self, user_data):
-        self._message.append((user_data))
-
-
 class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 

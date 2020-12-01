@@ -19,21 +19,6 @@ from abc import ABC, abstractmethod
 from cogment.session import Session
 
 
-class Actor:
-    def __init__(self, actor_class, name):
-        self.actor_class = actor_class
-        self.name = name
-
-        self._feedback = []
-        self._message = []
-
-    def add_feedback(self, value, confidence, tick_id, user_data):
-        self._feedback.append((tick_id, value, confidence, user_data))
-
-    def send_message(self, user_data):
-        self._message.append(user_data)
-
-
 class ActorClass:
     def __init__(
         self,

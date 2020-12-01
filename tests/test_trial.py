@@ -15,12 +15,9 @@
 import pytest
 import unittest
 
-from cogment.actor import Actor
 from cogment.api.common_pb2 import TrialActor
-from cogment.environment import Environment
-from cogment.api.common_pb2 import Message, TrialActor
 from cogment.errors import Error
-from cogment.trial import Trial
+from cogment.trial import Environment, Trial
 
 # Works because the `test_cogment_app` directory is added to sys.path in conftest.py
 import cog_settings

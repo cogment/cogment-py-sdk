@@ -12,19 +12,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.actor import Actor
+from collections import deque
+
 from cogment.api.common_pb2 import Feedback, Message
-from cogment.environment import Environment, ENVIRONMENT_ACTOR_NAME
+from cogment.environment import ENVIRONMENT_ACTOR_NAME
 from cogment.errors import Error
 
 
 class Trial:
+    class Environment:
+        def __init__(self):
+            self.name = ENVIRONMENT_ACTOR_NAME
+            self._messages = deque()
+
+        def add_prepared_message(self, payload):
+            self._messages.append(payload)
+
+        def get_prepared_messages(self, sender_name):
+            while len(self._messages) > 0:
+                payload = self._messages.popleft()
+                message = Message(sender_name=sender_name, receiver_name=self.name)
+                if payload is not None:
+                    message.payload.Pack(payload)
+                yield message
+
+    class Actor(Environment):
+        def __init__(self, name, actor_class):
+            super().__init__()
+            self.name = name
+            self.actor_class = actor_class
+            self._feedbacks = deque()
+
+        def add_prepared_feedback(self, tick_id, value, confidence, user_data):
+            self._feedbacks.append((tick_id, value, confidence, user_data))
+
+        def get_prepared_feedbacks(self):
+            while len(self._feedbacks) > 0:
+                (tick_id, value, confidence, user_data) = self._feedbacks.popleft()
+                feedback = Feedback(
+                    actor_name=self.name,
+                    tick_id=tick_id,
+                    value=value,
+                    confidence=confidence
+                )
+                if user_data is not None:
+                    feedback.user_data.Pack(user_data)
+                yield feedback
+
     def __init__(self, id, actors_in_trial, cog_settings):
         self.id = id
         self.over = False
         self.cog_settings = cog_settings
         self.tick_id = -1
-        self.environment = Environment()
+        self.environment = self.Environment()
 
         self._actions = None  # Managed externally
         self._actions_by_actor_id = None  # Managed externally
@@ -44,7 +84,10 @@ class Trial:
             if actor_in_trial.actor_class not in self.cog_settings.actor_classes:
                 raise Error(f"class '{actor_in_trial.actor_class}' of actor '{actor_in_trial.name}' can not be found.")
             actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
-            actor = Actor(actor_class, actor_in_trial.name)
+            actor = self.Actor(
+                name=actor_in_trial.name,
+                actor_class=actor_class
+            )
             self.actors.append(actor)
 
     def _add_actor_counts(self):
@@ -81,42 +124,28 @@ class Trial:
 
     def add_feedback(self, value, confidence, to, tick_id, user_data):
         for actor in self.get_actors(pattern_list=to):
-            actor.add_feedback(value, confidence, tick_id, user_data)
+            actor.add_prepared_feedback(
+                tick_id=tick_id,
+                value=value,
+                confidence=confidence,
+                user_data=user_data
+            )
 
     def _gather_all_feedback(self):
         for actor in self.actors:
-            a_fb = actor._feedback
-            actor._feedback = []
-
-            for fb in a_fb:
-                re = Feedback(actor_name=actor.name, tick_id=fb[0], value=fb[1], confidence=fb[2])
-                if fb[3] is not None:
-                    re.user_data.Pack(fb[3])
-
-                yield re
+            for feedback in actor.get_prepared_feedbacks():
+                yield feedback
 
     def send_message(self, user_data, to=[], to_environment=False):
         if to_environment:
-            self.environment.send_message(user_data=user_data)
-        for d in self.get_actors(pattern_list=to):
-            d.send_message(user_data=user_data)
+            self.environment.add_prepared_message(payload=user_data)
+        for actor in self.get_actors(pattern_list=to):
+            actor.add_prepared_message(payload=user_data)
 
     def _gather_all_messages(self, source_name):
         for actor in self.actors:
-            a_msg = actor._message
-            actor._message = []
+            for message in actor.get_prepared_messages(source_name):
+                yield message
 
-            for msg in a_msg:
-                re = Message(sender_name=source_name, receiver_name=actor.name)
-                if msg is not None:
-                    re.payload.Pack(msg)
-                yield re
-
-        e_msg = self.environment._message
-        self.environment._message = []
-        for msg in e_msg:
-            re = Message(sender_name=source_name, receiver_name=ENVIRONMENT_ACTOR_NAME)
-
-            if msg is not None:
-                re.payload.Pack(msg)
-            yield re
+        for message in self.environment.get_prepared_messages(source_name):
+            yield message
