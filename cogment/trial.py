@@ -76,9 +76,6 @@ class Trial:
         self._add_actors(actors_in_trial)
         self._add_actor_counts()
 
-    def get_environment(self):
-        return self.environment
-
     def _add_actors(self, actors_in_trial):
         for actor_in_trial in actors_in_trial:
             if actor_in_trial.actor_class not in self.cog_settings.actor_classes:

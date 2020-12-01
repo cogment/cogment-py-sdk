@@ -17,7 +17,7 @@ import unittest
 
 from cogment.api.common_pb2 import TrialActor
 from cogment.errors import Error
-from cogment.trial import Environment, Trial
+from cogment.trial import Trial
 
 # Works because the `test_cogment_app` directory is added to sys.path in conftest.py
 import cog_settings
@@ -47,9 +47,6 @@ class TestTrial:
                 TrialActor(actor_class="my_actor_class_1", name="agent_1"),
                 TrialActor(actor_class="my_unknown_actor_class", name="agent_2")
             ], cog_settings)
-
-    def test_get_environment(self, trial):
-        assert isinstance(trial.get_environment(), Environment)
 
     def test_get_actors_all(self, trial):
         actors = trial.get_actors(["*"])
