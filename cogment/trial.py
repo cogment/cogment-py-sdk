@@ -78,7 +78,7 @@ class Trial:
         return matched_actors
 
     def add_feedback(self, value, confidence, to, tick_id, user_data):
-        for actor in self.get_actors(pattern=to):
+        for actor in self.get_actors(pattern_list=to):
             actor.add_feedback(value, confidence, tick_id, user_data)
 
     def _gather_all_feedback(self):
@@ -96,7 +96,7 @@ class Trial:
     def send_message(self, user_data, to, to_environment=False):
         if to_environment:
             self.environment.send_message(user_data=user_data)
-        for d in self.get_actors(pattern=to):
+        for d in self.get_actors(pattern_list=to):
             d.send_message(user_data=user_data)
 
     def _gather_all_messages(self, source_name):

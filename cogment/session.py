@@ -20,6 +20,10 @@ class Session(ABC):
     def __init__(self, trial):
         self._trial = trial
 
+        # Pre-compute since it will be used regularly
+        self._active_actors = [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class.id)
+                             for actor in trial.actors]
+
     def get_trial_id(self):
         assert self._trial is not None
         return self._trial.id
@@ -34,8 +38,7 @@ class Session(ABC):
 
     def get_active_actors(self):
         assert self._trial is not None
-        return [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class)
-                for actor in self._trial.actors]
+        return self._active_actors
 
     def add_feedback(self, value, confidence, to, tick_id=-1, user_data=None):
         assert self._trial is not None
