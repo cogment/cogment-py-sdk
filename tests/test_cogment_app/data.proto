@@ -18,3 +18,12 @@ message Action {
   int32 action_value = 1;
 }
 
+message MyMessageUserData {
+  string a_string = 1;
+  int32 an_int = 3;
+}
+
+message MyFeedbackUserData {
+  bool a_bool = 1;
+  float a_float = 2;
+}

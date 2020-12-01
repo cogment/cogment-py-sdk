@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\ndata.proto\x12\x10test_cogment_app\"\x0b\n\tEnvConfig\">\n\x0bTrialConfig\x12/\n\nenv_config\x18\x01 \x01(\x0b\x32\x1b.test_cogment_app.EnvConfig\"%\n\x0bObservation\x12\x16\n\x0eobserved_value\x18\x01 \x01(\x05\"\x1e\n\x06\x41\x63tion\x12\x14\n\x0c\x61\x63tion_value\x18\x01 \x01(\x05\x62\x06proto3'
+  serialized_pb=b'\n\ndata.proto\x12\x10test_cogment_app\"\x0b\n\tEnvConfig\">\n\x0bTrialConfig\x12/\n\nenv_config\x18\x01 \x01(\x0b\x32\x1b.test_cogment_app.EnvConfig\"%\n\x0bObservation\x12\x16\n\x0eobserved_value\x18\x01 \x01(\x05\"\x1e\n\x06\x41\x63tion\x12\x14\n\x0c\x61\x63tion_value\x18\x01 \x01(\x05\"5\n\x11MyMessageUserData\x12\x10\n\x08\x61_string\x18\x01 \x01(\t\x12\x0e\n\x06\x61n_int\x18\x03 \x01(\x05\"5\n\x12MyFeedbackUserData\x12\x0e\n\x06\x61_bool\x18\x01 \x01(\x08\x12\x0f\n\x07\x61_float\x18\x02 \x01(\x02\x62\x06proto3'
 )
 
 
@@ -145,11 +145,91 @@ _ACTION = _descriptor.Descriptor(
   serialized_end=178,
 )
 
+
+_MYMESSAGEUSERDATA = _descriptor.Descriptor(
+  name='MyMessageUserData',
+  full_name='test_cogment_app.MyMessageUserData',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='a_string', full_name='test_cogment_app.MyMessageUserData.a_string', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='an_int', full_name='test_cogment_app.MyMessageUserData.an_int', index=1,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=180,
+  serialized_end=233,
+)
+
+
+_MYFEEDBACKUSERDATA = _descriptor.Descriptor(
+  name='MyFeedbackUserData',
+  full_name='test_cogment_app.MyFeedbackUserData',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='a_bool', full_name='test_cogment_app.MyFeedbackUserData.a_bool', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='a_float', full_name='test_cogment_app.MyFeedbackUserData.a_float', index=1,
+      number=2, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=235,
+  serialized_end=288,
+)
+
 _TRIALCONFIG.fields_by_name['env_config'].message_type = _ENVCONFIG
 DESCRIPTOR.message_types_by_name['EnvConfig'] = _ENVCONFIG
 DESCRIPTOR.message_types_by_name['TrialConfig'] = _TRIALCONFIG
 DESCRIPTOR.message_types_by_name['Observation'] = _OBSERVATION
 DESCRIPTOR.message_types_by_name['Action'] = _ACTION
+DESCRIPTOR.message_types_by_name['MyMessageUserData'] = _MYMESSAGEUSERDATA
+DESCRIPTOR.message_types_by_name['MyFeedbackUserData'] = _MYFEEDBACKUSERDATA
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 EnvConfig = _reflection.GeneratedProtocolMessageType('EnvConfig', (_message.Message,), {
@@ -179,6 +259,20 @@ Action = _reflection.GeneratedProtocolMessageType('Action', (_message.Message,),
   # @@protoc_insertion_point(class_scope:test_cogment_app.Action)
   })
 _sym_db.RegisterMessage(Action)
+
+MyMessageUserData = _reflection.GeneratedProtocolMessageType('MyMessageUserData', (_message.Message,), {
+  'DESCRIPTOR' : _MYMESSAGEUSERDATA,
+  '__module__' : 'data_pb2'
+  # @@protoc_insertion_point(class_scope:test_cogment_app.MyMessageUserData)
+  })
+_sym_db.RegisterMessage(MyMessageUserData)
+
+MyFeedbackUserData = _reflection.GeneratedProtocolMessageType('MyFeedbackUserData', (_message.Message,), {
+  'DESCRIPTOR' : _MYFEEDBACKUSERDATA,
+  '__module__' : 'data_pb2'
+  # @@protoc_insertion_point(class_scope:test_cogment_app.MyFeedbackUserData)
+  })
+_sym_db.RegisterMessage(MyFeedbackUserData)
 
 
 # @@protoc_insertion_point(module_scope)
