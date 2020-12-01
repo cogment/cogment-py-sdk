@@ -91,7 +91,7 @@ class Trial:
             for fb in a_fb:
                 re = Feedback(actor_name=actor.name, tick_id=fb[0], value=fb[1], confidence=fb[2])
                 if fb[3] is not None:
-                    re.content = fb[3].SerializeToString()
+                    re.user_data.Pack(fb[3])
 
                 yield re
 
