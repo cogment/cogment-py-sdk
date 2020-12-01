@@ -95,7 +95,7 @@ class Trial:
 
                 yield re
 
-    def send_message(self, user_data, to, to_environment=False):
+    def send_message(self, user_data, to=[], to_environment=False):
         if to_environment:
             self.environment.send_message(user_data=user_data)
         for d in self.get_actors(pattern_list=to):
