@@ -24,7 +24,7 @@ from cogment.trial import Trial
 
 # Works because the `test_cogment_app` directory is added to sys.path in conftest.py
 import cog_settings
-from data_pb2 import EnvConfig, TrialConfig, MyMessageUserData
+from data_pb2 import EnvConfig, TrialConfig, MyMessageUserData, MyFeedbackUserData
 
 @pytest.fixture(scope="function")
 def unittest_case():
@@ -121,4 +121,47 @@ class TestTrial:
         with pytest.raises(AttributeError):
             [m for m in trial._gather_all_messages("test_source")]
 
+    def test_add_feedback(self, trial, unittest_case):
+        trial.add_feedback(
+            value=12,
+            confidence=1.0,
+            to=["agent_1", "agent_2"],
+            tick_id=666,
+            user_data=MyFeedbackUserData(a_bool=False, a_float=3.0)
+        )
 
+        trial.add_feedback(
+            value=-2,
+            confidence=0.,
+            to=["agent_3"],
+            tick_id=667,
+            user_data=MyFeedbackUserData(a_bool=True, a_float=3.0)
+        )
+
+        feedbacks_as_tuples = []
+        for f in trial._gather_all_feedback():
+            user_data = MyFeedbackUserData()
+            assert f.user_data.Unpack(user_data)
+            feedbacks_as_tuples.append((f.actor_name, f.value, f.confidence, f.tick_id, user_data))
+
+        assert len(feedbacks_as_tuples) == 3
+        unittest_case.assertCountEqual(feedbacks_as_tuples, [
+            ("agent_1", 12, 1., 666, MyFeedbackUserData(a_bool=False, a_float=3.0)),
+            ("agent_2", 12, 1., 666, MyFeedbackUserData(a_bool=False, a_float=3.0)),
+            ("agent_3", -2, 0., 667, MyFeedbackUserData(a_bool=True, a_float=3.0))
+        ])
+
+        assert len([m for m in trial._gather_all_feedback()]) == 0
+
+    def test_add_feedback_bad_user_data(self, trial):
+        trial.add_feedback(
+            value=12,
+            confidence=1.0,
+            to=["agent_1", "agent_2"],
+            tick_id=666,
+            user_data={"a_string": "foo", "an_int": 42}
+        )
+
+        # Maybe this should be caught earlier
+        with pytest.raises(AttributeError):
+            [f for f in trial._gather_all_feedback()]
