@@ -31,6 +31,7 @@ import logging
 import typing
 import asyncio
 from traceback import print_exc
+import grpc.experimental.aio
 
 
 def _trial_key(trial_id, actor_name):
@@ -51,6 +52,11 @@ async def read_observations(context, agent_session):
     try:
         while True:
             request = await context.read()
+
+            # This means the GRPC channel has been closed by the orchestrator.
+            if request == grpc.experimental.aio.EOF:
+                break
+
             agent_session._trial.tick_id = request.observation.tick_id
 
             obs = DecodeObservationData(
