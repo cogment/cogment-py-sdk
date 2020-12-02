@@ -27,6 +27,12 @@ lint:
   script:
     - poetry run task lint
 
+apache_licenses_check:
+  stage: lint
+  image: registry.gitlab.com/ai-r/apache-license-checker:latest
+  script:
+    - apache-license-checker
+
 module_test:
   extends: .base_poetry
   stage: test
