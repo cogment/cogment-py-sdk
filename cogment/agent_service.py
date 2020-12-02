@@ -30,6 +30,7 @@ import atexit
 import logging
 import typing
 import asyncio
+from traceback import print_exc
 
 
 def _trial_key(trial_id, actor_name):
@@ -47,31 +48,39 @@ def _impl_can_serve_actor_class(impl, actor_class):
 
 
 async def read_observations(context, agent_session):
-    while True:
-        request = await context.read()
-        agent_session._trial.tick_id = request.observation.tick_id
+    try:
+        while True:
+            request = await context.read()
+            agent_session._trial.tick_id = request.observation.tick_id
 
-        obs = DecodeObservationData(
-            agent_session.actor_class,
-            request.observation.data,
-            agent_session._latest_observation,
-        )
-        agent_session._latest_observation = obs
-        agent_session._new_observation(obs)
+            obs = DecodeObservationData(
+                agent_session.actor_class,
+                request.observation.data,
+                agent_session._latest_observation,
+            )
+            agent_session._latest_observation = obs
+            agent_session._new_observation(obs)
+    except Exception as e:
+        print_exc()
+        raise e
 
 
 async def write_actions(context, agent_session):
-    while True:
-        act = await agent_session._retrieve_action()
-        msg = agent_api.AgentActionReply()
-        msg.action.content = act.SerializeToString()
+    try:
+        while True:
+            act = await agent_session._retrieve_action()
+            msg = agent_api.AgentActionReply()
+            msg.action.content = act.SerializeToString()
 
-        msg.feedbacks.extend(agent_session.trial._gather_all_feedback())
+            msg.feedbacks.extend(agent_session._trial._gather_all_feedback())
 
-        actor_name = dict(context.invocation_metadata())["actor-name"]
-        msg.messages.extend(agent_session.trial._gather_all_messages(actor_name))
+            actor_name = dict(context.invocation_metadata())["actor-name"]
+            msg.messages.extend(agent_session._trial._gather_all_messages(actor_name))
 
-        await context.write(msg)
+            await context.write(msg)
+    except Exception as e:
+        print_exc()
+        raise e
 
 
 class AgentServicer(AgentEndpointServicer):
@@ -203,7 +212,6 @@ class AgentServicer(AgentEndpointServicer):
 
             await agent_session._task
 
-            print("actor main task over")
             reader_task.cancel()
             writer_task.cancel()
 

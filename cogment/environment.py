@@ -17,6 +17,7 @@ import importlib
 import logging
 from cogment.session import Session
 from abc import ABC, abstractmethod
+from traceback import print_exc
 
 ENVIRONMENT_ACTOR_NAME = "env"
 
@@ -65,13 +66,16 @@ class EnvironmentSession(Session):
     async def event_loop(self):
         assert self.__started
         assert not self._ended
-
-        loop_active = True
-        while loop_active:
-            event = await self.__event_queue.get()
-            keep_looping = yield event
-            self.__event_queue.task_done()
-            loop_active = keep_looping is None or bool(keep_looping)
+        try:
+            loop_active = True
+            while loop_active:
+                event = await self.__event_queue.get()
+                keep_looping = yield event
+                self.__event_queue.task_done()
+                loop_active = keep_looping is None or bool(keep_looping)
+        except Exception as e:
+            print_exc()
+            raise e
 
     def produce_observations(self, observations):
         assert self.__started

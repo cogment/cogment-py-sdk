@@ -37,6 +37,7 @@ import logging
 import typing
 import asyncio
 from time import time
+from traceback import print_exc
 
 
 def new_actions_table(settings, trial):
@@ -102,7 +103,7 @@ def pack_observations(env_session, observations, reply, tick_id):
         reply.observation_set.actors_map.append(obs_key)
 
 
-async def _process_reply(observations, env_session):
+def _process_reply(observations, env_session):
     rep = env_api.EnvActionReply()
 
     rep.feedbacks.extend(env_session._trial._gather_all_feedback())
@@ -113,18 +114,22 @@ async def _process_reply(observations, env_session):
 
 
 async def write_observations(context, env_session):
-    while True:
-        observations, final = await env_session._retrieve_obs()
+    try:
+        while True:
+            observations, final = await env_session._retrieve_obs()
 
-        reply = _process_reply(observations, env_session)
-        reply.set_end_trial(final)
-        await context.write(reply)
+            reply = _process_reply(observations, env_session)
+            reply.final_update = final
+            await context.write(reply)
 
-        if final:
-            break
+            if final:
+                break
+    except Exception as e:
+        print_exc()
+        raise e
 
 
-async def _process_actions(request, env_session):
+def _process_actions(request, env_session):
     len_actions = len(request.action_set.actions)
     len_actors = len(env_session._trial._actions_by_actor_id)
 
@@ -231,32 +236,36 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         return reply
 
     async def OnAction(self, request_iterator, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        key = trial_id
-        env_session = self.__env_sessions[key]
+            key = trial_id
+            env_session = self.__env_sessions[key]
 
-        with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
-            env_session._trial.tick_id += 1
+            with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
+                env_session._trial.tick_id += 1
 
-            # We are going to have three concurrent coroutines:
-            # - One that reads actions from the orchestrator
-            # - One that sends observations to the orchestrator
-            # - The environment's main (which will be the current coroutine)
-            loop = asyncio.get_running_loop()
-            reader_task = loop.create_task(read_actions(context, env_session))
-            writer_task = loop.create_task(write_observations(context, env_session))
+                # We are going to have three concurrent coroutines:
+                # - One that reads actions from the orchestrator
+                # - One that sends observations to the orchestrator
+                # - The environment's main (which will be the current coroutine)
+                loop = asyncio.get_running_loop()
+                reader_task = loop.create_task(read_actions(context, env_session))
+                writer_task = loop.create_task(write_observations(context, env_session))
 
-            await env_session._task
-            if not env_session._ended:
+                await env_session._task
+                if not env_session._ended:
+                    del self.__env_sessions[key]
+                    raise Exception(f"Trial [{trial_id}] was never ended")
+
+                await writer_task
+                await reader_task
+
                 del self.__env_sessions[key]
-                raise Exception(f"Trial [{trial_id}] was never ended")
-
-            await writer_task
-            await reader_task
-
-            del self.__env_sessions[key]
+        except Exception as e:
+            print_exc()
+            raise e
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
