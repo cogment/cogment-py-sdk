@@ -67,7 +67,7 @@ class TestEnvironment:
             environment_session.end()
             print('-- end `environment`')
 
-        context = Context(cog_project=cog_settings, user_id='test_trial_lifecyle')
+        context = Context(cog_settings=cog_settings, user_id='test_trial_lifecyle')
 
         context.register_environment(impl=environment)
 

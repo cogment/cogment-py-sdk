@@ -58,36 +58,36 @@ DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, "false")
 DEFAULT_PROMETHEUS_PORT = 8000
 
 
-def _add_actor_service(grpc_server, impls, service_names, cog_project):
-    servicer = AgentServicer(impls, cog_project)
+def _add_actor_service(grpc_server, impls, service_names, cog_settings):
+    servicer = AgentServicer(impls, cog_settings)
     add_AgentEndpointServicer_to_server(servicer, grpc_server)
     service_names.append(agent_endpoint_descriptor.full_name)
 
 
-def _add_env_service(grpc_server, impls, cog_project):
-    servicer = EnvironmentServicer(impls, cog_project)
+def _add_env_service(grpc_server, impls, cog_settings):
+    servicer = EnvironmentServicer(impls, cog_settings)
     add_EnvironmentEndpointServicer_to_server(servicer, grpc_server)
 
 
-def _add_prehook_service(grpc_server, impls, cog_project):
-    servicer = PrehookServicer(impls, cog_project)
+def _add_prehook_service(grpc_server, impls, cog_settings):
+    servicer = PrehookServicer(impls, cog_settings)
     add_TrialHooksServicer_to_server(servicer, grpc_server)
 
 
-def _add_datalog_service(grpc_server, impl, cog_project):
-    servicer = LogExporterService(impl, cog_project)
+def _add_datalog_service(grpc_server, impl, cog_settings):
+    servicer = LogExporterService(impl, cog_settings)
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
 
 class Context:
-    def __init__(self, user_id: str, cog_project: ModuleType):
+    def __init__(self, user_id: str, cog_settings: ModuleType):
         self._user_id = user_id
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
         self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
         self.__grpc_server = None  # type: Any
-        self.__cog_project = cog_project
+        self.__cog_settings = cog_settings
 
     def register_actor(self,
                        impl: Callable[[ActorSession], Awaitable[None]],
@@ -136,17 +136,17 @@ class Context:
                     self.__grpc_server,
                     self.__actor_impls,
                     service_names,
-                    self.__cog_project,
+                    self.__cog_settings,
                 )
 
             if self.__env_impls:
-                _add_env_service(self.__grpc_server, self.__env_impls, self.__cog_project)
+                _add_env_service(self.__grpc_server, self.__env_impls, self.__cog_settings)
 
             if self.__prehook_impls:
-                _add_prehook_service(self.__grpc_server, self.__prehook_impls, self.__cog_project)
+                _add_prehook_service(self.__grpc_server, self.__prehook_impls, self.__cog_settings)
 
             if self.__datalog_impl is not None:
-                _add_datalog_service(self.__grpc_server, self.__datalog_impl, self.__cog_project)
+                _add_datalog_service(self.__grpc_server, self.__datalog_impl, self.__cog_settings)
 
             self.__grpc_server.add_insecure_port(f"[::]:{port}")
             await self.__grpc_server.start()
@@ -157,11 +157,11 @@ class Context:
                           endpoint,
                           impl: Callable[[ControlSession], Awaitable[None]]):
 
-        servicer = ControlServicer(self.__cog_project, endpoint)
+        servicer = ControlServicer(self.__cog_settings, endpoint)
         await servicer.run(trial_config, self._user_id, impl)
 
     async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls[impl_name]
 
-        servicer = ClientServicer(self.__cog_project, endpoint)
+        servicer = ClientServicer(self.__cog_settings, endpoint)
         await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)

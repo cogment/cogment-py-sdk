@@ -91,8 +91,8 @@ async def write_actions(client_session, action_conn):
 
 
 class ClientServicer:
-    def __init__(self, cog_project, endpoint):
-        self.cog_project = cog_project
+    def __init__(self, cog_settings, endpoint):
+        self.cog_settings = cog_settings
 
         channel = grpc.experimental.aio.insecure_channel(endpoint)
         self._actor_stub = ActorEndpointStub(channel)
@@ -109,7 +109,7 @@ class ClientServicer:
 
         reply = await self._actor_stub.JoinTrial(req)
 
-        trial = Trial(reply.trial_id, reply.actors_in_trial, self.cog_project)
+        trial = Trial(reply.trial_id, reply.actors_in_trial, self.cog_settings)
 
         self_info = None
         for info in reply.actors_in_trial:
@@ -119,7 +119,7 @@ class ClientServicer:
         if self_info is None:
             raise InvalidRequestError(f"Unknown actor name: {reply.actor_name}", request=reply)
 
-        actor_class = self.cog_project.actor_classes[self_info.actor_class]
+        actor_class = self.cog_settings.actor_classes[self_info.actor_class]
 
         config = None
         if reply.HasField("config"):

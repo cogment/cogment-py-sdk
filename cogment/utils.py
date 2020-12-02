@@ -97,25 +97,25 @@ def user_params_to_raw_params(params, settings):
 
 class DecodeData():
 
-    def __init__(self, trial_params, cog_project):
-        self.__cog_project = cog_project
+    def __init__(self, trial_params, cog_settings):
+        self.__cog_settings = cog_settings
         self.last_obs = []
 
         actor_classes_list = [
-            actor.id for actor in self.__cog_project.actor_classes]
+            actor.id for actor in self.__cog_settings.actor_classes]
         trial_actor_list = [actor.actor_class for actor in trial_params.actors]
         self.actor_counts = [0] * len(actor_classes_list)
         for index, actor_class in enumerate(actor_classes_list):
             self.actor_counts[index] += trial_actor_list.count(actor_class)
 
-        for ac_index, actor_class in enumerate(self.__cog_project.actor_classes):
+        for ac_index, actor_class in enumerate(self.__cog_settings.actor_classes):
             count = self.actor_counts[ac_index]
             self.last_obs.extend([None] * count)
 
     def decode_datasample(self, sample):
 
         actor_index = 0
-        for ac_index, actor_class in enumerate(self.__cog_project.actor_classes):
+        for ac_index, actor_class in enumerate(self.__cog_settings.actor_classes):
             count = self.actor_counts[ac_index]
             for _ in range(count):
                 try:
@@ -133,7 +133,7 @@ class DecodeData():
 
         action_list = []
         for act_data in sample.actions:
-            action = self.__cog_project.data_pb.Action()
+            action = self.__cog_settings.data_pb.Action()
             action.ParseFromString(act_data.content)
             action_list.append(action)
 
@@ -148,7 +148,7 @@ class DecodeData():
 
                 class_type = message.payload.type_url.split('.')
                 user_data = getattr(importlib.import_module(
-                    self.__cog_project.protolib), class_type[-1])()
+                    self.__cog_settings.protolib), class_type[-1])()
                 message.payload.Unpack(user_data)
 
                 sub_msg_list.append((message.sender_name, user_data))

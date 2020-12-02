@@ -22,8 +22,8 @@ from cogment.control import _ServedControlSession
 
 
 class ControlServicer:
-    def __init__(self, cog_project, endpoint):
-        self.cog_project = cog_project
+    def __init__(self, cog_settings, endpoint):
+        self.cog_settings = cog_settings
         channel = grpc.experimental.aio.insecure_channel(endpoint)
         self.lifecycle_stub = TrialLifecycleStub(channel)
 
@@ -33,6 +33,6 @@ class ControlServicer:
         req.user_id = user_id
 
         rep = await self.lifecycle_stub.StartTrial(req)
-        trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_project)
+        trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_settings)
 
         await impl(_ServedControlSession(trial, self.lifecycle_stub))

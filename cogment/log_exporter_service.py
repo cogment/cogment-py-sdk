@@ -23,20 +23,20 @@ import asyncio
 
 class LogExporterService(LogExporterServicer):
 
-    def __init__(self, impl, cog_project):
+    def __init__(self, impl, cog_settings):
         self.__impl = impl
-        self.__cog_project = cog_project
+        self.__cog_settings = cog_settings
         logging.info("Log Exporter Service started")
 
     async def OnLogSample(self, request_iterator, context):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
 
-        trial = Trial(trial_id, [], self.__cog_project)
+        trial = Trial(trial_id, [], self.__cog_settings)
 
         msg = await request_iterator.__anext__()
         assert msg.HasField("trial_params")
-        trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_project)
+        trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_settings)
 
         session = _ServedDatalogSession(self.__impl, trial, trial_params)
         loop = asyncio.get_running_loop()

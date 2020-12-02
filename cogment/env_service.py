@@ -150,10 +150,10 @@ async def read_actions(context, env_session):
 
 
 class EnvironmentServicer(EnvironmentEndpointServicer):
-    def __init__(self, env_impls, cog_project):
+    def __init__(self, env_impls, cog_settings):
         self.__impls = env_impls
         self.__env_sessions = {}
-        self.__cog_project = cog_project
+        self.__cog_settings = cog_settings
 
         self.UPDATE_REQUEST_TIME = Summary(
             "environment_update_processing_seconds",
@@ -201,20 +201,20 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
 
         self.TRIALS_STARTED.labels(target_impl_name).inc()
 
-        trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
+        trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
         trial.tick_id = 0
 
         # action table time
-        actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_project, trial)
+        actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_settings, trial)
 
         trial._actions = actions_by_actor_class
         trial._actions_by_actor_id = actions_by_actor_id
 
         config = None
         if request.HasField("config"):
-            if self.__cog_project.environment.config_type is None:
+            if self.__cog_settings.environment.config_type is None:
                 raise Exception("Environment received config data of unknown type (was it defined in cogment.yaml)")
-            config = self.__cog_project.environment.config_type()
+            config = self.__cog_settings.environment.config_type()
             config.ParseFromString(request.config.content)
 
         new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl_name, config)

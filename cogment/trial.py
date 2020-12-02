@@ -18,10 +18,10 @@ from cogment.api.common_pb2 import Feedback, Message
 
 
 class Trial:
-    def __init__(self, id, actors_in_trial, cog_project):
+    def __init__(self, id, actors_in_trial, cog_settings):
         self.id = id
         self.over = False
-        self.cog_project = cog_project
+        self.cog_settings = cog_settings
         self.tick_id = -1
         self.environment = Environment()
 
@@ -41,12 +41,12 @@ class Trial:
     def _add_actors(self, actors_in_trial):
         for actor_in_trial in actors_in_trial:
             # TODO, handle what happens when the class is not found.
-            actor_class = self.cog_project.actor_classes[actor_in_trial.actor_class]
+            actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
             actor = Actor(actor_class, actor_in_trial.name)
             self.actors.append(actor)
 
     def _add_actor_counts(self):
-        class_list = self.cog_project.actor_classes._actor_classes_list
+        class_list = self.cog_settings.actor_classes._actor_classes_list
         self.actor_counts = [0] * len(class_list)
         for class_index, class_member in enumerate(class_list):
             for actor in self.actors:

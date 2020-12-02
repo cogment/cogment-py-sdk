@@ -25,10 +25,10 @@ import logging
 
 class PrehookServicer(TrialHooksServicer):
 
-    def __init__(self, impls, cog_project):
+    def __init__(self, impls, cog_settings):
 
         self.__impls = impls
-        self.__cog_project = cog_project
+        self.__cog_settings = cog_settings
 
         logging.info("Prehook Service started")
 
@@ -36,8 +36,8 @@ class PrehookServicer(TrialHooksServicer):
         metadata = dict(context.invocation_metadata())
         trial_id = metadata["trial-id"]
 
-        trial = Trial(trial_id, [], self.__cog_project)
-        user_params = utils.raw_params_to_user_params(request.params, self.__cog_project)
+        trial = Trial(trial_id, [], self.__cog_settings)
+        user_params = utils.raw_params_to_user_params(request.params, self.__cog_settings)
 
         prehook = _ServedPrehookSession(user_params, trial)
         for impl in self.__impls:
@@ -46,5 +46,5 @@ class PrehookServicer(TrialHooksServicer):
 
         reply = PreTrialContext()
         reply.CopyFrom(request)
-        reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_project))
+        reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
         return reply

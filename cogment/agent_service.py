@@ -75,10 +75,10 @@ async def write_actions(context, agent_session):
 
 
 class AgentServicer(AgentEndpointServicer):
-    def __init__(self, agent_impls, cog_project):
+    def __init__(self, agent_impls, cog_settings):
         self.__impls = agent_impls
         self.__agent_sessions = {}
-        self.__cog_project = cog_project
+        self.__cog_settings = cog_settings
         atexit.register(self.__cleanup)
 
         self.DECIDE_REQUEST_TIME = Summary(
@@ -122,11 +122,11 @@ class AgentServicer(AgentEndpointServicer):
         if self_info is None:
             raise InvalidRequestError(f"Unknown agent name: {actor_name}", request=request)
 
-        if self_info.actor_class not in self.__cog_project.actor_classes:
+        if self_info.actor_class not in self.__cog_settings.actor_classes:
             raise InvalidRequestError(
                 message=f"Unknown agent class: {request.actor_class}", request=request
             )
-        actor_class = self.__cog_project.actor_classes[self_info.actor_class]
+        actor_class = self.__cog_settings.actor_classes[self_info.actor_class]
 
         if not _impl_can_serve_actor_class(impl, actor_class):
             raise InvalidRequestError(
@@ -139,7 +139,7 @@ class AgentServicer(AgentEndpointServicer):
 
         self.ACTORS_STARTED.labels(request.impl_name).inc()
 
-        trial = Trial(trial_id, request.actors_in_trial, self.__cog_project)
+        trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
 
         config = None
         if request.HasField("config"):
