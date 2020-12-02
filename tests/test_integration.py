@@ -127,7 +127,8 @@ class TestIntegration:
         assert environment_call_count == 1
         assert environment_tick_count == target_tick_count
         assert agent_call_count == 2
-        assert agent_tick_count / agent_call_count == target_tick_count
+        # The + 1 is to  account for a decision made on the initial observation.
+        assert agent_tick_count / agent_call_count == target_tick_count + 1
 
 
 
