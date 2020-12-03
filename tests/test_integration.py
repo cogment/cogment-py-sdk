@@ -101,15 +101,21 @@ class TestIntegration:
             actor_session.start()
 
             async for event in actor_session.event_loop():
-                print('--`agent`-- event_loop', event)
-                unittest_case.assertCountEqual(event.keys(),["observation"])
                 agent_tick_count += 1
+                print('--`agent`-- event_loop', event)
+                if "observation" in event:
+                    assert event["observation"].observed_value == 12
 
-                assert event["observation"].observed_value == 12
+                    print('--`agent`-- before do_action')
+                    actor_session.do_action(Action(action_value=-1))
+                    print('--`agent`-- after do_action')
 
-                print('--`agent`-- before do_action')
-                actor_session.do_action(Action(action_value=-1))
-                print('--`agent`-- after do_action')
+                if "final_data" in event:
+                    assert len(event["final_data"].observations) == 1
+                    assert len(event["final_data"].messages) == 0
+                    assert len(event["final_data"].rewards) == 0
+
+                    assert event["final_data"].observations[0].observed_value == 12
 
             print('--`agent`-- end')
 
@@ -127,8 +133,8 @@ class TestIntegration:
         assert environment_call_count == 1
         assert environment_tick_count == target_tick_count
         assert agent_call_count == 2
-        # The + 1 is to  account for a decision made on the initial observation.
-        assert agent_tick_count / agent_call_count == target_tick_count + 1
+        # The + 2 is to  account for a decision made on the initial observation and the for the final data
+        assert agent_tick_count / agent_call_count == target_tick_count + 2
 
 
 

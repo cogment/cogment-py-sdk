@@ -180,7 +180,7 @@ class AgentServicer(AgentEndpointServicer):
         agent_session = self.__agent_sessions[key]
 
         package = SimpleNamespace(observations=[], rewards=[], messages=[])
-        for obs_request in request.observations():
+        for obs_request in request.final_data.observations:
             obs = DecodeObservationData(
                 agent_session.actor_class,
                 obs_request.data,
@@ -188,12 +188,12 @@ class AgentServicer(AgentEndpointServicer):
             agent_session._latest_observation = obs
             package.observations.append(obs)
 
-        for rew_request in request.rewards():
+        for rew_request in request.final_data.rewards:
             reward = Reward()
             reward._set_all(rew_request, -1)
             package.rewards.append(reward)
 
-        for msg_request in request.messages():
+        for msg_request in request.final_data.messages:
             package.messages.append(msg_request)
 
         await agent_session._end(package)
