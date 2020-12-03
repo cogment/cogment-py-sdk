@@ -102,10 +102,10 @@ class AgentServicer(AgentEndpointServicer):
             ["name"],
         )
         self.ACTORS_STARTED = Counter(
-            "actors_started", "Number of actors created", ["impl_name"]
+            "actor_started", "Number of actors created", ["impl_name"]
         )
         self.ACTORS_ENDED = Counter(
-            "actors_ended", "Number of actors ended", ["impl_name"]
+            "actor_ended", "Number of actors ended", ["impl_name"]
         )
         self.MESSAGES_RECEIVED = Counter(
             "actor_received_messages", "Number of messages received", ["name"]
