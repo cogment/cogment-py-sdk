@@ -125,7 +125,7 @@ class TestIntegration:
         context.register_actor(impl_name="test", impl=agent)
 
         serve_environment = asyncio.create_task(context.serve_all_registered(port=9001))
-        await context.start_trial(TrialConfig(), endpoint=orchestrator_endpoint, impl=trial_controller)
+        await context.start_trial(endpoint=orchestrator_endpoint, impl=trial_controller, trial_config=TrialConfig())
         serve_environment.cancel()
 
         assert trial_id != None

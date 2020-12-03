@@ -76,7 +76,9 @@ async def write_actions(context, agent_session):
         while True:
             act = await agent_session._retrieve_action()
             msg = agent_api.AgentActionReply()
-            msg.action.content = act.SerializeToString()
+
+            if act is not None:
+                msg.action.content = act.SerializeToString()
 
             msg.feedbacks.extend(agent_session._trial._gather_all_feedback())
 

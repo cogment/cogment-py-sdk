@@ -153,12 +153,12 @@ class Context:
             await self.__grpc_server.wait_for_termination()
 
     async def start_trial(self,
-                          trial_config,
                           endpoint,
-                          impl: Callable[[ControlSession], Awaitable[None]]):
+                          impl: Callable[[ControlSession], Awaitable[None]],
+                          trial_config=None):
 
         servicer = ControlServicer(self.__cog_settings, endpoint)
-        await servicer.run(trial_config, self._user_id, impl)
+        await servicer.run(self._user_id, impl, trial_config)
 
     async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls[impl_name]

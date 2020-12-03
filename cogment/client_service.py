@@ -86,7 +86,10 @@ async def write_actions(client_session, action_conn):
     while True:
         act = await client_session._retrieve_action()
         action_req = orchestrator.TrialActionRequest()
-        action_req.action.content = act.SerializeToString()
+
+        if act is not None:
+            action_req.action.content = act.SerializeToString()
+
         await action_conn.write(action_req)
 
 

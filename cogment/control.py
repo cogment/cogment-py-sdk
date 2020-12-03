@@ -18,10 +18,13 @@ from abc import ABC, abstractmethod
 from types import SimpleNamespace
 
 
-# Future functionality:
+# Future functionality (as a non-participant):
 #   - Accept/refuse actor connections
 #   - Diconnect actors
+#   - Request tick updates?
+#   - Request any observation?
 #   - Send messages?
+#   - Request to receive every message?
 class ControlSession(ABC):
     def __init__(self, trial, stub):
         self._trial = trial

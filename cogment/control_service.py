@@ -27,10 +27,11 @@ class ControlServicer:
         channel = grpc.experimental.aio.insecure_channel(endpoint)
         self.lifecycle_stub = TrialLifecycleStub(channel)
 
-    async def run(self, trial_config, user_id, impl):
+    async def run(self, user_id, impl, trial_config):
         req = orchestrator.TrialStartRequest()
-        req.config.content = trial_config.SerializeToString()
         req.user_id = user_id
+        if trial_config is not None:
+            req.config.content = trial_config.SerializeToString()
 
         rep = await self.lifecycle_stub.StartTrial(req)
         trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_settings)
