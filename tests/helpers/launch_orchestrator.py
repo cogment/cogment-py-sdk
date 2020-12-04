@@ -90,7 +90,7 @@ def launch_orchestrator(
         nonlocal status
         process.terminate()
         try:
-            process.wait(1)
+            process.wait(5)
             if docker_image:
                 while(True):
                     with open(status_file, 'r') as status:
