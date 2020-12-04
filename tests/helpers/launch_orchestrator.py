@@ -27,6 +27,9 @@ def launch_orchestrator(
     docker_image=COGMENT_ORCHESTRATOR_IMAGE,
     binary=COGMENT_ORCHESTRATOR
 ):
+    if docker_image:
+        assert subprocess.run(["docker", "pull",  docker_image]).returncode == 0
+
     config_file = 'cogment.yaml'
     # For platform where docker is runned in a VM, replacing localhost by the special host that loops back to the vm's host
     # cf. https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
