@@ -18,33 +18,39 @@ import tempfile
 import os
 import warnings
 
-COGMENT_ORCHESTRATOR_IMAGE = os.environ.get('COGMENT_ORCHESTRATOR_IMAGE')
-COGMENT_ORCHESTRATOR = os.environ.get('COGMENT_ORCHESTRATOR')
+COGMENT_ORCHESTRATOR_IMAGE = os.environ.get("COGMENT_ORCHESTRATOR_IMAGE")
+COGMENT_ORCHESTRATOR = os.environ.get("COGMENT_ORCHESTRATOR")
 
 def launch_orchestrator(
     app_directory,
-    port,
+    orchestrator_port,
+    test_port,
     docker_image=COGMENT_ORCHESTRATOR_IMAGE,
     binary=COGMENT_ORCHESTRATOR
 ):
     if docker_image:
         assert subprocess.run(["docker", "pull",  docker_image]).returncode == 0
 
-    config_file = 'cogment.yaml'
-    # For platform where docker is runned in a VM, replacing localhost by the special host that loops back to the vm's host
-    # cf. https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
-    if docker_image and (platform.system() == 'Windows' or platform.system() == 'Darwin'):
-        with open(os.path.join(app_directory, config_file), 'r') as cogment_yaml_in:
-            config_file = 'cogment-dockerinvm.yaml'
-            with open(os.path.join(app_directory, config_file), 'w') as cogment_yaml_out:
-                for line in cogment_yaml_in:
-                    cogment_yaml_out.write(line.replace('localhost', 'host.docker.internal'))
+    config_file_template = "cogment.yaml"
+    config_file = f"cogment_{test_port}.yaml"
+
+    test_host = f"grpc://localhost:{test_port}"
+    if docker_image and (platform.system() == "Windows" or platform.system() == "Darwin"):
+        # For platform where docker is runned in a VM, replacing localhost by the special host that loops back to the vm"s host
+        # cf. https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
+        test_host = f"grpc://host.docker.internal:{test_port}"
+
+
+    with open(os.path.join(app_directory, config_file_template), "r") as cogment_yaml_in:
+        with open(os.path.join(app_directory, config_file), "w") as cogment_yaml_out:
+            for line in cogment_yaml_in:
+                cogment_yaml_out.write(line.replace("grpc://localhost:9001", test_host))
 
     status_dir = tempfile.mkdtemp()
-    status_file = os.path.join(status_dir, 'cogment_orchestrator_status')
+    status_file = os.path.join(status_dir, "cogment_orchestrator_status")
     if docker_image:
-        # fifo don't worker between the host and the running docker image let's be less clever.
-        with open(status_file, 'w'): pass
+        # fifo don"t worker between the host and the running docker image let"s be less clever.
+        with open(status_file, "w"): pass
     else:
         os.mkfifo(status_file)
 
@@ -53,60 +59,60 @@ def launch_orchestrator(
         process = subprocess.Popen(["docker", "run",
                                     "--volume", f"{status_dir}:/status",
                                     "--volume", f"{app_directory}:/app",
-                                    "-p", f"{port}:{port}",
+                                    "-p", f"{orchestrator_port}:{orchestrator_port}",
                                     docker_image,
-                                    f"--lifecycle_port={port}",
-                                    f"--actor_port={port}",
+                                    f"--lifecycle_port={orchestrator_port}",
+                                    f"--actor_port={orchestrator_port}",
                                     f"--config={config_file}",
                                     "--status_file=/status/cogment_orchestrator_status"
                                     ])
     else:
         process = subprocess.Popen([binary,
-                                    f"--lifecycle_port={port}",
-                                    f"--actor_port={port}",
+                                    f"--lifecycle_port={orchestrator_port}",
+                                    f"--actor_port={orchestrator_port}",
                                     f"--status_file={status_file}",
                                     f"--config={config_file}",
                                     ], cwd=app_directory)
 
-    print('Orchestrator starting')
+    print("Orchestrator starting")
     status = None
     if docker_image:
         while(True):
-            with open(status_file, 'r') as status:
+            with open(status_file, "r") as status:
                 if status.read(1) == "I":
                     break
     else:
-        status = open(status_file, 'r')
+        status = open(status_file, "r")
         assert(status.read(1) == "I")
-    print('Orchestrator initialized')
+    print("Orchestrator initialized")
     if docker_image:
         while(True):
-            with open(status_file, 'r') as status:
+            with open(status_file, "r") as status:
                 if status.read(2) == "IR":
                     break
     else:
         assert(status.read(1) == "R")
-    print('Orchestrator ready')
+    print("Orchestrator ready")
 
     def terminate_orchestrator():
-        print('Orchestrator terminating')
+        print("Orchestrator terminating")
         nonlocal status
         process.terminate()
         try:
             process.wait(5)
             if docker_image:
-                while(True):
-                    with open(status_file, 'r') as status:
-                        if status.read(3) == "IRT":
-                            break
+                with open(status_file, "r") as status:
+                    if status.read(3) != "IRT":
+                        warnings.warn("Orchestrator failed to update status file.")
             else:
-                assert(status.read(1) == "T")
+                if (status.read(1) != "T"):
+                    warnings.warn("Orchestrator failed to update status file.")
                 status.close()
-            print('Orchestrator terminated')
+            print("Orchestrator terminated")
         except subprocess.TimeoutExpired:
             process.kill()
             warnings.warn("Orchestrator failed to terminate properly.")
-            print('Orchestrator killed')
+            print("Orchestrator killed")
         # Get rid of the status file
         os.remove(status_file)
         os.rmdir(status_dir)

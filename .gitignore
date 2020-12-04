@@ -12,7 +12,7 @@ dist
 # Generated/Downloaded files
 /cogment/version.py
 /cogment/api
-/tests/test_cogment_app/cogment-dockerinvm.yaml
+/tests/test_cogment_app/cogment_*.yaml
 
 # Environment file (used for tests)
 /.env
