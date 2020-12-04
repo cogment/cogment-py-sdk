@@ -91,7 +91,7 @@ class EnvironmentSession(Session):
             event = {"final_actions" : actions}
             await self.__event_queue.put(event)
 
-            result = await self.__final_obs_future()
+            result = await self.__final_obs_future
             self.__final_obs_future = None
         else:
             logging.warning("The environment received an end request that it was unable to handle.")
