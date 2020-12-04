@@ -232,7 +232,7 @@ class AgentServicer(AgentEndpointServicer):
 
     async def OnReward(self, request, context):
         metadata = dict(context.invocation_metadata())
-        actor_name = int(metadata["actor-name"])
+        actor_name = str(metadata["actor-name"])
         trial_id = metadata["trial-id"]
 
         key = _trial_key(trial_id, actor_name)
@@ -252,7 +252,7 @@ class AgentServicer(AgentEndpointServicer):
 
     async def OnMessage(self, request, context):
         metadata = dict(context.invocation_metadata())
-        actor_name = int(metadata["actor-name"])
+        actor_name = str(metadata["actor-name"])
         trial_id = metadata["trial-id"]
 
         key = _trial_key(trial_id, actor_name)
