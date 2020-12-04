@@ -92,7 +92,7 @@ async def write_actions(context, agent_session):
 
 
 class AgentServicer(AgentEndpointServicer):
-    def __init__(self, agent_impls, cog_settings):
+    def __init__(self, agent_impls, cog_settings, prometheus_registry):
         self.__impls = agent_impls
         self.__agent_sessions = {}
         self.__cog_settings = cog_settings
@@ -102,18 +102,23 @@ class AgentServicer(AgentEndpointServicer):
             "actor_decide_processing_seconds",
             "Time spent by an actor on the decide function",
             ["name"],
+            registry=prometheus_registry
         )
         self.ACTORS_STARTED = Counter(
-            "actor_started", "Number of actors created", ["impl_name"]
+            "actor_started", "Number of actors created", ["impl_name"],
+            registry=prometheus_registry
         )
         self.ACTORS_ENDED = Counter(
-            "actor_ended", "Number of actors ended", ["impl_name"]
+            "actor_ended", "Number of actors ended", ["impl_name"],
+            registry=prometheus_registry
         )
         self.MESSAGES_RECEIVED = Counter(
-            "actor_received_messages", "Number of messages received", ["name"]
+            "actor_received_messages", "Number of messages received", ["name"],
+            registry=prometheus_registry
         )
         self.REWARDS_RECEIVED = Gauge(
-            "actor_reward_summation", "Cumulative rewards received", ["name"]
+            "actor_reward_summation", "Cumulative rewards received", ["name"],
+            registry=prometheus_registry
         )
 
         logging.info("Agent Service started")

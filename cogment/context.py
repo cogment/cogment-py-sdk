@@ -17,10 +17,11 @@ from typing import Callable, Awaitable, Dict, List, Any
 from types import ModuleType
 import os
 import asyncio
+from traceback import print_exc
 from types import SimpleNamespace
 import grpc
 import grpc.experimental.aio
-from prometheus_client import start_http_server
+from prometheus_client import start_http_server, CollectorRegistry
 
 from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession
@@ -58,24 +59,24 @@ DEFAULT_ENABLE_REFLECTION = os.getenv(ENABLE_REFLECTION_VAR_NAME, "false")
 DEFAULT_PROMETHEUS_PORT = 8000
 
 
-def _add_actor_service(grpc_server, impls, service_names, cog_settings):
-    servicer = AgentServicer(impls, cog_settings)
+def _add_actor_service(grpc_server, impls, service_names, cog_settings, prometheus_registry):
+    servicer = AgentServicer(impls, cog_settings, prometheus_registry)
     add_AgentEndpointServicer_to_server(servicer, grpc_server)
     service_names.append(agent_endpoint_descriptor.full_name)
 
 
-def _add_env_service(grpc_server, impls, cog_settings):
-    servicer = EnvironmentServicer(impls, cog_settings)
+def _add_env_service(grpc_server, impls, cog_settings, prometheus_registry):
+    servicer = EnvironmentServicer(impls, cog_settings, prometheus_registry)
     add_EnvironmentEndpointServicer_to_server(servicer, grpc_server)
 
 
-def _add_prehook_service(grpc_server, impls, cog_settings):
-    servicer = PrehookServicer(impls, cog_settings)
+def _add_prehook_service(grpc_server, impls, cog_settings, prometheus_registry):
+    servicer = PrehookServicer(impls, cog_settings, prometheus_registry)
     add_TrialHooksServicer_to_server(servicer, grpc_server)
 
 
-def _add_datalog_service(grpc_server, impl, cog_settings):
-    servicer = LogExporterService(impl, cog_settings)
+def _add_datalog_service(grpc_server, impl, cog_settings, prometheus_registry):
+    servicer = LogExporterService(impl, cog_settings, prometheus_registry)
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
 
@@ -86,7 +87,8 @@ class Context:
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
         self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
-        self.__grpc_server = None  # type: Any
+        self._grpc_server = None  # type: Any
+        self._prometheus_registry = CollectorRegistry()
         self.__cog_settings = cog_settings
 
     def register_actor(self,
@@ -94,7 +96,7 @@ class Context:
                        impl_name: str,
                        actor_classes: List[str] = []):
         assert impl_name not in self.__actor_impls
-        assert self.__grpc_server is None
+        assert self._grpc_server is None
 
         self.__actor_impls[impl_name] = SimpleNamespace(
             impl=impl, actor_classes=actor_classes
@@ -104,19 +106,19 @@ class Context:
                              impl: Callable[[EnvironmentSession], Awaitable[None]],
                              impl_name: str = "default"):
         assert impl_name not in self.__env_impls
-        assert self.__grpc_server is None
+        assert self._grpc_server is None
 
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl)
 
     def register_pre_trial_hook(self,
                                 impl: Callable[[PrehookSession], Awaitable[None]]):
-        assert self.__grpc_server is None
+        assert self._grpc_server is None
 
         self.__prehook_impls.append(impl)
 
     def register_datalog(self,
                          impl: Callable[[DatalogSession], Awaitable[None]]):
-        assert self.__grpc_server is None
+        assert self._grpc_server is None
         assert self.__datalog_impl is None
 
         self.__datalog_impl = impl
@@ -124,41 +126,63 @@ class Context:
     async def serve_all_registered(self,
                                    port: int,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
+        try:
+            start_http_server(prometheus_port)
 
-        start_http_server(prometheus_port)
+            if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
+                self._grpc_server = grpc.experimental.aio.server()
 
-        if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
-            self.__grpc_server = grpc.experimental.aio.server()
+                service_names: List[str] = []
+                if self.__actor_impls:
+                    _add_actor_service(
+                        self._grpc_server,
+                        self.__actor_impls,
+                        service_names,
+                        self.__cog_settings,
+                        self._prometheus_registry
+                    )
 
-            service_names: List[str] = []
-            if self.__actor_impls:
-                _add_actor_service(
-                    self.__grpc_server,
-                    self.__actor_impls,
-                    service_names,
-                    self.__cog_settings,
-                )
+                if self.__env_impls:
+                    _add_env_service(
+                        self._grpc_server,
+                        self.__env_impls,
+                        self.__cog_settings,
+                        self._prometheus_registry
+                    )
 
-            if self.__env_impls:
-                _add_env_service(self.__grpc_server, self.__env_impls, self.__cog_settings)
+                if self.__prehook_impls:
+                    _add_prehook_service(
+                        self._grpc_server,
+                        self.__prehook_impls,
+                        self.__cog_settings,
+                        self._prometheus_registry
+                    )
 
-            if self.__prehook_impls:
-                _add_prehook_service(self.__grpc_server, self.__prehook_impls, self.__cog_settings)
+                if self.__datalog_impl is not None:
+                    _add_datalog_service(
+                        self._grpc_server,
+                        self.__datalog_impl,
+                        self.__cog_settings,
+                        self._prometheus_registry
+                    )
 
-            if self.__datalog_impl is not None:
-                _add_datalog_service(self.__grpc_server, self.__datalog_impl, self.__cog_settings)
-
-            self.__grpc_server.add_insecure_port(f"[::]:{port}")
-            await self.__grpc_server.start()
-            await self.__grpc_server.wait_for_termination()
+                self._grpc_server.add_insecure_port(f"[::]:{port}")
+                await self._grpc_server.start()
+                await self._grpc_server.wait_for_termination()
+        except Exception as e:
+            print_exc()
+            raise e
 
     async def start_trial(self,
                           endpoint,
                           impl: Callable[[ControlSession], Awaitable[None]],
                           trial_config=None):
-
-        servicer = ControlServicer(self.__cog_settings, endpoint)
-        await servicer.run(self._user_id, impl, trial_config)
+        try:
+            servicer = ControlServicer(self.__cog_settings, endpoint)
+            await servicer.run(self._user_id, impl, trial_config)
+        except Exception as e:
+            print_exc()
+            raise e
 
     async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls[impl_name]

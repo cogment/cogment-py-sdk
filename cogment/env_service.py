@@ -155,7 +155,7 @@ async def read_actions(context, env_session):
 
 
 class EnvironmentServicer(EnvironmentEndpointServicer):
-    def __init__(self, env_impls, cog_settings):
+    def __init__(self, env_impls, cog_settings, prometheus_registry):
         self.__impls = env_impls
         self.__env_sessions = {}
         self.__cog_settings = cog_settings
@@ -164,20 +164,25 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             "environment_update_processing_seconds",
             "Times spend by an environment on the update function",
             ["impl_name"],
+            registry=prometheus_registry
         )
         self.TRAINING_DURATION = Summary(
-            "environment_trial_duration", "Trial duration", ["trial_actor"]
+            "environment_trial_duration", "Trial duration", ["trial_actor"],
+            registry=prometheus_registry
         )
         self.TRIALS_STARTED = Counter(
-            "environment_trials_started", "Number of trial starts", ["impl_name"]
+            "environment_trials_started", "Number of trial starts", ["impl_name"],
+            registry=prometheus_registry
         )
         self.TRIALS_ENDED = Counter(
-            "environment_trials_ended", "Number of trial ends", ["impl_name"]
+            "environment_trials_ended", "Number of trial ends", ["impl_name"],
+            registry=prometheus_registry
         )
         self.MESSAGES_RECEIVED = Counter(
             "environment_received_messages",
             "Number of messages received",
             ["impl_name"],
+            registry=prometheus_registry
         )
 
         atexit.register(self.__cleanup)
