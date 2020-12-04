@@ -33,6 +33,7 @@ class ControlServicer:
         if trial_config is not None:
             req.config.content = trial_config.SerializeToString()
 
+        # TODO: after the next line the process hangs indefinitely when running two integration tests
         rep = await self.lifecycle_stub.StartTrial(req)
         trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_settings)
 
