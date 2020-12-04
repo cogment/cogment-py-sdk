@@ -21,6 +21,10 @@ from traceback import print_exc
 
 ENVIRONMENT_ACTOR_NAME = "env"
 
+_ACTIONS = "actions"
+_FINAL_ACTIONS = "final_actions"
+_MESSAGE = "message"
+
 
 class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
@@ -32,6 +36,7 @@ class EnvironmentSession(Session):
 
         self._ended = False
         self._obs_queue = asyncio.Queue()
+        self._last_event_received = False
         self._task = None  # Task used to call _run()
 
         self.__impl = impl
@@ -56,12 +61,13 @@ class EnvironmentSession(Session):
         assert self.__started
         assert not self._ended
         try:
-            loop_active = True
+            loop_active = not self._last_event_received
             while loop_active:
                 event = await self.__event_queue.get()
+                self._last_event_received = _FINAL_ACTIONS in event
                 keep_looping = yield event
                 self.__event_queue.task_done()
-                loop_active = keep_looping is None or bool(keep_looping)
+                loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
         except Exception as e:
             print_exc()
             raise e
@@ -88,7 +94,7 @@ class EnvironmentSession(Session):
         if self.__event_queue:
             self.__final_obs_future = asyncio.get_running_loop().create_future()
 
-            event = {"final_actions" : actions}
+            event = {_FINAL_ACTIONS : actions}
             await self.__event_queue.put(event)
 
             result = await self.__final_obs_future
@@ -103,7 +109,7 @@ class EnvironmentSession(Session):
             return
 
         if self.__event_queue:
-            event = {"actions" : actions}
+            event = {_ACTIONS : actions}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning("The environment received actions that it was unable to handle.")
@@ -113,7 +119,7 @@ class EnvironmentSession(Session):
             return
 
         if self.__event_queue:
-            event = {"message" : (message.sender_name(), message.payload())}
+            event = {_MESSAGE : (message.sender_name(), message.payload())}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning("The environment received a message that it was unable to handle.")

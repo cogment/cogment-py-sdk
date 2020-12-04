@@ -19,6 +19,12 @@ from abc import ABC, abstractmethod
 from cogment.session import Session
 
 
+_OBSERVATION = "observation"
+_FINAL_DATA = "final_data"
+_MESSAGE = "message"
+_REWARD = "reward"
+
+
 class ActorClass:
     def __init__(
         self,
@@ -100,6 +106,7 @@ class ActorSession(Session):
         self._action_queue = asyncio.Queue()
         self._task = None  # Task used to call _run()
         self._latest_observation = None
+        self._last_event_received = False
 
         self.__impl = impl
         self.__started = False
@@ -121,12 +128,13 @@ class ActorSession(Session):
         assert self.__started
         assert not self._ended
 
-        loop_active = True
+        loop_active = not self._last_event_received
         while loop_active:
             event = await self.__event_queue.get()
+            self._last_event_received = _FINAL_DATA in event
             keep_looping = yield event
             self.__event_queue.task_done()
-            loop_active = keep_looping is None or bool(keep_looping)
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
 
     def do_action(self, action):
         assert self.__started
@@ -142,7 +150,7 @@ class ActorSession(Session):
                 std_messages.append((msg.sender_name(), msg.payload()))
             package.messages = std_messages
 
-            event = {"final_data" : package}
+            event = {_FINAL_DATA : package}
             await self.__event_queue.put(event)
         else:
             logging.warning("The actor received final data that it was unable to handle.")
@@ -152,7 +160,7 @@ class ActorSession(Session):
             return
 
         if self.__event_queue:
-            event = {"observation" : obs}
+            event = {_OBSERVATION : obs}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning("The actor received an observation that it was unable to handle.")
@@ -162,7 +170,7 @@ class ActorSession(Session):
             return
 
         if self.__event_queue:
-            event = {"reward" : reward}
+            event = {_REWARD : reward}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning("The actor received a reward that it was unable to handle.")
@@ -172,7 +180,7 @@ class ActorSession(Session):
             return
 
         if self.__event_queue:
-            event = {"message" : (message.sender_name(), message.payload())}
+            event = {_MESSAGE : (message.sender_name(), message.payload())}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning("The actor received a message that it was unable to handle.")
