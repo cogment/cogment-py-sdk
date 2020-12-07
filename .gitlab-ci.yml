@@ -48,7 +48,7 @@ integration_test:
   extends: .base_docker
   stage: test
   variables:
-      COGMENT_ORCHESTRATOR_IMAGE: "registry.gitlab.com/ai-r/cogment-orchestrator:latest"
+      COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0-alpha1"
   script:
     - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
     - docker run --rm --volume $(pwd):/output cogment/cogment-py-sdk-integration-test:$CI_JOB_ID  --junitxml=/output/integration_test_report.xml
