@@ -9,7 +9,11 @@ homepage = "https://cogment.ai"
 repository = "https://gitlab.com/cogment/cogment"
 # Customized build.py to customize commands.
 build="build.py"
-include = ["./cogment/version.py"]
+# gitignored files need to be specifically included
+include = [
+  "./cogment/version.py",   
+  "./cogment/api/*.proto"
+]
 exclude = [
   "./cogment/version.py.in",
   "./cogment/api/*.py"
