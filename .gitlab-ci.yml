@@ -2,6 +2,7 @@ stages:
   - lint
   - test
   - build
+  - publish
 
 .base_poetry:
   image: python:3.7
@@ -56,8 +57,22 @@ integration_test:
     reports:
       junit: integration_test_report.xml
 
-test_build:
+build_sdist:
   extends: .base_poetry
   stage: build
   script:
     - poetry build -f sdist
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - dist/*.tar.gz
+
+publish_to_pypi:
+  extends: .base_poetry
+  stage: publish
+  script:
+    - poetry publish -u $PYPI_USERNAME -p $PYPI_PASSWORD
+  only:
+    - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(?:-[[:alnum:]]+)?$/
+
+
