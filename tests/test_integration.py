@@ -23,23 +23,17 @@ from cogment import Context
 from helpers.launch_orchestrator import launch_orchestrator
 from helpers.find_free_port import find_free_port
 
-# Works because the `test_cogment_app` directory is added to sys.path in conftest.py
-import cog_settings
-from data_pb2 import TrialConfig, Observation, Action
-
-TEST_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_cogment_app')
-
 @pytest.fixture(scope="function")
 def unittest_case():
     return unittest.TestCase()
 
 @pytest.fixture(scope="function")
-def cogment_test_setup():
+def cogment_test_setup(test_cogment_app_dir):
     orchestrator_port=find_free_port()
     test_port=find_free_port()
     # Launch the orchestrator
     terminate_orchestrator = launch_orchestrator(
-        TEST_DIR,
+        test_cogment_app_dir,
         orchestrator_port=orchestrator_port,
         test_port=test_port
     )
@@ -54,7 +48,7 @@ def cogment_test_setup():
 class TestIntegration:
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
-    async def test_environment_controlled_trial(self, cogment_test_setup, unittest_case):
+    async def test_environment_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
         trial_id = None
         target_tick_count = 10
 
@@ -79,18 +73,18 @@ class TestIntegration:
             assert environment_session.get_trial_id() == trial_id
             environment_call_count+=1
 
-            environment_session.start([("*", Observation(observed_value=12))])
+            environment_session.start([("*", data_pb2.Observation(observed_value=12))])
 
             async for event in environment_session.event_loop():
                 unittest_case.assertCountEqual(event.keys(),["actions"])
                 environment_tick_count += 1
 
                 if environment_tick_count>=target_tick_count:
-                    environment_session.end([("*", Observation(observed_value=12))])
+                    environment_session.end([("*", data_pb2.Observation(observed_value=12))])
                     # TODO: I find it weird to need this break, shouldn't the event loop just end in this case?
                     break
                 else:
-                    environment_session.produce_observations([("*", Observation(observed_value=12))])
+                    environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
 
 
             environment_ended_future.set_result(True)
@@ -110,7 +104,7 @@ class TestIntegration:
             async for event in actor_session.event_loop():
                 if "observation" in event:
                     assert event["observation"].observed_value == 12
-                    actor_session.do_action(Action(action_value=-1))
+                    actor_session.do_action(data_pb2.Action(action_value=-1))
                     agent_observation_count += 1
 
                 if "final_data" in event:
@@ -134,7 +128,7 @@ class TestIntegration:
         await context.start_trial(
             endpoint=cogment_test_setup["orchestrator_endpoint"],
             impl=trial_controller,
-            trial_config=TrialConfig()
+            trial_config=data_pb2.TrialConfig()
         )
         assert await environment_ended_future
         await context._grpc_server.stop(grace=5.)
@@ -152,7 +146,7 @@ class TestIntegration:
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
     @pytest.mark.skip # TODO figure out why we can't have two consecutive context sessions.
-    async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case):
+    async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
         trial_id = None
 
         trial_controller_call_count=0
@@ -178,15 +172,15 @@ class TestIntegration:
             assert environment_session.get_trial_id() == trial_id
             environment_call_count+=1
 
-            environment_session.start([("*", Observation(observed_value=0))])
+            environment_session.start([("*", data_pb2.Observation(observed_value=0))])
 
             async for event in environment_session.event_loop():
                 environment_tick_count += 1
 
                 if "actions" in event:
-                    environment_session.produce_observations([("*", Observation(observed_value=environment_tick_count))])
+                    environment_session.produce_observations([("*", data_pb2.Observation(observed_value=environment_tick_count))])
                 if "final_actions" in event:
-                    environment_session.end([("*", Observation(observed_value=environment_tick_count))])
+                    environment_session.end([("*", data_pb2.Observation(observed_value=environment_tick_count))])
                     # TODO: I find it weird to need this break, shouldn't the event loop just end in this case?
                     break
 
@@ -209,7 +203,7 @@ class TestIntegration:
                 agents_tick_count[actor_session.name] += 1
                 if "observation" in event:
                     assert event["observation"].observed_value == agents_tick_count[actor_session.name] - 1
-                    actor_session.do_action(Action(action_value=agents_tick_count[actor_session.name]))
+                    actor_session.do_action(data_pb2.Action(action_value=agents_tick_count[actor_session.name]))
 
                 if "final_data" in event:
                     assert len(event["final_data"].observations) == 1
@@ -230,7 +224,7 @@ class TestIntegration:
         await context.start_trial(
             endpoint=cogment_test_setup["orchestrator_endpoint"],
             impl=trial_controller,
-            trial_config=TrialConfig()
+            trial_config=data_pb2.TrialConfig()
         )
         assert await environment_ended_future
         await context._grpc_server.stop(grace=5.)

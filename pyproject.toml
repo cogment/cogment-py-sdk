@@ -41,7 +41,6 @@ pytest-timeout = "^1.4.2"
 lint = "task lint_pycodestyle && task lint_mypy"
 lint_pycodestyle = "pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/"
 lint_mypy = "mypy --config-file mypy.ini cogment/"
-generate_test_cogment_app = "cd ./tests/test_cogment_app && ${COGMENT_PATH} generate -v --python_dir=."
 test = "pytest"
 
 [tool.pytest.ini_options]

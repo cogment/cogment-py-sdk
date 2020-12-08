@@ -16,17 +16,35 @@ import pytest
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'test_cogment_app'))
+from helpers.cogment_generate import cogment_generate
+
+TEST_COGMENT_APP_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_cogment_app')
+
+@pytest.fixture(scope="session")
+def test_cogment_app_dir():
+    cogment_generate(TEST_COGMENT_APP_DIR)
+    return TEST_COGMENT_APP_DIR
+
+
+@pytest.fixture(scope="session")
+def cog_settings(test_cogment_app_dir):
+    sys.path.append(test_cogment_app_dir)
+    import cog_settings
+    return cog_settings
+
+@pytest.fixture(scope="session")
+def data_pb2(test_cogment_app_dir):
+    sys.path.append(test_cogment_app_dir)
+    import data_pb2
+    return data_pb2
 
 def pytest_addoption(parser):
     parser.addoption(
         "--launch-orchestrator", action="store_true", default=False, help="launch a live orchestrator run slow tests"
     )
 
-
 def pytest_configure(config):
     config.addinivalue_line("markers", "use_orchestrator: mark test as requiring a live orchestrator to run")
-
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--launch-orchestrator"):

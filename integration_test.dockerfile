@@ -1,12 +1,18 @@
 ARG COGMENT_ORCHESTRATOR_IMAGE=cogment/orchestrator:latest
+ARG COGMENT_IMAGE=cogment/cli:latest
 FROM $COGMENT_ORCHESTRATOR_IMAGE as orchestrator
+FROM $COGMENT_IMAGE as cogment
 FROM ubuntu:20.04
 
-RUN apt-get update && apt-get install -y curl build-essential python3 python3-distutils python3-pip
+RUN apt-get update && apt-get install -y curl build-essential python3 python3-distutils python3-pip protobuf-compiler
 
 # Retrieve the orchestrator!
 COPY --from=orchestrator /usr/local/bin/orchestrator /usr/local/bin/
 ENV COGMENT_ORCHESTRATOR /usr/local/bin/orchestrator
+
+# Retrieve the cli!
+COPY --from=cogment /usr/local/bin/cogment /usr/local/bin/
+ENV COGMENT /usr/local/bin/cogment
 
 ## Poetry setup
 ENV POETRY_VERSION=1.1.3 \

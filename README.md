@@ -36,11 +36,9 @@ The version of the used cogment protobuf API is defined in the `.cogment-api.yam
 
 ### Tests
 
-A test cogment app is defined in `./tests/test_cogment_app`. To make things easier, generated files are versioned in the repository. To get a fresh/updated generation, simply run
+To run them the first step is to configure the way to launch the orchestrator and the cli in a `.env` file. 
 
-```
-COGMENT_PATH=/path/to/your/cogment poetry run task generate_test_cogment_app
-```
+You can copy `.env.template` for an example of what's expected.
 
 #### Module tests
 
@@ -54,7 +52,7 @@ poetry run task test
 
 #### Integration tests
 
-These tests launch and use an orchestrator they are slower but more in depth. To run them the first step is to configure the way to launch the orchestrator in a `.env` file. You can copy `.env.template` for an example of what's expected.
+These tests launch and use an orchestrator they are slower but more in depth. 
 
 Then, to execute the integration tests (as well as the module tests), simply run
 
@@ -65,7 +63,11 @@ poetry run task test --launch-orchestrator
 These tests can also be launched in a docker image.
 
 ```
-docker build -t cogment/cogment-py-sdk-integration-test:latest --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
+docker build \
+  -t cogment/cogment-py-sdk-integration-test:latest \
+  --build-arg COGMENT_IMAGE="<PATH_TO_COGMENT_IMAGE" \
+  --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE" \
+  -f integration_test.dockerfile .
 docker run --rm cogment/cogment-py-sdk-integration-test:latest
 ```
 

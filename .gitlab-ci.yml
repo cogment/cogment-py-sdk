@@ -34,24 +34,15 @@ apache_licenses_check:
   script:
     - apache-license-checker
 
-module_test:
-  extends: .base_poetry
-  stage: test
-  script:
-    - poetry run task test --junitxml=module_test_report.xml
-  artifacts:
-    when: always
-    reports:
-      junit: module_test_report.xml
-
 integration_test:
   extends: .base_docker
   stage: test
   variables:
-      COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0-alpha1"
+    COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0-alpha1"
+    COGMENT_IMAGE: "cogment/cli:v1.0.0-alpha1"
   script:
-    - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" -f integration_test.dockerfile .
-    - docker run --rm --volume $(pwd):/output cogment/cogment-py-sdk-integration-test:$CI_JOB_ID  --junitxml=/output/integration_test_report.xml
+    - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" --build-arg COGMENT_IMAGE="$COGMENT_IMAGE" -f integration_test.dockerfile .
+    - docker run --rm  --volume $(pwd):/output  cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
   artifacts:
     when: always
     reports:
