@@ -12,11 +12,11 @@ build="build.py"
 # gitignored files need to be specifically included
 include = [
   "./cogment/version.py",   
-  "./cogment/api/*.proto"
+  "./cogment/api/*.proto",
+  "./cogment/api/*.py"
 ]
 exclude = [
-  "./cogment/version.py.in",
-  "./cogment/api/*.py"
+  "./cogment/version.py.in"
 ]
 
 [tool.poetry.dependencies]
@@ -45,3 +45,10 @@ test = "pytest"
 [tool.pytest.ini_options]
 addopts = "-rfs"
 junit_suite_name = "cogment_py_sdk_tests"
+
+[build-system]
+requires = [
+  "poetry-core>=1.0.0", 
+  "setuptools"
+]
+build-backend = "poetry.core.masonry.api"
