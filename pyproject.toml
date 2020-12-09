@@ -6,11 +6,12 @@ authors = ["Artificial Intelligence Redefined <dev+cogment@ai-r.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://cogment.ai"
-repository = "https://gitlab.com/cogment/cogment"
+repository = "https://github.com/cogment/cogment-py-sdk"
 # Customized build.py to customize commands.
 build="build.py"
 # gitignored files need to be specifically included
 include = [
+  "CHANGELOG.md",
   "./cogment/version.py",   
   "./cogment/api/*.proto",
   "./cogment/api/*.py"
