@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-alpha2 - 2020-12-09
+
 ### Fixed 
 
 - Add missing cogment protobuf api files to the generated package.
