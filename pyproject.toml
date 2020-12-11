@@ -35,6 +35,7 @@ pytest = "^6.1.1"
 PyYAML = "^5.3.1"
 pytest-dotenv = "^0.5.2"
 pytest-asyncio = "^0.14.0"
+pytest-timeout = "^1.4.2"
 
 [tool.taskipy.tasks]
 lint = "task lint_pycodestyle && task lint_mypy"
@@ -46,6 +47,7 @@ test = "pytest"
 [tool.pytest.ini_options]
 addopts = "-rfs"
 junit_suite_name = "cogment_py_sdk_tests"
+timeout = 15
 
 [build-system]
 requires = [
