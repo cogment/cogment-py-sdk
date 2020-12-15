@@ -1,5 +1,9 @@
 # cogment python SDK
 
+> ⚠️ 🚧 This is part of an upcoming release of cogment and still unstable.
+>
+> Current stable version can be found at <https://gitlab.com/cogment/cogment>
+
 [![Latest final release](https://img.shields.io/pypi/v/cogment?style=flat-square)](https://pypi.org/project/cogment/) [![Apache 2 License](https://img.shields.io/badge/license-Apache%202-green?style=flat-square)](./LICENSE) [![Changelog](https://img.shields.io/badge/-Changelog%20-blueviolet?style=flat-square)](./CHANGELOG.md)
 
 ## Introduction
