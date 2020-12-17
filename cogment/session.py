@@ -17,15 +17,15 @@ from abc import ABC
 
 class Session(ABC):
     class ActiveActor:
-        def __init__(self, actor_name, actor_class):
+        def __init__(self, actor_name, actor_class_name):
             self.actor_name = actor_name
-            self.actor_class = actor_class
+            self.actor_class_name = actor_class_name
 
     def __init__(self, trial):
         self._trial = trial
 
         # Pre-compute since it will be used regularly
-        self._active_actors = [self.ActiveActor(actor_name=actor.name, actor_class=actor.actor_class.id)
+        self._active_actors = [self.ActiveActor(actor_name=actor.name, actor_class_name=actor.actor_class.id)
                              for actor in trial.actors]
 
     def get_trial_id(self):

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import traceback
 import grpc
 import grpc.experimental.aio
 
@@ -37,4 +39,8 @@ class ControlServicer:
         rep = await self.lifecycle_stub.StartTrial(req)
         trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_settings)
 
-        await impl(_ServedControlSession(trial, self.lifecycle_stub))
+        try:
+            await impl(_ServedControlSession(trial, self.lifecycle_stub))
+        except Exception:
+            logging.error(f"An exception occured in user control implementation:\n{traceback.format_exc()}")
+            raise

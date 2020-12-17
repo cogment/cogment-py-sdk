@@ -18,6 +18,7 @@ from cogment.trial import Trial
 from cogment.datalog import _ServedDatalogSession
 from cogment.utils import raw_params_to_user_params, list_versions
 import logging
+import traceback
 import asyncio
 
 
@@ -29,34 +30,39 @@ class LogExporterService(LogExporterServicer):
         logging.info("Log Exporter Service started")
 
     async def OnLogSample(self, request_iterator, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        trial = Trial(trial_id, [], self.__cog_settings)
+            trial = Trial(trial_id, [], self.__cog_settings)
 
-        msg = await request_iterator.__anext__()
-        assert msg.HasField("trial_params")
-        trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_settings)
+            msg = await request_iterator.__anext__()
+            assert msg.HasField("trial_params")
+            trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_settings)
 
-        session = _ServedDatalogSession(self.__impl, trial, trial_params)
-        loop = asyncio.get_running_loop()
-        session._task = loop.create_task(session._run())
+            session = _ServedDatalogSession(self.__impl, trial, trial_params)
+            loop = asyncio.get_running_loop()
+            session._task = loop.create_task(session._run())
 
-        # TODO: Wait for session._started
-        async for msg in request_iterator:
-            if session._task.done():
-                break
-            assert msg.HasField("sample")
-            session._new_sample(msg.sample)
+            # TODO: Wait for session._started
+            async for msg in request_iterator:
+                if session._task.done():
+                    break
+                assert msg.HasField("sample")
+                session._new_sample(msg.sample)
 
-        if not session._task.done():
-            session._end()
+            if not session._task.done():
+                session._end()
 
-        return LogExporterSampleReply()
+            return LogExporterSampleReply()
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
 
     async def Version(self, request, context):
         try:
             return list_versions()
         except Exception:
-            traceback.print_exc()
+            logging.error(f"{traceback.format_exc()}")
             raise

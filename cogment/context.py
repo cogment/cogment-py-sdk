@@ -17,7 +17,6 @@ from typing import Callable, Awaitable, Dict, List, Any
 from types import ModuleType
 import os
 import asyncio
-from traceback import print_exc
 from types import SimpleNamespace
 import grpc
 import grpc.experimental.aio
@@ -126,66 +125,61 @@ class Context:
     async def serve_all_registered(self,
                                    port: int,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
-        try:
-            start_http_server(prometheus_port)
 
-            if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
-                self._grpc_server = grpc.experimental.aio.server()
+        start_http_server(prometheus_port)
 
-                service_names: List[str] = []
-                if self.__actor_impls:
-                    _add_actor_service(
-                        self._grpc_server,
-                        self.__actor_impls,
-                        service_names,
-                        self.__cog_settings,
-                        self._prometheus_registry
-                    )
+        if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
+            self._grpc_server = grpc.experimental.aio.server()
 
-                if self.__env_impls:
-                    _add_env_service(
-                        self._grpc_server,
-                        self.__env_impls,
-                        self.__cog_settings,
-                        self._prometheus_registry
-                    )
+            service_names: List[str] = []
+            if self.__actor_impls:
+                _add_actor_service(
+                    self._grpc_server,
+                    self.__actor_impls,
+                    service_names,
+                    self.__cog_settings,
+                    self._prometheus_registry
+                )
 
-                if self.__prehook_impls:
-                    _add_prehook_service(
-                        self._grpc_server,
-                        self.__prehook_impls,
-                        self.__cog_settings,
-                        self._prometheus_registry
-                    )
+            if self.__env_impls:
+                _add_env_service(
+                    self._grpc_server,
+                    self.__env_impls,
+                    self.__cog_settings,
+                    self._prometheus_registry
+                )
 
-                if self.__datalog_impl is not None:
-                    _add_datalog_service(
-                        self._grpc_server,
-                        self.__datalog_impl,
-                        self.__cog_settings,
-                        self._prometheus_registry
-                    )
+            if self.__prehook_impls:
+                _add_prehook_service(
+                    self._grpc_server,
+                    self.__prehook_impls,
+                    self.__cog_settings,
+                    self._prometheus_registry
+                )
 
-                self._grpc_server.add_insecure_port(f"[::]:{port}")
-                await self._grpc_server.start()
-                await self._grpc_server.wait_for_termination()
-        except Exception as e:
-            print_exc()
-            raise e
+            if self.__datalog_impl is not None:
+                _add_datalog_service(
+                    self._grpc_server,
+                    self.__datalog_impl,
+                    self.__cog_settings,
+                    self._prometheus_registry
+                )
+
+            self._grpc_server.add_insecure_port(f"[::]:{port}")
+            await self._grpc_server.start()
+            await self._grpc_server.wait_for_termination()
 
     async def start_trial(self,
                           endpoint,
                           impl: Callable[[ControlSession], Awaitable[None]],
                           trial_config=None):
-        try:
-            servicer = ControlServicer(self.__cog_settings, endpoint)
-            await servicer.run(self._user_id, impl, trial_config)
-        except Exception as e:
-            print_exc()
-            raise e
+        servicer = ControlServicer(self.__cog_settings, endpoint)
+        await servicer.run(self._user_id, impl, trial_config)
 
     async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
-        actor_impl = self.__actor_impls[impl_name]
+        actor_impl = self.__actor_impls.get(impl_name)
+        if actor_impl is None:
+            raise Exception(f"Unknown actor impl [{impl_name}].  Was it registered?")
 
         servicer = ClientServicer(self.__cog_settings, endpoint)
         await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)

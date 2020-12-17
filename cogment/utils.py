@@ -18,6 +18,7 @@ from cogment.delta_encoding import DecodeObservationData
 
 from types import SimpleNamespace
 
+import logging
 import importlib
 import grpc
 
@@ -82,8 +83,7 @@ def user_params_to_raw_params(params, settings):
 
     result.environment.endpoint = params.environment.endpoint
     if params.environment.config is not None:
-        result.environment.config.content = \
-            params.environment.config.SerializeToString()
+        result.environment.config.content = params.environment.config.SerializeToString()
 
     for actor_data in params.actors:
         actor_pb = result.actors.add()
@@ -118,11 +118,7 @@ class DecodeData():
         for ac_index, actor_class in enumerate(self.__cog_settings.actor_classes):
             count = self.actor_counts[ac_index]
             for _ in range(count):
-                try:
-                    obs_id = sample.observations.actors_map[actor_index]
-                except Exception:
-                    print(sample)
-
+                obs_id = sample.observations.actors_map[actor_index]
                 obs_data = sample.observations.observations[obs_id]
 
                 obs = DecodeObservationData(

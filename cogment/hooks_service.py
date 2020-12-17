@@ -21,6 +21,7 @@ from cogment.trial import Trial
 from cogment.prehook import _ServedPrehookSession
 
 import logging
+import traceback
 
 
 class PrehookServicer(TrialHooksServicer):
@@ -33,18 +34,29 @@ class PrehookServicer(TrialHooksServicer):
         logging.info("Prehook Service started")
 
     async def OnPreTrial(self, request, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        trial = Trial(trial_id, [], self.__cog_settings)
-        user_params = utils.raw_params_to_user_params(request.params, self.__cog_settings)
+            trial = Trial(trial_id, [], self.__cog_settings)
+            user_params = utils.raw_params_to_user_params(request.params, self.__cog_settings)
 
-        prehook = _ServedPrehookSession(user_params, trial)
-        for impl in self.__impls:
-            await impl(prehook)
-            prehook._recode()
+            prehook = _ServedPrehookSession(user_params, trial)
+            for impl in self.__impls:
+                try:
+                    await impl(prehook)
+                except Exception:
+                    logging.error(
+                        f"An exception occured in user pre-trial hook implementation:\n{traceback.format_exc()}")
+                    raise
 
-        reply = PreTrialContext()
-        reply.CopyFrom(request)
-        reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
-        return reply
+                prehook._recode()
+
+            reply = PreTrialContext()
+            reply.CopyFrom(request)
+            reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
+            return reply
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise

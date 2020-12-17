@@ -31,13 +31,12 @@ from cogment.trial import Trial
 
 from prometheus_client import Summary, Counter
 
-import traceback
 import atexit
 import logging
+import traceback
 import typing
 import asyncio
 from time import time
-from traceback import print_exc
 
 
 def new_actions_table(settings, trial):
@@ -74,10 +73,8 @@ def pack_observations(env_session, observations, reply, tick_id):
 
     for actor_index, actor in enumerate(env_session._trial.actors):
         if not new_obs[actor_index]:
-            raise Exception("An actor is missing an observation")
-        snapshots[actor_index] = isinstance(
-            new_obs[actor_index], actor.actor_class.observation_space
-        )
+            raise Exception(f"Actor [{actor.name}] is missing an observation")
+        snapshots[actor_index] = isinstance(new_obs[actor_index], actor.actor_class.observation_space)
 
     # dupping time
     seen_observations = {}
@@ -86,16 +83,14 @@ def pack_observations(env_session, observations, reply, tick_id):
     reply.observation_set.timestamp = timestamp
 
     for actor_index, actor in enumerate(env_session._trial.actors):
-        obs_id = id(new_obs[actor_index])
+        actor_obs = new_obs[actor_index]
+        obs_id = id(actor_obs)
         obs_key = seen_observations.get(obs_id)
         if obs_key is None:
             obs_key = len(reply.observation_set.observations)
 
-            observation_data = ObservationData(
-                content=new_obs[actor_index].SerializeToString(),
-                snapshot=snapshots[actor_index],
-            )
-
+            obs_content = actor_obs.SerializeToString()
+            observation_data = ObservationData(content=obs_content, snapshot=snapshots[actor_index])
             reply.observation_set.observations.append(observation_data)
 
             seen_observations[obs_id] = obs_key
@@ -124,9 +119,10 @@ async def write_observations(context, env_session):
 
             if final:
                 break
-    except Exception as e:
-        print_exc()
-        raise e
+
+    except Exception:
+        logging.error(f"{traceback.format_exc()}")
+        raise
 
 
 def _process_actions(request, env_session):
@@ -134,24 +130,27 @@ def _process_actions(request, env_session):
     len_actors = len(env_session._trial._actions_by_actor_id)
 
     if len_actions != len_actors:
-        raise Exception(
-            f"Received {len_actions} actions but have {len_actors} actors"
-        )
+        raise Exception(f"Received {len_actions} actions but have {len_actors} actors")
 
     for i, action in enumerate(env_session._trial._actions_by_actor_id):
         action.ParseFromString(request.action_set.actions[i])
 
-    return env_session._trial._actions
+    return env_session._trial._actions_by_actor_id
 
 
 async def read_actions(context, env_session):
-    while True:
-        request = await context.read()
+    try:
+        while True:
+            request = await context.read()
 
-        if request == grpc.experimental.aio.EOF:
-            break
+            if request == grpc.experimental.aio.EOF:
+                break
 
-        env_session._new_action(_process_actions(request, env_session))
+            env_session._new_action(_process_actions(request, env_session))
+
+    except Exception:
+        logging.error(f"{traceback.format_exc()}")
+        raise
 
 
 class EnvironmentServicer(EnvironmentEndpointServicer):
@@ -190,57 +189,64 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         logging.info("Environment Service started")
 
     async def OnStart(self, request, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        target_impl_name = request.impl_name
-        if not target_impl_name:
-            target_impl_name = "default"
+            if len(self.__impls) == 0:
+                raise InvalidRequestError(message="No implementation registered", request=request)
 
-        impl = self.__impls.get(target_impl_name)
-        if impl is None:
-            raise InvalidRequestError(
-                message=f"Unknown environment implementation name [{target_impl_name}]", request=request
-            )
+            if request.impl_name:
+                impl_name = request.impl_name
+                impl = self.__impls.get(impl_name)
+                if impl is None:
+                    raise InvalidRequestError(message=f"Unknown environment impl [{impl_name}]", request=request)
+            else:
+                impl_name, impl = next(iter(self.__impls.items()))
+                logging.info(f"Environment impl [{impl_name}] arbitrarily chosen")
 
-        key = trial_id
-        if key in self.__env_sessions:
-            raise InvalidRequestError(
-                message=f"Environment already exists for trial [{trial_id}]", request=request
-            )
+            key = trial_id
+            if key in self.__env_sessions:
+                raise InvalidRequestError(message=f"Environment already exists for trial [{trial_id}]", request=request)
 
-        self.TRIALS_STARTED.labels(target_impl_name).inc()
+            self.TRIALS_STARTED.labels(impl_name).inc()
 
-        trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
-        trial.tick_id = 0
+            trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
+            trial.tick_id = 0
 
-        # action table time
-        actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_settings, trial)
+            # action table time
+            actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_settings, trial)
 
-        trial._actions = actions_by_actor_class
-        trial._actions_by_actor_id = actions_by_actor_id
+            trial._actions = actions_by_actor_class
+            trial._actions_by_actor_id = actions_by_actor_id
 
-        config = None
-        if request.HasField("config"):
-            if self.__cog_settings.environment.config_type is None:
-                raise Exception("Environment received config data of unknown type (was it defined in cogment.yaml)")
-            config = self.__cog_settings.environment.config_type()
-            config.ParseFromString(request.config.content)
+            config = None
+            if request.HasField("config"):
+                if self.__cog_settings.environment.config_type is None:
+                    raise Exception("Environment received config data of unknown type (was it defined in cogment.yaml)")
+                config = self.__cog_settings.environment.config_type()
+                config.ParseFromString(request.config.content)
 
-        new_session = _ServedEnvironmentSession(impl.impl, trial, target_impl_name, config)
-        self.__env_sessions[key] = new_session
+            new_session = _ServedEnvironmentSession(impl.impl, trial, impl_name, config)
+            self.__env_sessions[key] = new_session
 
-        loop = asyncio.get_running_loop()
-        new_session._task = loop.create_task(new_session._run())
+            loop = asyncio.get_running_loop()
+            new_session._task = loop.create_task(new_session._run())
 
-        observations, _ = await new_session._retrieve_obs()
+            observations, _ = await new_session._retrieve_obs()
 
-        reply = env_api.EnvStartReply()
-        pack_observations(new_session, observations, reply, 0)
+            reply = env_api.EnvStartReply()
+            pack_observations(new_session, observations, reply, 0)
 
-        return reply
+            return reply
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
 
     async def OnAction(self, request_iterator, context):
+        reader_task = None
+        writer_task = None
         try:
             metadata = dict(context.invocation_metadata())
             trial_id = metadata["trial-id"]
@@ -264,49 +270,63 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                     del self.__env_sessions[key]
                     raise Exception(f"Trial [{trial_id}] was never ended")
 
-                await writer_task
-                await reader_task
-
                 del self.__env_sessions[key]
-        except Exception as e:
-            print_exc()
-            raise e
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
+
+        finally:
+            if reader_task is not None:
+                reader_task.cancel()
+            if writer_task is not None:
+                writer_task.cancel()
 
     async def OnMessage(self, request, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        key = trial_id
-        env_session = self.__env_sessions[key]
+            key = trial_id
+            env_session = self.__env_sessions[key]
 
-        for message in request.messages:
-            self.MESSAGES_RECEIVED.labels(env_session.impl_name).inc()
-            env_session._new_message(message)
+            for message in request.messages:
+                self.MESSAGES_RECEIVED.labels(env_session.impl_name).inc()
+                env_session._new_message(message)
 
-        return env_api.EnvMessageReply()
+            return env_api.EnvMessageReply()
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
 
     async def OnEnd(self, request, context):
-        metadata = dict(context.invocation_metadata())
-        trial_id = metadata["trial-id"]
+        try:
+            metadata = dict(context.invocation_metadata())
+            trial_id = metadata["trial-id"]
 
-        key = trial_id
-        env_session = self.__env_sessions[key]
+            key = trial_id
+            env_session = self.__env_sessions[key]
 
-        for actor in env_session._trial.actors:
-            self.TRAINING_DURATION.labels(actor.name).observe(env_session._trial.tick_id)
+            for actor in env_session._trial.actors:
+                self.TRAINING_DURATION.labels(actor.name).observe(env_session._trial.tick_id)
 
-        obs = await env_session._end_request(_process_actions(request, env_session))
+            obs = await env_session._end_request(_process_actions(request, env_session))
 
-        if obs:
-            reply = _process_reply(obs, env_session)
-        else:
-            reply = env_api.EnvActionReply()
-        reply.set_end_trial(True)
+            if obs:
+                reply = _process_reply(obs, env_session)
+            else:
+                reply = env_api.EnvActionReply()
+            reply.set_end_trial(True)
 
-        self.TRIALS_ENDED.labels(env_session.impl_name).inc()
-        self.__env_sessions.pop(key, None)
+            self.TRIALS_ENDED.labels(env_session.impl_name).inc()
+            self.__env_sessions.pop(key, None)
 
-        return reply
+            return reply
+
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
 
     def __cleanup(self):
         self.__env_sessions.clear()

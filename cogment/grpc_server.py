@@ -16,6 +16,7 @@ import os
 import atexit
 import signal
 import threading
+import logging
 
 # from cogment.hooks_service import HooksService, TrialHooks
 # from cogment.agent_service import AgentService, Agent
@@ -83,9 +84,9 @@ class GrpcServer:
     def _add_service(self, service_type, settings):
         """Adds a service to the grpc server.
            This only works before the server is actually started."""
-        print(f"Versions for {service_type.__name__}:")
+        logging.info(f"Versions for {service_type.__name__}:")
         for v in list_versions(service_type).versions:
-            print(f'  {v.name}: {v.version}')
+            logging.info(f'  {v.name}: {v.version}')
 
         # Register service
         if issubclass(service_type, Agent):
@@ -108,8 +109,7 @@ class GrpcServer:
         self._grpc_server.start()
 
         for s in self._service_types:
-            print(f"{s.full_name} service"
-                  f" listening on port {self._port}")
+            logging.info(f"{s.full_name} service listening on port {self._port}")
 
         self._grpc_server.wait_for_termination()
 

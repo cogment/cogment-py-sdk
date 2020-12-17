@@ -14,6 +14,7 @@
 
 import asyncio
 import logging
+import traceback
 from abc import ABC, abstractmethod
 
 
@@ -65,7 +66,11 @@ class DatalogSession(ABC):
             logging.warning("A sample was missed")
 
     async def _run(self):
-        await self.__impl(self)
+        try:
+            await self.__impl(self)
+        except Exception:
+            logging.error(f"An exception occured in user datalog implementation:\n{traceback.format_exc()}")
+            raise
 
 
 class _ServedDatalogSession(DatalogSession):

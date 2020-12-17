@@ -15,6 +15,7 @@
 import asyncio
 import importlib
 import logging
+import traceback
 from abc import ABC, abstractmethod
 from cogment.session import Session
 
@@ -97,11 +98,12 @@ class ActorSession(Session):
 
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(trial)
-        self.actor_class = actor_class
+        self.class_name = actor_class.id
         self.name = name
         self.impl_name = impl_name
         self.config = config
 
+        self._actor_class = actor_class
         self._ended = False
         self._action_queue = asyncio.Queue()
         self._task = None  # Task used to call _run()
@@ -141,6 +143,7 @@ class ActorSession(Session):
         self._action_queue.put_nowait(action)
 
     async def _end(self, package):
+        logging.debug(f"Actor [{self.name}] received final data")
         if not self._ended:
             self._ended = True
 
@@ -153,9 +156,10 @@ class ActorSession(Session):
             event = {_FINAL_DATA : package}
             await self.__event_queue.put(event)
         else:
-            logging.warning("The actor received final data that it was unable to handle.")
+            logging.warning(f"Actor [{self.name}] received final data that it was unable to handle.")
 
     def _new_observation(self, obs):
+        logging.debug(f"Actor [{self.name}] received an observation")
         if not self.__started or self._ended:
             return
 
@@ -163,9 +167,10 @@ class ActorSession(Session):
             event = {_OBSERVATION : obs}
             self.__event_queue.put_nowait(event)
         else:
-            logging.warning("The actor received an observation that it was unable to handle.")
+            logging.warning(f"Actor [{self.name}] received an observation that it was unable to handle.")
 
     def _new_reward(self, reward):
+        logging.debug(f"Actor [{self.name}] received a reward")
         if not self.__started or self._ended:
             return
 
@@ -173,9 +178,10 @@ class ActorSession(Session):
             event = {_REWARD : reward}
             self.__event_queue.put_nowait(event)
         else:
-            logging.warning("The actor received a reward that it was unable to handle.")
+            logging.warning(f"Actor [{self.name}] received a reward that it was unable to handle.")
 
     def _new_message(self, message):
+        logging.debug(f"Actor [{self.name}] received a message")
         if not self.__started or self._ended:
             return
 
@@ -183,10 +189,14 @@ class ActorSession(Session):
             event = {_MESSAGE : (message.sender_name(), message.payload())}
             self.__event_queue.put_nowait(event)
         else:
-            logging.warning("The actor received a message that it was unable to handle.")
+            logging.warning(f"Actor [{self.name}] received a message that it was unable to handle.")
 
     async def _run(self):
-        await self.__impl(self)
+        try:
+            await self.__impl(self)
+        except Exception:
+            logging.error(f"An exception occured in user agent implementation:\n{traceback.format_exc()}")
+            raise
 
 
 class _ServedActorSession(ActorSession):
@@ -196,6 +206,7 @@ class _ServedActorSession(ActorSession):
     async def _retrieve_action(self):
         action = await self._action_queue.get()
         self._action_queue.task_done()
+        logging.debug(f"Agent actor [{self.name}] action has been retrieved")
         return action
 
 
@@ -206,4 +217,5 @@ class _ClientActorSession(ActorSession):
     async def _retrieve_action(self):
         action = await self._action_queue.get()
         self._action_queue.task_done()
+        logging.debug(f"Client actor [{self.name}] action has been retrieved")
         return action

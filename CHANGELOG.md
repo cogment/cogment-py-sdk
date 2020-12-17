@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Create better errors around handling of implementation names
+
+### Added
+
+- Avoid silent crashes by catching and logging exceptions thrown in async task and user code
+- Cancel tasks properly when they raise exceptions
+- debug logging in strategic places
+
+### Fixed
+
+- Send actions list to environment (as documented)
+- Store actor class name (string) for user facing session value and hide internal data
+- Client servicer code
+
 ## v1.0.0-alpha2 - 2020-12-09
 
 ### Fixed 

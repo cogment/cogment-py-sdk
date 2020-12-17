@@ -19,7 +19,7 @@ For further Cogment information, check out the documentation at <https://docs.co
 ### Local setup
 
 Make sure you have the following installed:
-  - [Python](https://www.python.org) (any version >3.8 should work),
+  - [Python](https://www.python.org) (any version >=3.7 should work),
   - [Poetry](https://python-poetry.org).
 
 Install the dependencies, including downloading and building the cogment protobuf API, by navigating to the python SDK directory and run the following

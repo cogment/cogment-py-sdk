@@ -240,7 +240,7 @@ class ReloaderLoop(object):
             try:
                 ast.parse(source_file.read(), filename=filename)
             except SyntaxError:
-                traceback.print_exc()
+                logging.error(f"{traceback.format_exc()}")
                 return
 
         self.log_reload(filename)

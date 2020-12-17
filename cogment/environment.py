@@ -15,9 +15,9 @@
 import asyncio
 import importlib
 import logging
+import traceback
 from cogment.session import Session
 from abc import ABC, abstractmethod
-from traceback import print_exc
 
 ENVIRONMENT_ACTOR_NAME = "env"
 
@@ -60,17 +60,14 @@ class EnvironmentSession(Session):
     async def event_loop(self):
         assert self.__started
         assert not self._ended
-        try:
-            loop_active = not self._last_event_received
-            while loop_active:
-                event = await self.__event_queue.get()
-                self._last_event_received = _FINAL_ACTIONS in event
-                keep_looping = yield event
-                self.__event_queue.task_done()
-                loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
-        except Exception as e:
-            print_exc()
-            raise e
+
+        loop_active = not self._last_event_received
+        while loop_active:
+            event = await self.__event_queue.get()
+            self._last_event_received = _FINAL_ACTIONS in event
+            keep_looping = yield event
+            self.__event_queue.task_done()
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
 
     def produce_observations(self, observations):
         assert self.__started
@@ -84,6 +81,8 @@ class EnvironmentSession(Session):
             self._obs_queue.put_nowait((observations, True))
 
     async def _end_request(self, actions):
+        logging.debug("Environment received an end request")
+
         if self._ended:
             return None
         self._ended = True
@@ -105,6 +104,8 @@ class EnvironmentSession(Session):
         return result
 
     def _new_action(self, actions):
+        logging.debug("Environment received actions")
+
         if not self.__started or self._ended:
             return
 
@@ -115,6 +116,8 @@ class EnvironmentSession(Session):
             logging.warning("The environment received actions that it was unable to handle.")
 
     def _new_message(self, message):
+        logging.debug("Environment received a message")
+
         if not self.__started or self._ended:
             return
 
@@ -125,7 +128,11 @@ class EnvironmentSession(Session):
             logging.warning("The environment received a message that it was unable to handle.")
 
     async def _run(self):
-        await self.__impl(self)
+        try:
+            await self.__impl(self)
+        except Exception:
+            logging.error(f"An exception occured in user environment implementation:\n{traceback.format_exc()}")
+            raise
 
 
 class _ServedEnvironmentSession(EnvironmentSession):
@@ -137,4 +144,5 @@ class _ServedEnvironmentSession(EnvironmentSession):
     async def _retrieve_obs(self):
         obs = await self._obs_queue.get()
         self._obs_queue.task_done()
+        logging.debug("Environment observation has been retrieved")
         return obs

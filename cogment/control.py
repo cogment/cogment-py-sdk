@@ -34,7 +34,7 @@ class ControlSession(ABC):
         return self._trial.id
 
     def get_actors(self):
-        return [SimpleNamespace(actor_name=actor.name, actor_class=actor.actor_class)
+        return [SimpleNamespace(actor_name=actor.name, actor_class_name=actor.actor_class)
                 for actor in self._trial.actors]
 
     async def terminate_trial(self):
