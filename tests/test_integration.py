@@ -22,6 +22,7 @@ from cogment import Context
 
 from helpers.launch_orchestrator import launch_orchestrator
 from helpers.find_free_port import find_free_port
+import urllib.request
 
 @pytest.fixture(scope="function")
 def unittest_case():
@@ -120,9 +121,10 @@ class TestIntegration:
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
+        prometheus_port=find_free_port()
         serve_environment = asyncio.create_task(context.serve_all_registered(
             port=cogment_test_setup["test_port"],
-            prometheus_port=find_free_port()
+            prometheus_port=prometheus_port
         ))
 #         await asyncio.sleep(1) # wait for the grpc server to be up and running.
         await context.start_trial(
@@ -130,6 +132,27 @@ class TestIntegration:
             impl=trial_controller,
             trial_config=data_pb2.TrialConfig()
         )
+
+        prometheus_connection = urllib.request.urlopen("http://localhost:"+ str(prometheus_port))
+        promethus_bytes = prometheus_connection.read()
+        promethus_data = promethus_bytes.decode("utf8")
+        prometheus_connection.close()
+
+        index = promethus_data.find("actor_decide_processing_seconds_count")
+        assert index != -1
+        index = promethus_data.find("actor_class=\"test\"")
+        assert index != -1
+        index = promethus_data.find("name=\"actor_1\"")
+        assert index != -1
+        index = promethus_data.find("name=\"actor_2\"")
+        assert index != -1
+        index = promethus_data.find("environment_update_processing_seconds_count")
+        assert index != -1
+        index = promethus_data.find("impl_name=\"default\"")
+        assert index != -1
+        index = promethus_data.find("Can you find anything ?")
+        assert index == -1
+
         assert await environment_ended_future
         await context._grpc_server.stop(grace=5.)
         await serve_environment

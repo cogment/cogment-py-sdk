@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Send actions list to environment (as documented)
 - Store actor class name (string) for user facing session value and hide internal data
 - Client servicer code
+- Fix prometheus server.
 
 ## v1.0.0-alpha2 - 2020-12-09
 

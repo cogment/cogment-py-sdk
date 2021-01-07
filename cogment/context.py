@@ -126,8 +126,6 @@ class Context:
                                    port: int,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
 
-        start_http_server(prometheus_port)
-
         if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
             self._grpc_server = grpc.experimental.aio.server()
 
@@ -164,6 +162,8 @@ class Context:
                     self.__cog_settings,
                     self._prometheus_registry
                 )
+
+            start_http_server(prometheus_port, "", self._prometheus_registry)
 
             self._grpc_server.add_insecure_port(f"[::]:{port}")
             await self._grpc_server.start()

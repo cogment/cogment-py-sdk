@@ -29,7 +29,7 @@ def launch_orchestrator(
     binary=COGMENT_ORCHESTRATOR
 ):
     if docker_image:
-        assert subprocess.run(["docker", "pull",  docker_image]).returncode == 0
+        subprocess.run(["docker", "pull",  docker_image])
 
     config_file_template = "cogment.yaml"
     config_file = f"cogment_{test_port}.yaml"
@@ -56,16 +56,26 @@ def launch_orchestrator(
 
     process = None
     if docker_image:
-        process = subprocess.Popen(["docker", "run",
-                                    "--volume", f"{status_dir}:/status",
-                                    "--volume", f"{app_directory}:/app",
-                                    "-p", f"{orchestrator_port}:{orchestrator_port}",
-                                    docker_image,
-                                    f"--lifecycle_port={orchestrator_port}",
-                                    f"--actor_port={orchestrator_port}",
-                                    f"--config={config_file}",
-                                    "--status_file=/status/cogment_orchestrator_status"
-                                    ])
+        launch_orchestator_args = [
+            "docker", "run",
+            "--volume", f"{status_dir}:/status",
+            "--volume", f"{app_directory}:/app"
+        ]
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            # For platforms where docker is runned in a VM, we need to expose the orchestrator port
+            launch_orchestator_args.extend(["-p", f"{orchestrator_port}:{orchestrator_port}"])
+        else:
+            # For platforms where it's runned of the host we can use the host network
+            launch_orchestator_args.extend([ "--network", "host"])
+        
+        launch_orchestator_args.extend([
+            docker_image,
+            f"--lifecycle_port={orchestrator_port}",
+            f"--actor_port={orchestrator_port}",
+            f"--config={config_file}",
+            "--status_file=/status/cogment_orchestrator_status"                        
+        ])
+        process = subprocess.Popen(launch_orchestator_args)
     else:
         process = subprocess.Popen([binary,
                                     f"--lifecycle_port={orchestrator_port}",

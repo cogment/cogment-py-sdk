@@ -102,23 +102,28 @@ class AgentServicer(AgentEndpointServicer):
         self.DECIDE_REQUEST_TIME = Summary(
             "actor_decide_processing_seconds",
             "Time spent by an actor on the decide function",
-            ["name"],
+            ["name", "actor_class"],
             registry=prometheus_registry
         )
         self.ACTORS_STARTED = Counter(
-            "actor_started", "Number of actors created", ["impl_name"],
+            "actor_started", "Number of actors created", ["actor_class"],
             registry=prometheus_registry
         )
+
         self.ACTORS_ENDED = Counter(
-            "actor_ended", "Number of actors ended", ["impl_name"],
+            "actor_ended", "Number of actors ended", ["actor_class"],
             registry=prometheus_registry
         )
         self.MESSAGES_RECEIVED = Counter(
-            "actor_received_messages", "Number of messages received", ["name"],
+            "actor_received_messages", "Number of messages received", ["name", "actor_class"],
             registry=prometheus_registry
         )
         self.REWARDS_RECEIVED = Gauge(
-            "actor_reward_summation", "Cumulative rewards received", ["name"],
+            "actor_reward_summation", "Cumulative rewards received", ["name", "actor_class"],
+            registry=prometheus_registry
+        )
+        self.REWARDS_COUNTER = Counter(
+            "actor_rewards_count", "Number of rewards received", ["name", "actor_class"],
             registry=prometheus_registry
         )
 
@@ -237,7 +242,7 @@ class AgentServicer(AgentEndpointServicer):
 
             agent_session = self.__agent_sessions[key]
 
-            with self.DECIDE_REQUEST_TIME.labels(agent_session.name).time():
+            with self.DECIDE_REQUEST_TIME.labels(agent_session.name, agent_session.impl_name).time():
                 loop = asyncio.get_running_loop()
 
                 reader_task = loop.create_task(read_observations(context, agent_session))
@@ -268,13 +273,17 @@ class AgentServicer(AgentEndpointServicer):
             reward = Reward()
             reward._set_all(request.reward, request.tick_id)
 
-            agent_session = self.__agent_sessions[key]
-            if reward.value < 0.0:
-                self.REWARDS_RECEIVED.labels(agent_session.name).dec(abs(reward.value))
-            else:
-                self.REWARDS_RECEIVED.labels(agent_session.name).inc(reward.value)
+            agent_session = self.__agent_sessions.get(key)
+            if agent_session is not None:
+                self.REWARDS_COUNTER.labels(agent_session.name, agent_session.impl_name).inc()
+                if reward.value < 0.0:
+                    self.REWARDS_RECEIVED.labels(agent_session.name, agent_session.impl_name).dec(abs(reward.value))
+                else:
+                    self.REWARDS_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc(reward.value)
 
-            agent_session._new_reward(reward)
+                agent_session._new_reward(reward)
+            else:
+                logging.error(f"Uknown trial id {trial_id} or/and actor name {actor_name}.")
 
             return agent_api.AgentRewardReply()
 
@@ -294,7 +303,7 @@ class AgentServicer(AgentEndpointServicer):
 
             for message in request.messages:
                 agent_session._new_message(message)
-                self.MESSAGES_RECEIVED.labels(agent_session.name).inc()
+                self.MESSAGES_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc()
 
             return agent_api.AgentMessageReply()
 
