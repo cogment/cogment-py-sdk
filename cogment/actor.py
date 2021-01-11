@@ -186,7 +186,7 @@ class ActorSession(Session):
             return
 
         if self.__event_queue:
-            event = {_MESSAGE : (message.sender_name(), message.payload())}
+            event = {_MESSAGE : (message.sender_name, message.payload)}
             self.__event_queue.put_nowait(event)
         else:
             logging.warning(f"Actor [{self.name}] received a message that it was unable to handle.")

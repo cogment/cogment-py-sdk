@@ -31,7 +31,7 @@ class Trial:
         def get_prepared_messages(self, sender_name):
             while len(self._messages) > 0:
                 payload = self._messages.popleft()
-                message = Message(sender_name=sender_name, receiver_name=self.name)
+                message = Message(tick_id=-1, sender_name=sender_name, receiver_name=self.name)
                 if payload is not None:
                     message.payload.Pack(payload)
                 yield message
