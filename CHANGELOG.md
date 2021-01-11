@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Support messsages
 - Avoid silent crashes by catching and logging exceptions thrown in async task and user code
 - Cancel tasks properly when they raise exceptions
-- debug logging in strategic places
+- Debug logging in strategic places
 
 ### Fixed
 
@@ -23,7 +24,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Store actor class name (string) for user facing session value and hide internal data
 - Client servicer code
 - Fix prometheus server
-- Fixes to support messages
 
 ## v1.0.0-alpha2 - 2020-12-09
 
