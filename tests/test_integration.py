@@ -210,7 +210,6 @@ class TestIntegration:
 
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
-    @pytest.mark.skip  # TODO figure out why we can't have two consecutive context sessions.
     async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
         trial_id = None
 
