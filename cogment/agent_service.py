@@ -66,6 +66,9 @@ async def read_observations(context, agent_session):
             agent_session._latest_observation = obs
             agent_session._new_observation(obs)
 
+    except asyncio.CancelledError:
+        logging.debug("read_observations coroutine cancelled")
+
     except Exception:
         logging.error(f"{traceback.format_exc()}")
         raise
@@ -86,6 +89,9 @@ async def write_actions(context, agent_session):
             msg.messages.extend(agent_session._trial._gather_all_messages(actor_name))
 
             await context.write(msg)
+
+    except asyncio.CancelledError:
+        logging.debug("write_action coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -225,7 +231,7 @@ class AgentServicer(AgentEndpointServicer):
 
             self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
 
-            self.__agent_sessions.pop(key, None)
+            del self.__agent_sessions[key]
 
             return agent_api.AgentEndReply()
 
@@ -249,8 +255,11 @@ class AgentServicer(AgentEndpointServicer):
                 writer_task = loop.create_task(write_actions(context, agent_session))
 
                 await agent_session._task
+                logging.debug(f"User agent implementation for [{agent_session.name}] returned")
 
-                del self.__agent_sessions[key]
+                if key in self.__agent_sessions:
+                    logging.error(f"User agent implementation for [{agent_session.name}] ended before required")
+                    del self.__agent_sessions[key]
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

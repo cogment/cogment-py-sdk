@@ -120,6 +120,9 @@ async def write_observations(context, env_session):
             if final:
                 break
 
+    except asyncio.CancelledError:
+        logging.debug("write_observations coroutine cancelled")
+
     except Exception:
         logging.error(f"{traceback.format_exc()}")
         raise
@@ -147,6 +150,9 @@ async def read_actions(context, env_session):
                 break
 
             env_session._new_action(_process_actions(request, env_session))
+
+    except asyncio.CancelledError:
+        logging.debug("read_actions coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -266,11 +272,13 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 writer_task = loop.create_task(write_observations(context, env_session))
 
                 await env_session._task
-                if not env_session._ended:
-                    del self.__env_sessions[key]
-                    raise Exception(f"Trial [{trial_id}] was never ended")
+                if env_session._ended:
+                    logging.debug(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}] returned")
+                else:
+                    logging.error(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
+                                  f" running trial [{trial_id}] returned before end")
 
-                del self.__env_sessions[key]
+                self.__env_sessions.pop(key, None)
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

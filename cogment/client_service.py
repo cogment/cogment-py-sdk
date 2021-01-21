@@ -84,6 +84,9 @@ async def read_observations(client_session, reply_itor):
 
                 break
 
+    except asyncio.CancelledError:
+        logging.debug("read_observations coroutine cancelled")
+
     except Exception:
         logging.error(f"{traceback.format_exc()}")
         raise
@@ -159,9 +162,12 @@ class ClientServicer:
 
         try:
             await impl(new_session)
+            logging.debug(f"User agent implementation for [{new_session.name}] returned")
+
         except Exception:
             logging.error(f"An exception occured in user client implementation [{new_session.impl_name}]:\n"
                           f"{traceback.format_exc()}")
             raise
+
         finally:
             reader_task.cancel()

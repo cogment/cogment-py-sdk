@@ -132,11 +132,16 @@ class ActorSession(Session):
 
         loop_active = not self._last_event_received
         while loop_active:
-            event = await self.__event_queue.get()
-            self._last_event_received = _FINAL_DATA in event
-            keep_looping = yield event
-            self.__event_queue.task_done()
-            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
+            try:
+                event = await self.__event_queue.get()
+            except asyncio.CancelledError:
+                logging.debug("Coroutine cancelled while waiting for an event")
+                break
+            else:
+                self._last_event_received = _FINAL_DATA in event
+                keep_looping = yield event
+                self.__event_queue.task_done()
+                loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
 
     def do_action(self, action):
         assert self.__started

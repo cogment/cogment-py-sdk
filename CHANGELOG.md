@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Catching exceptions that normally occur at the end of trials
+
+### Fixed
+
+- Fix a crash occuring at the end of a trial in service actor implementations involving a `KeyError`.
+
 ## v1.0.0-alpha3 - 2021-01-11
 
 ### Changed
