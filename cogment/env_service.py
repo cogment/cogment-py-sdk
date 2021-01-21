@@ -112,6 +112,7 @@ async def write_observations(context, env_session):
     try:
         while True:
             observations, final = await env_session._retrieve_obs()
+            env_session._trial.tick_id += 1
 
             reply = _process_reply(observations, env_session)
             reply.final_update = final
@@ -261,7 +262,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             env_session = self.__env_sessions[key]
 
             with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
-                env_session._trial.tick_id += 1
 
                 # We are going to have three concurrent coroutines:
                 # - One that reads actions from the orchestrator

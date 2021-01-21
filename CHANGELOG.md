@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - Fix a crash occuring at the end of a trial in service actor implementations involving a `KeyError`.
+- tick_id was not being updated
 
 ## v1.0.0-alpha3 - 2021-01-11
 
