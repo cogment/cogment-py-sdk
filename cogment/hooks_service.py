@@ -26,7 +26,7 @@ import traceback
 
 class PrehookServicer(TrialHooksServicer):
 
-    def __init__(self, impls, cog_settings):
+    def __init__(self, impls, cog_settings, prometheus_registry):
 
         self.__impls = impls
         self.__cog_settings = cog_settings
