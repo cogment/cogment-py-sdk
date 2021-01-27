@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import logging
 import traceback
 import grpc
@@ -41,6 +42,11 @@ class ControlServicer:
 
         try:
             await impl(_ServedControlSession(trial, self.lifecycle_stub))
+            logging.debug(f"Control implementation returned")
+
+        except asyncio.CancelledError:
+            logging.debug("Control implementation coroutine cancelled")
+
         except Exception:
             logging.error(f"An exception occured in user control implementation:\n{traceback.format_exc()}")
             raise

@@ -32,8 +32,6 @@ import traceback
 async def read_observations(client_session, reply_itor):
     try:
         async for reply in reply_itor:
-            logging.debug(f"Client actor [{client_session.name}] received a reply (obs)")
-
             if not reply.final_data:
                 for obs_reply in reply.data.observations:
                     tick_id = obs_reply.tick_id
@@ -85,7 +83,15 @@ async def read_observations(client_session, reply_itor):
                 break
 
     except asyncio.CancelledError:
-        logging.debug("read_observations coroutine cancelled")
+        logging.debug(f"Client [{client_session.name}] 'read_observations' coroutine cancelled")
+
+    except grpc.experimental.aio._call.AioRpcError as exc:
+        if exc.code() == grpc.StatusCode.UNAVAILABLE:
+            logging.error(f"Orchestrator communication lost: [{exc.details()}]")
+            logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
+            client_session._task.cancel()
+        else:
+            raise
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -102,6 +108,9 @@ async def write_actions(client_session):
                 action_req.action.content = act.SerializeToString()
 
             yield action_req
+
+    except asyncio.CancelledError:
+        logging.debug(f"Client [{client_session.name}] 'write_actions' coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -152,21 +161,19 @@ class ClientServicer:
             impl, actor_class, trial, self_info.name, impl_name, config
         )
 
-        loop = asyncio.get_running_loop()
-
         metadata = (("trial-id", trial.id), ("actor-name", self_info.name))
         req_itor = write_actions(new_session)
         reply_itor = self._actor_stub.ActionStream(request_iterator=req_itor, metadata=metadata)
 
-        reader_task = loop.create_task(read_observations(new_session, reply_itor))
+        reader_task = asyncio.create_task(read_observations(new_session, reply_itor))
 
         try:
-            await impl(new_session)
-            logging.debug(f"User agent implementation for [{new_session.name}] returned")
+            new_session._task = asyncio.create_task(new_session._run())
+            await new_session._task
+            logging.debug(f"User client implementation for [{new_session.name}] returned")
 
         except Exception:
-            logging.error(f"An exception occured in user client implementation [{new_session.impl_name}]:\n"
-                          f"{traceback.format_exc()}")
+            logging.error(f"{traceback.format_exc()}")
             raise
 
         finally:

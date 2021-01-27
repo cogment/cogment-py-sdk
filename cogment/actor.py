@@ -134,14 +134,22 @@ class ActorSession(Session):
         while loop_active:
             try:
                 event = await self.__event_queue.get()
-            except asyncio.CancelledError:
-                logging.debug("Coroutine cancelled while waiting for an event")
+
+            except asyncio.CancelledError as exc:
+                logging.debug(f"Coroutine for actor [{self.name}] cancelled while waiting for an event")
                 break
-            else:
-                self._last_event_received = _FINAL_DATA in event
-                keep_looping = yield event
-                self.__event_queue.task_done()
-                loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
+
+            self._last_event_received = _FINAL_DATA in event
+            keep_looping = yield event
+            self.__event_queue.task_done()
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
+            if not loop_active:
+                if self._last_event_received:
+                    logging.debug(f"Last event received, exiting event loop for actor [{self.name}]")
+                else:
+                    logging.debug(f"End of event loop for actor [{self.name}] requested by user")
+
+        logging.debug(f"Exiting actor [{self.name}] event loop generator")
 
     def do_action(self, action):
         assert self.__started
@@ -164,7 +172,6 @@ class ActorSession(Session):
             logging.warning(f"Actor [{self.name}] received final data that it was unable to handle.")
 
     def _new_observation(self, obs):
-        logging.debug(f"Actor [{self.name}] received an observation")
         if not self.__started or self._ended:
             return
 
@@ -199,8 +206,13 @@ class ActorSession(Session):
     async def _run(self):
         try:
             await self.__impl(self)
+
+        except asyncio.CancelledError:
+            logging.debug(f"Actor [{self.name}] implementation coroutine cancelled")
+
         except Exception:
-            logging.error(f"An exception occured in user agent implementation:\n{traceback.format_exc()}")
+            logging.error(f"An exception occured in user actor implementation [{self.impl_name}]:\n"
+                          f"{traceback.format_exc()}")
             raise
 
 
@@ -211,7 +223,6 @@ class _ServedActorSession(ActorSession):
     async def _retrieve_action(self):
         action = await self._action_queue.get()
         self._action_queue.task_done()
-        logging.debug(f"Agent actor [{self.name}] action has been retrieved")
         return action
 
 
@@ -222,5 +233,4 @@ class _ClientActorSession(ActorSession):
     async def _retrieve_action(self):
         action = await self._action_queue.get()
         self._action_queue.task_done()
-        logging.debug(f"Client actor [{self.name}] action has been retrieved")
         return action

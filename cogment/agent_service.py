@@ -52,8 +52,8 @@ async def read_observations(context, agent_session):
         while True:
             request = await context.read()
 
-            # This means the GRPC channel has been closed by the orchestrator.
             if request == grpc.experimental.aio.EOF:
+                logging.info(f"Orchestrator disconnected agent [{agent_session.name}]")
                 break
 
             agent_session._trial.tick_id = request.observation.tick_id
@@ -67,7 +67,7 @@ async def read_observations(context, agent_session):
             agent_session._new_observation(obs)
 
     except asyncio.CancelledError:
-        logging.debug("read_observations coroutine cancelled")
+        logging.debug(f"Agent [{agent_session.name}] 'read_observations' coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -91,7 +91,7 @@ async def write_actions(context, agent_session):
             await context.write(msg)
 
     except asyncio.CancelledError:
-        logging.debug("write_action coroutine cancelled")
+        logging.debug(f"Agent [{agent_session.name}] 'write_action' coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -195,8 +195,7 @@ class AgentServicer(AgentEndpointServicer):
             )
             self.__agent_sessions[key] = new_session
 
-            loop = asyncio.get_running_loop()
-            new_session._task = loop.create_task(new_session._run())
+            new_session._task = asyncio.create_task(new_session._run())
 
             return agent_api.AgentStartReply()
 
@@ -208,30 +207,34 @@ class AgentServicer(AgentEndpointServicer):
         try:
             metadata = dict(context.invocation_metadata())
             key = _trial_key(metadata["trial-id"], metadata["actor-name"])
-            agent_session = self.__agent_sessions[key]
 
-            package = SimpleNamespace(observations=[], rewards=[], messages=[])
-            for obs_request in request.final_data.observations:
-                obs = DecodeObservationData(
-                    agent_session._actor_class,
-                    obs_request.data,
-                    agent_session._latest_observation)
-                agent_session._latest_observation = obs
-                package.observations.append(obs)
+            agent_session = self.__agent_sessions.get(key)
+            if agent_session is not None:
+                package = SimpleNamespace(observations=[], rewards=[], messages=[])
+                for obs_request in request.final_data.observations:
+                    obs = DecodeObservationData(
+                        agent_session._actor_class,
+                        obs_request.data,
+                        agent_session._latest_observation)
+                    agent_session._latest_observation = obs
+                    package.observations.append(obs)
 
-            for rew_request in request.final_data.rewards:
-                reward = Reward()
-                reward._set_all(rew_request, -1)
-                package.rewards.append(reward)
+                for rew_request in request.final_data.rewards:
+                    reward = Reward()
+                    reward._set_all(rew_request, -1)
+                    package.rewards.append(reward)
 
-            for msg_request in request.final_data.messages:
-                package.messages.append(msg_request)
+                for msg_request in request.final_data.messages:
+                    package.messages.append(msg_request)
 
-            await agent_session._end(package)
+                await agent_session._end(package)
 
-            self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
+                self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
 
-            del self.__agent_sessions[key]
+                del self.__agent_sessions[key]
+
+            else:
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for end-of-trial")
 
             return agent_api.AgentEndReply()
 
@@ -246,20 +249,20 @@ class AgentServicer(AgentEndpointServicer):
             metadata = dict(context.invocation_metadata())
             key = _trial_key(metadata["trial-id"], metadata["actor-name"])
 
-            agent_session = self.__agent_sessions[key]
+            agent_session = self.__agent_sessions.get(key)
+            if agent_session is not None:
+                with self.DECIDE_REQUEST_TIME.labels(agent_session.name, agent_session.impl_name).time():
+                    reader_task = asyncio.create_task(read_observations(context, agent_session))
+                    writer_task = asyncio.create_task(write_actions(context, agent_session))
 
-            with self.DECIDE_REQUEST_TIME.labels(agent_session.name, agent_session.impl_name).time():
-                loop = asyncio.get_running_loop()
+                    await agent_session._task
+                    logging.debug(f"User agent implementation for [{agent_session.name}] returned")
 
-                reader_task = loop.create_task(read_observations(context, agent_session))
-                writer_task = loop.create_task(write_actions(context, agent_session))
-
-                await agent_session._task
-                logging.debug(f"User agent implementation for [{agent_session.name}] returned")
-
-                if key in self.__agent_sessions:
-                    logging.error(f"User agent implementation for [{agent_session.name}] ended before required")
-                    del self.__agent_sessions[key]
+                    if key in self.__agent_sessions:
+                        logging.error(f"User agent implementation for [{agent_session.name}] ended before required")
+                        del self.__agent_sessions[key]
+            else:
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for observation")
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")
@@ -292,7 +295,7 @@ class AgentServicer(AgentEndpointServicer):
 
                 agent_session._new_reward(reward)
             else:
-                logging.error(f"Uknown trial id {trial_id} or/and actor name {actor_name}.")
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for reward")
 
             return agent_api.AgentRewardReply()
 
@@ -308,11 +311,13 @@ class AgentServicer(AgentEndpointServicer):
 
             key = _trial_key(trial_id, actor_name)
 
-            agent_session = self.__agent_sessions[key]
-
-            for message in request.messages:
-                agent_session._new_message(message)
-                self.MESSAGES_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc()
+            agent_session = self.__agent_sessions.get(key)
+            if agent_session is not None:
+                for message in request.messages:
+                    agent_session._new_message(message)
+                    self.MESSAGES_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc()
+            else:
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for message")
 
             return agent_api.AgentMessageReply()
 

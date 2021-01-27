@@ -122,7 +122,7 @@ async def write_observations(context, env_session):
                 break
 
     except asyncio.CancelledError:
-        logging.debug("write_observations coroutine cancelled")
+        logging.debug("Environment 'write_observations' coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -153,7 +153,7 @@ async def read_actions(context, env_session):
             env_session._new_action(_process_actions(request, env_session))
 
     except asyncio.CancelledError:
-        logging.debug("read_actions coroutine cancelled")
+        logging.debug("Environment 'read_actions' coroutine cancelled")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -237,8 +237,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             new_session = _ServedEnvironmentSession(impl.impl, trial, impl_name, config)
             self.__env_sessions[key] = new_session
 
-            loop = asyncio.get_running_loop()
-            new_session._task = loop.create_task(new_session._run())
+            new_session._task = asyncio.create_task(new_session._run())
 
             observations, _ = await new_session._retrieve_obs()
 
@@ -267,9 +266,8 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 # - One that reads actions from the orchestrator
                 # - One that sends observations to the orchestrator
                 # - The environment's main (which will be the current coroutine)
-                loop = asyncio.get_running_loop()
-                reader_task = loop.create_task(read_actions(context, env_session))
-                writer_task = loop.create_task(write_observations(context, env_session))
+                reader_task = asyncio.create_task(read_actions(context, env_session))
+                writer_task = asyncio.create_task(write_observations(context, env_session))
 
                 await env_session._task
                 if env_session._ended:
@@ -325,7 +323,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 reply = _process_reply(obs, env_session)
             else:
                 reply = env_api.EnvActionReply()
-            reply.set_end_trial(True)
+            reply.final_update = True
 
             self.TRIALS_ENDED.labels(env_session.impl_name).inc()
             self.__env_sessions.pop(key, None)

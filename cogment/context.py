@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from threading import Thread
+import logging
 from typing import Callable, Awaitable, Dict, List, Any
 from types import ModuleType
 import os
@@ -168,6 +168,7 @@ class Context:
             self._grpc_server.add_insecure_port(f"[::]:{port}")
             await self._grpc_server.start()
             await self._grpc_server.wait_for_termination()
+            logging.debug(f"Context gRPC server at port [{port}] for user [{self._user_id}] exited")
 
     async def start_trial(self,
                           endpoint,

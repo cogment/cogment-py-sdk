@@ -44,6 +44,9 @@ lint_mypy = "mypy --config-file mypy.ini cogment/"
 test = "pytest"
 
 [tool.pytest.ini_options]
+log_level = "DEBUG"
+log_format = "%(asctime)s.%(msecs)03d %(levelname)s %(message)s"
+log_date_format = "%H:%M:%S"
 addopts = "-rfs"
 junit_suite_name = "cogment_py_sdk_tests"
 timeout = 15

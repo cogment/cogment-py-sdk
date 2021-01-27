@@ -14,6 +14,7 @@
 
 import asyncio
 import os
+import logging
 import unittest
 
 import pytest
@@ -52,27 +53,26 @@ class TestIntegration:
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
     async def test_environment_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
+        controller_trial_id = None
         trial_id = None
         target_tick_count = 10
 
         trial_controller_call_count = 0
-        environment_ended_future = asyncio.get_running_loop().create_future()
 
         async def trial_controller(control_session):
-            nonlocal trial_id
+            nonlocal controller_trial_id
             nonlocal trial_controller_call_count
-            trial_id = control_session.get_trial_id()
+            controller_trial_id = control_session.get_trial_id()
             trial_controller_call_count += 1
-            # TODO: investigate how to do that in a better way or how to get rid of it
-            await environment_ended_future
 
         environment_call_count = 0
         environment_tick_count = 0
 
         async def environment(environment_session):
+            nonlocal trial_id
             nonlocal environment_call_count
             nonlocal environment_tick_count
-            assert environment_session.get_trial_id() == trial_id
+            trial_id = environment_session.get_trial_id()
             environment_call_count += 1
 
             environment_session.start([("*", data_pb2.Observation(observed_value=12))])
@@ -83,8 +83,6 @@ class TestIntegration:
 
                 if environment_tick_count >= target_tick_count:
                     environment_session.end([("*", data_pb2.Observation(observed_value=12))])
-                    # TODO: I find it weird to need this break, shouldn't the event loop just end in this case?
-                    break
                 elif "actions" in event and environment_tick_count == 1:
                     actors = environment_session.get_active_actors()
                     for actor in actors:
@@ -99,7 +97,7 @@ class TestIntegration:
                     environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
                 else:
                     environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
-            environment_ended_future.set_result(True)
+
 
         agent_call_count = 0
         agent_observation_count = 0
@@ -108,6 +106,9 @@ class TestIntegration:
         had_universal_message = False
         had_personal_message = False
         total_reward = 0
+        agents_ended = {}
+        agents_ended["actor_1"] = asyncio.get_running_loop().create_future()
+        agents_ended["actor_2"] = asyncio.get_running_loop().create_future()
 
         async def agent(actor_session):
             nonlocal agent_call_count
@@ -117,7 +118,9 @@ class TestIntegration:
             nonlocal had_universal_message
             nonlocal had_personal_message
             nonlocal total_reward
+            nonlocal agents_ended
             assert actor_session.get_trial_id() == trial_id
+            assert actor_session.name in agents_ended
             agent_call_count += 1
 
             actor_session.start()
@@ -154,6 +157,8 @@ class TestIntegration:
 
                     assert event["final_data"].observations[0].observed_value == 12
 
+            agents_ended[actor_session.name].set_result(True)
+
         context = Context(cog_settings=cog_settings, user_id='test_environment_controlled_trial')
 
         context.register_environment(impl=environment)
@@ -164,12 +169,13 @@ class TestIntegration:
             port=cogment_test_setup["test_port"],
             prometheus_port=prometheus_port
         ))
-#         await asyncio.sleep(1) # wait for the grpc server to be up and running.
         await context.start_trial(
             endpoint=cogment_test_setup["orchestrator_endpoint"],
             impl=trial_controller,
             trial_config=data_pb2.TrialConfig()
         )
+        assert len(agents_ended) > 0
+        await asyncio.wait(agents_ended.values())
 
         prometheus_connection = urllib.request.urlopen("http://localhost:" + str(prometheus_port))
         promethus_bytes = prometheus_connection.read()
@@ -191,11 +197,9 @@ class TestIntegration:
         index = promethus_data.find("Can you find anything ?")
         assert index == -1
 
-        assert await environment_ended_future
-        await context._grpc_server.stop(grace=5.)
-        await serve_environment
-
         assert trial_id != None
+        assert controller_trial_id != None
+        assert controller_trial_id == trial_id
         assert trial_controller_call_count == 1
         assert environment_call_count == 1
         assert environment_tick_count == target_tick_count
@@ -208,38 +212,42 @@ class TestIntegration:
         assert agent_message_count == 4
         assert total_reward == 42.0
 
+        await context._grpc_server.stop(grace=5.)  # To prepare for next test
+
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
     async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
+        controller_trial_id = None
         trial_id = None
 
         trial_controller_call_count = 0
 
         async def trial_controller(control_session):
-            print('--`trial_controller`-- start')
-            nonlocal trial_id
+            logging.info('--`trial_controller`-- start')
+            nonlocal controller_trial_id
             nonlocal trial_controller_call_count
-            trial_id = control_session.get_trial_id()
+            controller_trial_id = control_session.get_trial_id()
             trial_controller_call_count += 1
             await asyncio.sleep(3)
-            print('--`trial_controller`-- terminate_trial')
+            logging.info('--`trial_controller`-- terminate_trial')
             await control_session.terminate_trial()
-            print('--`trial_controller`-- end')
+            logging.info('--`trial_controller`-- end')
+
 
         environment_call_count = 0
         environment_tick_count = 0
-        environment_ended_future = asyncio.get_running_loop().create_future()
 
         async def environment(environment_session):
+            nonlocal trial_id
             nonlocal environment_call_count
             nonlocal environment_tick_count
-            nonlocal environment_ended_future
-            assert environment_session.get_trial_id() == trial_id
-            environment_call_count += 1
+            trial_id = environment_session.get_trial_id()
 
+            environment_call_count += 1
             environment_session.start([("*", data_pb2.Observation(observed_value=0))])
 
             async for event in environment_session.event_loop():
+                # await asyncio.sleep(0.25) # Fails with this delay, why???
                 environment_tick_count += 1
 
                 if "actions" in event:
@@ -247,28 +255,29 @@ class TestIntegration:
                         [("*", data_pb2.Observation(observed_value=environment_tick_count))])
                 if "final_actions" in event:
                     environment_session.end([("*", data_pb2.Observation(observed_value=environment_tick_count))])
-                    # TODO: I find it weird to need this break, shouldn't the event loop just end in this case?
-                    break
 
-            environment_ended_future.set_result(True)
 
         agent_call_count = 0
         agents_tick_count = {}
+        agents_ended = {}
+        agents_ended["actor_1"] = asyncio.get_running_loop().create_future()
+        agents_ended["actor_2"] = asyncio.get_running_loop().create_future()
 
         async def agent(actor_session):
             nonlocal agent_call_count
             nonlocal agents_tick_count
+            nonlocal agents_ended
             assert actor_session.get_trial_id() == trial_id
             agent_call_count += 1
             assert actor_session.name not in agents_tick_count
+            assert actor_session.name in agents_ended
             agents_tick_count[actor_session.name] = 0
 
             actor_session.start()
 
             async for event in actor_session.event_loop():
-                print('')
-                agents_tick_count[actor_session.name] += 1
                 if "observation" in event:
+                    agents_tick_count[actor_session.name] += 1
                     assert event["observation"].observed_value == agents_tick_count[actor_session.name] - 1
                     actor_session.do_action(data_pb2.Action(action_value=agents_tick_count[actor_session.name]))
 
@@ -277,14 +286,19 @@ class TestIntegration:
                     assert len(event["final_data"].messages) == 0
                     assert len(event["final_data"].rewards) == 0
 
-                    assert event["final_data"].observations[0].observed_value == agents_tick_count[actor_session.name] - 1
+                    assert event["final_data"].observations[0].observed_value == agents_tick_count[actor_session.name]
+
+
+            assert agents_tick_count[actor_session.name] == environment_tick_count
+            agents_ended[actor_session.name].set_result(True)
+
 
         context = Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial')
 
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
-        serve_environment = asyncio.create_task(context.serve_all_registered(
+        asyncio.create_task(context.serve_all_registered(
             port=cogment_test_setup["test_port"],
             prometheus_port=find_free_port()
         ))
@@ -293,11 +307,11 @@ class TestIntegration:
             impl=trial_controller,
             trial_config=data_pb2.TrialConfig()
         )
-        assert await environment_ended_future
-        await context._grpc_server.stop(grace=5.)
-        await serve_environment
+        await asyncio.wait(agents_ended.values())
 
         assert trial_id != None
+        assert controller_trial_id != None
+        assert controller_trial_id == trial_id
         assert trial_controller_call_count == 1
         assert environment_call_count == 1
         assert agent_call_count == 2
@@ -306,5 +320,6 @@ class TestIntegration:
 
         unittest_case.assertCountEqual(agents_tick_count.keys(), ["actor_1", "actor_2"])
         assert agents_tick_count["actor_1"] == agents_tick_count["actor_2"]
-
         assert agents_tick_count["actor_1"] == environment_tick_count
+
+        await context._grpc_server.stop(grace=5.)  # To prepare for next test

@@ -65,14 +65,27 @@ class EnvironmentSession(Session):
         while loop_active:
             try:
                 event = await self.__event_queue.get()
+
             except asyncio.CancelledError:
                 logging.debug("Coroutine cancelled while waiting for an event")
                 break
-            else:
-                self._last_event_received = _FINAL_ACTIONS in event
-                keep_looping = yield event
-                self.__event_queue.task_done()
-                loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
+
+            self._last_event_received = _FINAL_ACTIONS in event
+            keep_looping = yield event
+            self.__event_queue.task_done()
+            loop_active = ((keep_looping is None or bool(keep_looping)) and
+                            not self._last_event_received and
+                            not self._ended)
+
+            if not loop_active:
+                if self._last_event_received:
+                    logging.debug(f"Last event received, exiting environment event loop")
+                elif self._ended:
+                    logging.debug(f"Last observation sent, exiting environment event loop")
+                else:
+                    logging.debug(f"End of event loop for environment requested by user")
+
+        logging.debug(f"Exiting environment event loop generator")
 
     def produce_observations(self, observations):
         assert self.__started
@@ -109,8 +122,6 @@ class EnvironmentSession(Session):
         return result
 
     def _new_action(self, actions):
-        logging.debug("Environment received actions")
-
         if not self.__started or self._ended:
             return
 
@@ -135,6 +146,10 @@ class EnvironmentSession(Session):
     async def _run(self):
         try:
             await self.__impl(self)
+
+        except asyncio.CancelledError:
+            logging.debug("Environment implementation coroutine cancelled")
+
         except Exception:
             logging.error(f"An exception occured in user environment implementation:\n{traceback.format_exc()}")
             raise
@@ -149,5 +164,4 @@ class _ServedEnvironmentSession(EnvironmentSession):
     async def _retrieve_obs(self):
         obs = await self._obs_queue.get()
         self._obs_queue.task_done()
-        logging.debug("Environment observation has been retrieved")
         return obs
