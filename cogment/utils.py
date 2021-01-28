@@ -16,8 +16,6 @@ from cogment.api.common_pb2 import VersionInfo, ObservationData, TrialParams
 from cogment.version import __version__
 from cogment.delta_encoding import DecodeObservationData
 
-from types import SimpleNamespace
-
 import logging
 import importlib
 import grpc
@@ -42,10 +40,10 @@ def raw_params_to_user_params(params, settings):
         env_config = settings.environment.config_type()
         env_config.ParseFromString(params.environment.config.content)
 
-    environment = SimpleNamespace(
-        endpoint=params.environment.endpoint,
-        config=env_config
-    )
+    environment = {
+        "endpoint": params.environment.endpoint,
+        "config": env_config
+    }
 
     actors = []
     for actor in params.actors:
@@ -56,41 +54,45 @@ def raw_params_to_user_params(params, settings):
             actor_config = a_c.config_type()
             actor_config.ParseFromString(actor.config.content)
 
-        actor_data = SimpleNamespace(
-            actor_class=actor.actor_class,
-            endpoint=actor.endpoint,
-            config=actor_config
-        )
+        actor_data = {
+            "name": actor.name,
+            "actor_class": actor.actor_class,
+            "endpoint": actor.endpoint,
+            "implementation": actor.implementation,
+            "config": actor_config
+        }
         actors.append(actor_data)
 
-    return SimpleNamespace(
-        trial_config=trial_config,
-        environment=environment,
-        actors=actors,
-        max_steps=params.max_steps,
-        max_inactivity=params.max_inactivity
-    )
+    return {
+        "trial_config": trial_config,
+        "environment": environment,
+        "actors": actors,
+        "max_steps": params.max_steps,
+        "max_inactivity": params.max_inactivity
+    }
 
 
 def user_params_to_raw_params(params, settings):
     result = TrialParams()
 
-    result.max_steps = params.max_steps
-    result.max_inactivity = params.max_inactivity
+    result.max_steps = params["max_steps"]
+    result.max_inactivity = params["max_inactivity"]
 
-    if params.trial_config is not None:
-        result.trial_config.content = params.trial_config.SerializeToString()
+    if params["trial_config"] is not None:
+        result.trial_config.content = params["trial_config"].SerializeToString()
 
-    result.environment.endpoint = params.environment.endpoint
-    if params.environment.config is not None:
-        result.environment.config.content = params.environment.config.SerializeToString()
+    result.environment.endpoint = params["environment"]["endpoint"]
+    if params["environment"]["config"] is not None:
+        result.environment.config.content = params["environment"]["config"].SerializeToString()
 
-    for actor_data in params.actors:
+    for actor_data in params["actors"]:
         actor_pb = result.actors.add()
-        actor_pb.actor_class = actor_data.actor_class
-        actor_pb.endpoint = actor_data.endpoint
-        if actor_data.config is not None:
-            actor_pb.config.content = actor_data.config.SerializeToString()
+        actor_pb.name = actor_data["name"]
+        actor_pb.actor_class = actor_data["actor_class"]
+        actor_pb.endpoint = actor_data["endpoint"]
+        actor_pb.implementation = actor_data["implementation"]
+        if actor_data["config"] is not None:
+            actor_pb.config.content = actor_data["config"].SerializeToString()
 
     return result
 

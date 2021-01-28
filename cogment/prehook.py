@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
+from cogment.errors import InvalidParamsError
 
 
 class PrehookSession(ABC):
@@ -22,16 +23,14 @@ class PrehookSession(ABC):
         self._params = params
         self._trial = trial
 
-        self.trial_config = params.trial_config
-        self.trial_max_steps = params.max_steps
-        self.trial_max_inactivity = params.max_inactivity
+        self.trial_config = params["trial_config"]
+        self.trial_max_steps = params["max_steps"]
+        self.trial_max_inactivity = params["max_inactivity"]
 
-        self.environment_config = params.environment.config
-        self.environment_endpoint = params.environment.endpoint
+        self.environment_config = params["environment"]["config"]
+        self.environment_endpoint = params["environment"]["endpoint"]
 
-        self.actors_config = [actor.config for actor in params.actors]
-        self.actors_endpoint = [actor.endpoint for actor in params.actors]
-        self.actors_class = [actor.actor_class for actor in params.actors]
+        self.actors = params["actors"]
 
     @abstractmethod
     def _recode(self):
@@ -49,22 +48,19 @@ class _ServedPrehookSession(PrehookSession):
         super().__init__(params, trial)
 
     def _recode(self):
-        self._params.trial_config = self.trial_config
-        self._params.max_steps = self.trial_max_steps
-        self._params.max_inactivity = self.trial_max_inactivity
+        for act in self.actors:
+            if "name" not in act or \
+               "actor_class" not in act or \
+               "endpoint" not in act or \
+               "implementation" not in act or \
+               "config" not in act:
+                raise InvalidParamsError(f"incomplete actor: {act}")
 
-        self._params.environment.config = self.environment_config
-        self._params.environment.endpoint = self.environment_endpoint
+        self._params["actors"] = self.actors
 
-        nb_actors = len(self._params.actors)
-        if len(self.actors_config) != nb_actors:
-            raise AttributeError("Wrong number of actor configurations")
-        if len(self.actors_endpoint) != nb_actors:
-            raise AttributeError("Wrong number of actor endpoints")
-        if len(self.actors_class) != nb_actors:
-            raise AttributeError("Wrong number of actor classes")
+        self._params["trial_config"] = self.trial_config
+        self._params["max_steps"] = self.trial_max_steps
+        self._params["max_inactivity"] = self.trial_max_inactivity
 
-        for index in range(nb_actors):
-            self._params.actors[index].config = self.actors_config[index]
-            self._params.actors[index].endpoint = self.actors_endpoint[index]
-            self._params.actors[index].actor_class = self.actors_class[index]
+        self._params["environment"]["config"] = self.environment_config
+        self._params["environment"]["endpoint"] = self.environment_endpoint
