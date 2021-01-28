@@ -148,6 +148,7 @@ async def read_actions(context, env_session):
             request = await context.read()
 
             if request == grpc.experimental.aio.EOF:
+                logging.info(f"The orchestrator disconnected the environment")
                 break
 
             env_session._new_action(_process_actions(request, env_session))

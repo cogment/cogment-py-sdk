@@ -53,7 +53,7 @@ async def read_observations(context, agent_session):
             request = await context.read()
 
             if request == grpc.experimental.aio.EOF:
-                logging.info(f"Orchestrator disconnected agent [{agent_session.name}]")
+                logging.info(f"The orchestrator disconnected agent [{agent_session.name}]")
                 break
 
             agent_session._trial.tick_id = request.observation.tick_id
