@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-alpha5 - 2021-01-28
+
 ### Added
 
 - Manage errors and exceptions at end of trial
