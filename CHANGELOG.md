@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Manage errors and exceptions at end of trial
 - Debug logging at critical points
+- Add access to the complete actor configuration from prehook implementations
 
 ### Fixed
 
-- Bug fix where environment "Final" flag was not being set
+- Fix the instanciation of prehooks
+- Fix the environment "Final" flag not being set in some cases
 
 ## v1.0.0-alpha4 - 2021-01-26
 
