@@ -18,7 +18,7 @@ import grpc.experimental.aio
 import cogment.api.orchestrator_pb2 as orchestrator
 from cogment.actor import _ClientActorSession, Reward
 from cogment.api.common_pb2 import TrialActor
-from cogment.api.orchestrator_pb2_grpc import ActorEndpointStub
+from cogment.api.orchestrator_pb2_grpc import ClientActorStub
 from cogment.delta_encoding import DecodeObservationData
 from cogment.errors import InvalidRequestError
 from cogment.trial import Trial
@@ -122,7 +122,7 @@ class ClientServicer:
         self.cog_settings = cog_settings
 
         channel = grpc.experimental.aio.insecure_channel(endpoint)
-        self._actor_stub = ActorEndpointStub(channel)
+        self._actor_stub = ClientActorStub(channel)
 
     async def run(self, trial_id, impl, impl_name, actor_classes, actor_name):
 

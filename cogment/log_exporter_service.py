@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.api.data_pb2_grpc import LogExporterServicer
-from cogment.api.data_pb2 import LogExporterSampleReply
+from cogment.api.datalog_pb2_grpc import LogExporterServicer
+from cogment.api.datalog_pb2 import LogExporterSampleReply
 from cogment.trial import Trial
 from cogment.datalog import _ServedDatalogSession
 from cogment.utils import raw_params_to_user_params, list_versions

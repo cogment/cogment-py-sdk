@@ -49,7 +49,7 @@ from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
 
 # Log Exporter
 from cogment.log_exporter_service import LogExporterService
-from cogment.api.data_pb2_grpc import add_LogExporterServicer_to_server
+from cogment.api.datalog_pb2_grpc import add_LogExporterServicer_to_server
 
 
 DEFAULT_MAX_WORKERS = 1
