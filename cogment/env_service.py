@@ -167,27 +167,33 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
         self.__env_sessions = {}
         self.__cog_settings = cog_settings
 
-        self.UPDATE_REQUEST_TIME = Summary(
-            "environment_update_processing_seconds",
-            "Times spend by an environment on the update function",
+        self.update_count_per_trial = Summary(
+            "environment_update_count_per_trial",
+            "Number of update by trial",
             ["impl_name"],
             registry=prometheus_registry
         )
-        self.TRAINING_DURATION = Summary(
-            "environment_trial_duration", "Trial duration", ["trial_actor"],
+        self.trial_duration = Summary(
+            "environment_trial_duration_in_second", "Trial duration", ["trial_actor"],
             registry=prometheus_registry
         )
-        self.TRIALS_STARTED = Counter(
-            "environment_trials_started", "Number of trial starts", ["impl_name"],
+        self.trials_started = Counter(
+            "environment_trials_started", "Number of trial started", ["impl_name"],
             registry=prometheus_registry
         )
-        self.TRIALS_ENDED = Counter(
-            "environment_trials_ended", "Number of trial ends", ["impl_name"],
+        self.trials_ended = Counter(
+            "environment_trials_ended", "Number of trial ended", ["impl_name"],
             registry=prometheus_registry
         )
-        self.MESSAGES_RECEIVED = Counter(
+        self.messages_received = Counter(
             "environment_received_messages",
             "Number of messages received",
+            ["impl_name"],
+            registry=prometheus_registry
+        )
+        self.messages_sent = Counter(
+            "environment_sent_messages",
+            "Number of messages sent",
             ["impl_name"],
             registry=prometheus_registry
         )
@@ -217,7 +223,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             if key in self.__env_sessions:
                 raise InvalidRequestError(message=f"Environment already exists for trial [{trial_id}]", request=request)
 
-            self.TRIALS_STARTED.labels(impl_name).inc()
+            self.trials_started.labels(impl_name).inc()
 
             trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
             trial.tick_id = 0
@@ -261,23 +267,26 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             key = trial_id
             env_session = self.__env_sessions[key]
 
-            with self.UPDATE_REQUEST_TIME.labels(env_session.impl_name).time():
+            # We are going to have three concurrent coroutines:
+            # - One that reads actions from the orchestrator
+            # - One that sends observations to the orchestrator
+            # - The environment's main (which will be the current coroutine)
+            reader_task = asyncio.create_task(read_actions(context, env_session))
+            writer_task = asyncio.create_task(write_observations(context, env_session))
 
-                # We are going to have three concurrent coroutines:
-                # - One that reads actions from the orchestrator
-                # - One that sends observations to the orchestrator
-                # - The environment's main (which will be the current coroutine)
-                reader_task = asyncio.create_task(read_actions(context, env_session))
-                writer_task = asyncio.create_task(write_observations(context, env_session))
-
+            with self.trial_duration.labels(env_session.impl_name).time():
                 await env_session._task
-                if env_session._ended:
-                    logging.debug(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}] returned")
-                else:
-                    logging.error(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
-                                  f" running trial [{trial_id}] returned before end")
 
-                self.__env_sessions.pop(key, None)
+            self.update_count_per_trial.labels(env_session.impl_name).observe(env_session._trial.tick_id)
+
+            if env_session._ended:
+                logging.debug(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}] returned")
+            else:
+                logging.error(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
+                                f" running trial [{trial_id}] returned before end")
+
+            self.__env_sessions.pop(key, None)
+            self.trials_ended.labels(env_session.impl_name).inc()
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")
@@ -298,7 +307,7 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             env_session = self.__env_sessions[key]
 
             for message in request.messages:
-                self.MESSAGES_RECEIVED.labels(env_session.impl_name).inc()
+                self.messages_received.labels(env_session.impl_name).inc()
                 env_session._new_message(message)
 
             return env_api.EnvMessageReply()
@@ -315,9 +324,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
             key = trial_id
             env_session = self.__env_sessions[key]
 
-            for actor in env_session._trial.actors:
-                self.TRAINING_DURATION.labels(actor.name).observe(env_session._trial.tick_id)
-
             obs = await env_session._end_request(_process_actions(request, env_session))
 
             if obs:
@@ -326,7 +332,6 @@ class EnvironmentServicer(EnvironmentEndpointServicer):
                 reply = env_api.EnvActionReply()
             reply.final_update = True
 
-            self.TRIALS_ENDED.labels(env_session.impl_name).inc()
             self.__env_sessions.pop(key, None)
 
             return reply

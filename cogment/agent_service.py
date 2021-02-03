@@ -105,30 +105,30 @@ class AgentServicer(AgentEndpointServicer):
         self.__cog_settings = cog_settings
         atexit.register(self.__cleanup)
 
-        self.DECIDE_REQUEST_TIME = Summary(
+        self.decide_request_time = Summary(
             "actor_decide_processing_seconds",
             "Time spent by an actor on the decide function",
             ["name", "actor_class"],
             registry=prometheus_registry
         )
-        self.ACTORS_STARTED = Counter(
+        self.actors_started = Counter(
             "actor_started", "Number of actors created", ["actor_class"],
             registry=prometheus_registry
         )
 
-        self.ACTORS_ENDED = Counter(
+        self.actors_ended = Counter(
             "actor_ended", "Number of actors ended", ["actor_class"],
             registry=prometheus_registry
         )
-        self.MESSAGES_RECEIVED = Counter(
+        self.messages_received = Counter(
             "actor_received_messages", "Number of messages received", ["name", "actor_class"],
             registry=prometheus_registry
         )
-        self.REWARDS_RECEIVED = Gauge(
+        self.rewards_received = Gauge(
             "actor_reward_summation", "Cumulative rewards received", ["name", "actor_class"],
             registry=prometheus_registry
         )
-        self.REWARDS_COUNTER = Counter(
+        self.rewards_counter = Counter(
             "actor_rewards_count", "Number of rewards received", ["name", "actor_class"],
             registry=prometheus_registry
         )
@@ -178,7 +178,7 @@ class AgentServicer(AgentEndpointServicer):
             if key in self.__agent_sessions:
                 raise InvalidRequestError(message="Agent already exists", request=request)
 
-            self.ACTORS_STARTED.labels(request.impl_name).inc()
+            self.actors_started.labels(request.impl_name).inc()
 
             trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
 
@@ -229,7 +229,7 @@ class AgentServicer(AgentEndpointServicer):
 
                 await agent_session._end(package)
 
-                self.ACTORS_ENDED.labels(agent_session.impl_name).inc()
+                self.actors_ended.labels(agent_session.impl_name).inc()
 
                 del self.__agent_sessions[key]
 
@@ -251,7 +251,7 @@ class AgentServicer(AgentEndpointServicer):
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:
-                with self.DECIDE_REQUEST_TIME.labels(agent_session.name, agent_session.impl_name).time():
+                with self.decide_request_time.labels(agent_session.name, agent_session.impl_name).time():
                     reader_task = asyncio.create_task(read_observations(context, agent_session))
                     writer_task = asyncio.create_task(write_actions(context, agent_session))
 
@@ -287,11 +287,11 @@ class AgentServicer(AgentEndpointServicer):
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:
-                self.REWARDS_COUNTER.labels(agent_session.name, agent_session.impl_name).inc()
+                self.rewards_counter.labels(agent_session.name, agent_session.impl_name).inc()
                 if reward.value < 0.0:
-                    self.REWARDS_RECEIVED.labels(agent_session.name, agent_session.impl_name).dec(abs(reward.value))
+                    self.rewards_received.labels(agent_session.name, agent_session.impl_name).dec(abs(reward.value))
                 else:
-                    self.REWARDS_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc(reward.value)
+                    self.rewards_received.labels(agent_session.name, agent_session.impl_name).inc(reward.value)
 
                 agent_session._new_reward(reward)
             else:
@@ -315,7 +315,7 @@ class AgentServicer(AgentEndpointServicer):
             if agent_session is not None:
                 for message in request.messages:
                     agent_session._new_message(message)
-                    self.MESSAGES_RECEIVED.labels(agent_session.name, agent_session.impl_name).inc()
+                    self.messages_received.labels(agent_session.name, agent_session.impl_name).inc()
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for message")
 
