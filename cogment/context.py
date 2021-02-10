@@ -79,6 +79,24 @@ def _add_datalog_service(grpc_server, impl, cog_settings, prometheus_registry):
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
 
+class Endpoint:
+
+    def __init__(self, url: str):
+        self.url = url
+        self.private_key = None
+        self.root_certificates = None
+        self.certificate_chain = None
+
+
+class ServedEndpoint:
+
+    def __init__(self, port: int):
+        self.port = port
+        self.private_key_certificate_chain_pairs = None
+        self.root_certificates = None
+        self.require_client_auth = False
+
+
 class Context:
     def __init__(self, user_id: str, cog_settings: ModuleType):
         self._user_id = user_id
@@ -123,7 +141,7 @@ class Context:
         self.__datalog_impl = impl
 
     async def serve_all_registered(self,
-                                   port: int,
+                                   served_endpoint: ServedEndpoint,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
 
         if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
@@ -165,19 +183,27 @@ class Context:
 
             start_http_server(prometheus_port, "", self._prometheus_registry)
 
-            self._grpc_server.add_insecure_port(f"[::]:{port}")
+            address = f"[::]:{served_endpoint.port}"
+            if served_endpoint.private_key_certificate_chain_pairs is None:
+                self._grpc_server.add_insecure_port(address)
+            else:
+                creds = grpc.ssl_server_credentials(served_endpoint.private_key_certificate_chain_pairs,
+                                                    served_endpoint.root_certificates,
+                                                    served_endpoint.require_client_auth)
+                self._grpc_server.add_secure_port(address, creds)
+
             await self._grpc_server.start()
             await self._grpc_server.wait_for_termination()
-            logging.debug(f"Context gRPC server at port [{port}] for user [{self._user_id}] exited")
+            logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
 
     async def start_trial(self,
-                          endpoint,
+                          endpoint: Endpoint,
                           impl: Callable[[ControlSession], Awaitable[None]],
                           trial_config=None):
         servicer = ControlServicer(self.__cog_settings, endpoint)
         await servicer.run(self._user_id, impl, trial_config)
 
-    async def join_trial(self, trial_id, endpoint, impl_name, actor_name=None):
+    async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls.get(impl_name)
         if actor_impl is None:
             raise Exception(f"Unknown actor impl [{impl_name}].  Was it registered?")

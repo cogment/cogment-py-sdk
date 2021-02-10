@@ -27,7 +27,14 @@ from cogment.control import _ServedControlSession
 class ControlServicer:
     def __init__(self, cog_settings, endpoint):
         self.cog_settings = cog_settings
-        channel = grpc.experimental.aio.insecure_channel(endpoint)
+        if endpoint.private_key is None:
+            channel = grpc.experimental.aio.insecure_channel(endpoint.url)
+        else:
+            creds = grpc.ssl_channel_credentials(endpoint.root_certificates,
+                                                 endpoint.private_key,
+                                                 endpoint.certificate_chain)
+            channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
+
         self.lifecycle_stub = grpc_api.TrialLifecycleStub(channel)
 
     async def run(self, user_id, impl, trial_config):
@@ -36,7 +43,6 @@ class ControlServicer:
         if trial_config is not None:
             req.config.content = trial_config.SerializeToString()
 
-        # TODO: after the next line the process hangs indefinitely when running two integration tests
         rep = await self.lifecycle_stub.StartTrial(req)
         trial = Trial(rep.trial_id, rep.actors_in_trial, self.cog_settings)
 

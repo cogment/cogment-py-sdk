@@ -19,7 +19,7 @@ import unittest
 
 import pytest
 
-from cogment import Context
+import cogment
 
 from helpers.launch_orchestrator import launch_orchestrator
 from helpers.find_free_port import find_free_port
@@ -160,18 +160,21 @@ class TestIntegration:
 
             agents_ended[actor_session.name].set_result(True)
 
-        context = Context(cog_settings=cog_settings, user_id='test_environment_controlled_trial')
+        context = cogment.Context(cog_settings=cog_settings, user_id='test_environment_controlled_trial')
 
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
         prometheus_port = find_free_port()
+        served_endp = cogment.ServedEndpoint(cogment_test_setup["test_port"]) 
         serve_environment = asyncio.create_task(context.serve_all_registered(
-            port=cogment_test_setup["test_port"],
+            served_endpoint=served_endp,
             prometheus_port=prometheus_port
         ))
+
+        endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         await context.start_trial(
-            endpoint=cogment_test_setup["orchestrator_endpoint"],
+            endpoint=endp,
             impl=trial_controller,
             trial_config=data_pb2.TrialConfig()
         )
@@ -292,17 +295,20 @@ class TestIntegration:
             agents_ended[actor_session.name].set_result(True)
 
 
-        context = Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial')
+        context = cogment.Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial')
 
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
+        served_endp = cogment.ServedEndpoint(cogment_test_setup["test_port"]) 
         asyncio.create_task(context.serve_all_registered(
-            port=cogment_test_setup["test_port"],
+            served_endpoint=served_endp,
             prometheus_port=find_free_port()
         ))
+        
+        endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         await context.start_trial(
-            endpoint=cogment_test_setup["orchestrator_endpoint"],
+            endpoint=endp,
             impl=trial_controller,
             trial_config=data_pb2.TrialConfig()
         )

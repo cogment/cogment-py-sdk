@@ -120,7 +120,14 @@ class ClientServicer:
     def __init__(self, cog_settings, endpoint):
         self.cog_settings = cog_settings
 
-        channel = grpc.experimental.aio.insecure_channel(endpoint)
+        if endpoint.private_key is None:
+            channel = grpc.experimental.aio.insecure_channel(endpoint.url)
+        else:
+            creds = grpc.ssl_channel_credentials(endpoint.root_certificates,
+                                                 endpoint.private_key,
+                                                 endpoint.certificate_chain)
+            channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
+
         self._actor_stub = grpc_api.ClientActorStub(channel)
 
     async def run(self, trial_id, impl, impl_name, actor_classes, actor_name):

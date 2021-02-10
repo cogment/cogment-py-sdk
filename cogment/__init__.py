@@ -25,7 +25,7 @@ framework python SDK by AI Redefined Inc.
 
 from cogment.version import __version__
 
-from cogment.context import Context
+from cogment.context import Context, Endpoint, ServedEndpoint
 
 # Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList
