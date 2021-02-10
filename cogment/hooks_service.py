@@ -14,8 +14,8 @@
 
 from types import SimpleNamespace
 
-from cogment.api.hooks_pb2_grpc import TrialHooksServicer
-from cogment.api.hooks_pb2 import PreTrialContext
+import cogment.api.hooks_pb2_grpc as grpc_api
+import cogment.api.hooks_pb2 as hooks_api
 import cogment.utils as utils
 from cogment.trial import Trial
 from cogment.prehook import _ServedPrehookSession
@@ -24,7 +24,7 @@ import logging
 import traceback
 
 
-class PrehookServicer(TrialHooksServicer):
+class PrehookServicer(grpc_api.TrialHooksServicer):
 
     def __init__(self, impls, cog_settings, prometheus_registry):
 
@@ -52,7 +52,7 @@ class PrehookServicer(TrialHooksServicer):
 
                 prehook._recode()
 
-            reply = PreTrialContext()
+            reply = hooks_api.PreTrialContext()
             reply.CopyFrom(request)
             reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
             return reply

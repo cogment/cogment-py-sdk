@@ -13,8 +13,9 @@
 # limitations under the License.
 
 from collections import deque
+from typing import List
 
-from cogment.api.common_pb2 import Feedback, Message
+import cogment.api.common_pb2 as common_api
 from cogment.environment import ENVIRONMENT_ACTOR_NAME
 from cogment.errors import Error
 
@@ -31,7 +32,7 @@ class Trial:
         def get_prepared_messages(self, sender_name):
             while len(self._messages) > 0:
                 payload = self._messages.popleft()
-                message = Message(tick_id=-1, sender_name=sender_name, receiver_name=self.name)
+                message = common_api.Message(tick_id=-1, sender_name=sender_name, receiver_name=self.name)
                 if payload is not None:
                     message.payload.Pack(payload)
                 yield message
@@ -41,23 +42,29 @@ class Trial:
             super().__init__()
             self.name = name
             self.actor_class = actor_class
-            self._feedbacks = deque()
+            self._reward_data = deque()
 
-        def add_prepared_feedback(self, tick_id, value, confidence, user_data):
-            self._feedbacks.append((tick_id, value, confidence, user_data))
+        def add_prepared_reward_data(self, tick_id, value, confidence, user_data):
+            self._reward_data.append((tick_id, value, confidence, user_data))
 
-        def get_prepared_feedbacks(self):
-            while len(self._feedbacks) > 0:
-                (tick_id, value, confidence, user_data) = self._feedbacks.popleft()
-                feedback = Feedback(
-                    actor_name=self.name,
-                    tick_id=tick_id,
-                    value=value,
+        def get_prepared_rewards(self):
+            while len(self._reward_data) > 0:
+                (tick_id, reward_value, confidence, user_data) = self._reward_data.popleft()
+                source = common_api.RewardSource(
+                    # sender_name is not needed for sending rewards
+                    value=reward_value,
                     confidence=confidence
                 )
                 if user_data is not None:
-                    feedback.user_data.Pack(user_data)
-                yield feedback
+                    source.user_data.Pack(user_data)
+
+                reward = common_api.Reward(
+                    value=reward_value,  # This will be overwritten by orchestrator before delivery
+                    receiver_name=self.name,
+                    tick_id=tick_id,
+                )
+                reward.sources.append(source)
+                yield reward
 
     def __init__(self, id, actors_in_trial, cog_settings):
         self.id = id
@@ -95,10 +102,14 @@ class Trial:
                 if class_member.id == actor.actor_class.id:
                     self.actor_counts[class_index] += 1
 
-    def get_actors(self, pattern_list):
+    def get_actors(self, pattern_list: List[str]):
+        if not isinstance(pattern_list, list):
+            raise TypeError(f"The pattern_list must be a list: {type(pattern_list)}")
         matched_actors = []
         for actor in self.actors:
             for pattern in pattern_list:
+                if not isinstance(pattern, str):
+                    raise TypeError(f"The pattern must be a string: {type(pattern)}")
                 if pattern == "*":
                     matched_actors.append(actor)
                     break
@@ -119,20 +130,22 @@ class Trial:
 
         return matched_actors
 
-    def add_feedback(self, value, confidence, to, tick_id, user_data):
-        for actor in self.get_actors(pattern_list=to):
-            actor.add_prepared_feedback(
+    # TODO: Add source actor to set in reward
+    def add_reward(self, value, confidence, to, tick_id, user_data):
+        for dest_actor in self.get_actors(pattern_list=to):
+            dest_actor.add_prepared_reward_data(
                 tick_id=tick_id,
                 value=value,
                 confidence=confidence,
                 user_data=user_data
             )
 
-    def _gather_all_feedback(self):
+    def _gather_all_rewards(self):
         for actor in self.actors:
-            for feedback in actor.get_prepared_feedbacks():
-                yield feedback
+            for reward in actor.get_prepared_rewards():
+                yield reward
 
+    # We default `to` so users can provide a `to_environment=True` without a `to` parameter
     def send_message(self, user_data, to=[], to_environment=False):
         if to_environment:
             self.environment.add_prepared_message(payload=user_data)

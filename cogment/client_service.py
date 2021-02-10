@@ -15,10 +15,9 @@
 import grpc
 import grpc.experimental.aio
 
-import cogment.api.orchestrator_pb2 as orchestrator
-from cogment.actor import _ClientActorSession, Reward
-from cogment.api.common_pb2 import TrialActor
-from cogment.api.orchestrator_pb2_grpc import ClientActorStub
+import cogment.api.orchestrator_pb2 as orchestrator_api
+from cogment.actor import _ClientActorSession, RecvReward
+import cogment.api.orchestrator_pb2_grpc as grpc_api
 from cogment.delta_encoding import DecodeObservationData
 from cogment.errors import InvalidRequestError
 from cogment.trial import Trial
@@ -45,8 +44,8 @@ async def read_observations(client_session, reply_itor):
                     client_session._new_observation(obs)
 
                 for rew_request in reply.data.rewards:
-                    reward = Reward()
-                    reward._set_all(rew_request, -1)
+                    reward = RecvReward()
+                    reward._set_all(rew_request)
                     client_session._new_reward(reward)
 
                 for message in reply.data.messages:
@@ -68,8 +67,8 @@ async def read_observations(client_session, reply_itor):
                     package.observations.append(obs)
 
                 for rew_request in reply.data.rewards:
-                    reward = Reward()
-                    reward._set_all(rew_request, -1)
+                    reward = RecvReward()
+                    reward._set_all(rew_request)
                     package.rewards.append(reward)
 
                 for msg_request in reply.data.messages:
@@ -103,7 +102,7 @@ async def write_actions(client_session):
         while True:
             act = await client_session._retrieve_action()
 
-            action_req = orchestrator.TrialActionRequest()
+            action_req = orchestrator_api.TrialActionRequest()
             if act is not None:
                 action_req.action.content = act.SerializeToString()
 
@@ -122,7 +121,7 @@ class ClientServicer:
         self.cog_settings = cog_settings
 
         channel = grpc.experimental.aio.insecure_channel(endpoint)
-        self._actor_stub = ClientActorStub(channel)
+        self._actor_stub = grpc_api.ClientActorStub(channel)
 
     async def run(self, trial_id, impl, impl_name, actor_classes, actor_name):
 
@@ -130,9 +129,9 @@ class ClientServicer:
         #       when the list is empty
         if actor_name is None:
             requested_actor_class = actor_classes[0]
-            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_class=requested_actor_class)
+            req = orchestrator_api.TrialJoinRequest(trial_id=trial_id, actor_class=requested_actor_class)
         else:
-            req = orchestrator.TrialJoinRequest(trial_id=trial_id, actor_name=actor_name)
+            req = orchestrator_api.TrialJoinRequest(trial_id=trial_id, actor_name=actor_name)
 
         reply = await self._actor_stub.JoinTrial(req)
 

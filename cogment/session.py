@@ -44,9 +44,9 @@ class Session(ABC):
         assert self._trial is not None
         return self._active_actors
 
-    def add_feedback(self, value, confidence, to, tick_id=-1, user_data=None):
+    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         assert self._trial is not None
-        self._trial.add_feedback(value, confidence, to, tick_id, user_data)
+        self._trial.add_reward(value, confidence, to, tick_id, user_data)
 
     def send_message(self, user_data, to, to_environment=False):
         assert self._trial is not None

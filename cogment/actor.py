@@ -66,31 +66,29 @@ class ActorClassList:
         return self._actor_classes_list[index]
 
 
-class Reward:
+class RecvReward:
     def __init__(self):
         self.tick_id = -1
         self.value = 0
-        self.confidence = 0
+        self._sources = None
 
-        self._feedbacks = None
-
-    def _set_all(self, reward, tick_id):
-        self.tick_id = tick_id
+    def _set_all(self, reward):
+        self.tick_id = reward.tick_id
         self.value = reward.value
-        self.confidence = reward.confidence
-        self._set_feedbacks(reward.feedbacks)
+        self._sources = reward.sources
 
-    def _set_feedbacks(self, feedbacks):
-        self._feedbacks = feedbacks
-        if self.tick_id == -1 and self._feedbacks:
-            self.tick_id = self._feedbacks[0].tick_id
+    def get_nb_sources(self):
+        return len(self._sources)
 
-    def all_user_data(self):
-        assert self._feedbacks
-        for fdbk in self._feedbacks:
-            assert fdbk.tick_id == self.tick_id
-            if fdbk.content:
-                yield fdbk.content
+    def all_sources(self):
+        assert self._sources
+        for src in self._sources:
+            yield (src.value, src.confidence, src.sender_name, src.user_data)
+
+    def __str__(self):
+        res = f"tick_id = {self.tick_id}, value = {self.value}"
+        res += f", sources = {self._sources}"
+        return res
 
 
 class ActorSession(Session):

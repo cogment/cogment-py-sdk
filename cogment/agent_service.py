@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.api.agent_pb2_grpc import AgentEndpointServicer
+import cogment.api.agent_pb2_grpc as grpc_api
 import cogment.api.agent_pb2 as agent_api
 
 from cogment.utils import list_versions
@@ -20,7 +20,7 @@ from cogment.trial import Trial
 
 from cogment.errors import InvalidRequestError
 from cogment.delta_encoding import DecodeObservationData
-from cogment.actor import _ServedActorSession, Reward
+from cogment.actor import _ServedActorSession, RecvReward
 
 from prometheus_client import Summary, Counter, Gauge
 
@@ -28,7 +28,6 @@ from types import SimpleNamespace
 import traceback
 import atexit
 import logging
-import typing
 import asyncio
 import grpc.experimental.aio
 
@@ -83,7 +82,7 @@ async def write_actions(context, agent_session):
             if act is not None:
                 msg.action.content = act.SerializeToString()
 
-            msg.feedbacks.extend(agent_session._trial._gather_all_feedback())
+            msg.rewards.extend(agent_session._trial._gather_all_rewards())
 
             actor_name = dict(context.invocation_metadata())["actor-name"]
             msg.messages.extend(agent_session._trial._gather_all_messages(actor_name))
@@ -98,7 +97,7 @@ async def write_actions(context, agent_session):
         raise
 
 
-class AgentServicer(AgentEndpointServicer):
+class AgentServicer(grpc_api.AgentEndpointServicer):
     def __init__(self, agent_impls, cog_settings, prometheus_registry):
         self.__impls = agent_impls
         self.__agent_sessions = {}
@@ -220,8 +219,8 @@ class AgentServicer(AgentEndpointServicer):
                     package.observations.append(obs)
 
                 for rew_request in request.final_data.rewards:
-                    reward = Reward()
-                    reward._set_all(rew_request, -1)
+                    reward = RecvReward()
+                    reward._set_all(rew_request)
                     package.rewards.append(reward)
 
                 for msg_request in request.final_data.messages:
@@ -282,8 +281,8 @@ class AgentServicer(AgentEndpointServicer):
 
             key = _trial_key(trial_id, actor_name)
 
-            reward = Reward()
-            reward._set_all(request.reward, request.tick_id)
+            reward = RecvReward()
+            reward._set_all(request.reward)
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:

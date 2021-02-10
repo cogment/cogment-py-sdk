@@ -54,7 +54,6 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_environment_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
         controller_trial_id = None
-        trial_id = None
         target_tick_count = 10
 
         trial_controller_call_count = 0
@@ -67,12 +66,13 @@ class TestIntegration:
 
         environment_call_count = 0
         environment_tick_count = 0
+        environment_trial_id = None
 
         async def environment(environment_session):
-            nonlocal trial_id
+            nonlocal environment_trial_id
             nonlocal environment_call_count
             nonlocal environment_tick_count
-            trial_id = environment_session.get_trial_id()
+            environment_trial_id = environment_session.get_trial_id()
             environment_call_count += 1
 
             environment_session.start([("*", data_pb2.Observation(observed_value=12))])
@@ -87,7 +87,7 @@ class TestIntegration:
                     actors = environment_session.get_active_actors()
                     for actor in actors:
                         user_data = data_pb2.MyFeedbackUserData(a_bool=False, a_float=3.0)
-                        environment_session.add_feedback(21.0, 1.0, [actor.actor_name], user_data=user_data)
+                        environment_session.add_reward(21.0, 1.0, [actor.actor_name], user_data=user_data)
 
                         mess = data_pb2.MyMessageUserData(a_string="A personal string", an_int=21)
                         environment_session.send_message(mess, [actor.actor_name])
@@ -105,6 +105,7 @@ class TestIntegration:
         agent_message_count = 0
         had_universal_message = False
         had_personal_message = False
+        agent_trial_id = {}
         total_reward = 0
         agents_ended = {}
         agents_ended["actor_1"] = asyncio.get_running_loop().create_future()
@@ -119,8 +120,9 @@ class TestIntegration:
             nonlocal had_personal_message
             nonlocal total_reward
             nonlocal agents_ended
-            assert actor_session.get_trial_id() == trial_id
+            nonlocal agent_trial_id
             assert actor_session.name in agents_ended
+            agent_trial_id[actor_session.name] = actor_session.get_trial_id()
             agent_call_count += 1
 
             actor_session.start()
@@ -147,7 +149,6 @@ class TestIntegration:
                     reward = event['reward']
                     total_reward += reward.value
                     assert reward.value == 21.0
-                    assert reward.confidence == 1.0
 
                 elif "final_data" in event:
                     assert len(event["final_data"].observations) == 1
@@ -197,9 +198,14 @@ class TestIntegration:
         index = promethus_data.find("Can you find anything ?")
         assert index == -1
 
-        assert trial_id != None
+        assert environment_trial_id != None
         assert controller_trial_id != None
-        assert controller_trial_id == trial_id
+        assert "actor_1" in agent_trial_id
+        assert "actor_2" in agent_trial_id
+        assert controller_trial_id == environment_trial_id
+        assert controller_trial_id == agent_trial_id["actor_1"]
+        assert controller_trial_id == agent_trial_id["actor_2"]
+
         assert trial_controller_call_count == 1
         assert environment_call_count == 1
         assert environment_tick_count == target_tick_count
@@ -217,16 +223,11 @@ class TestIntegration:
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
     async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
-        controller_trial_id = None
-        trial_id = None
 
         trial_controller_call_count = 0
-
         async def trial_controller(control_session):
             logging.info('--`trial_controller`-- start')
-            nonlocal controller_trial_id
             nonlocal trial_controller_call_count
-            controller_trial_id = control_session.get_trial_id()
             trial_controller_call_count += 1
             await asyncio.sleep(3)
             logging.info('--`trial_controller`-- terminate_trial')
@@ -238,10 +239,8 @@ class TestIntegration:
         environment_tick_count = 0
 
         async def environment(environment_session):
-            nonlocal trial_id
             nonlocal environment_call_count
             nonlocal environment_tick_count
-            trial_id = environment_session.get_trial_id()
 
             environment_call_count += 1
             environment_session.start([("*", data_pb2.Observation(observed_value=0))])
@@ -267,7 +266,6 @@ class TestIntegration:
             nonlocal agent_call_count
             nonlocal agents_tick_count
             nonlocal agents_ended
-            assert actor_session.get_trial_id() == trial_id
             agent_call_count += 1
             assert actor_session.name not in agents_tick_count
             assert actor_session.name in agents_ended
@@ -276,6 +274,7 @@ class TestIntegration:
             actor_session.start()
 
             async for event in actor_session.event_loop():
+
                 if "observation" in event:
                     agents_tick_count[actor_session.name] += 1
                     assert event["observation"].observed_value == agents_tick_count[actor_session.name] - 1
@@ -309,9 +308,6 @@ class TestIntegration:
         )
         await asyncio.wait(agents_ended.values())
 
-        assert trial_id != None
-        assert controller_trial_id != None
-        assert controller_trial_id == trial_id
         assert trial_controller_call_count == 1
         assert environment_call_count == 1
         assert agent_call_count == 2

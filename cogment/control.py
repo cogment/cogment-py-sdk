@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cogment.api.orchestrator_pb2 as orchestrator
+import cogment.api.orchestrator_pb2 as orchestrator_api
 
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
@@ -38,7 +38,7 @@ class ControlSession(ABC):
                 for actor in self._trial.actors]
 
     async def terminate_trial(self):
-        req = orchestrator.TerminateTrialRequest()
+        req = orchestrator_api.TerminateTrialRequest()
         metadata = [("trial-id", self._trial.id)]
         await self._lifecycle_stub.TerminateTrial(
             request=req,

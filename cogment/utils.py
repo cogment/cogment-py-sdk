@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.api.common_pb2 import VersionInfo, ObservationData, TrialParams
+import cogment.api.common_pb2 as common_api
 from cogment.version import __version__
 from cogment.delta_encoding import DecodeObservationData
 
@@ -22,7 +22,7 @@ import grpc
 
 
 def list_versions():
-    reply = VersionInfo()
+    reply = common_api.VersionInfo()
     reply.versions.add(name='cogment_sdk', version=__version__)
     reply.versions.add(name='grpc', version=grpc.__version__)
 
@@ -73,7 +73,7 @@ def raw_params_to_user_params(params, settings):
 
 
 def user_params_to_raw_params(params, settings):
-    result = TrialParams()
+    result = common_api.TrialParams()
 
     result.max_steps = params["max_steps"]
     result.max_inactivity = params["max_inactivity"]

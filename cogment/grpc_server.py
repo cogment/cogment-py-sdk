@@ -23,9 +23,9 @@ import logging
 # from cogment.env_service import EnvService, Environment
 from cogment.utils import list_versions
 
-from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
-from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_server
-from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
+import cogment.api.hooks_pb2_grpc as grpc_hooks_api
+import cogment.api.environment_pb2_grpc as grpc_env_api
+import cogment.api.agent_pb2_grpc as grpc_agent_api
 
 from cogment.api.environment_pb2 import _ENVIRONMENTENDPOINT as env_descriptor
 from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_descriptor
@@ -91,15 +91,15 @@ class GrpcServer:
         # Register service
         if issubclass(service_type, Agent):
             self._service_types.append(agent_descriptor)
-            add_AgentEndpointServicer_to_server(
+            grpc_agent_api.add_AgentEndpointServicer_to_server(
                 AgentService(service_type, settings), self._grpc_server)
         elif issubclass(service_type, Environment):
             self._service_types.append(env_descriptor)
-            add_EnvironmentEndpointServicer_to_server(
+            grpc_env_api.add_EnvironmentEndpointServicer_to_server(
                 EnvService(service_type, settings), self._grpc_server)
         elif issubclass(service_type, TrialHooks):
             self._service_types.append(hooks_descriptor)
-            add_TrialHooksServicer_to_server(
+            grpc_hooks_api.add_TrialHooksServicer_to_server(
                 HooksService(service_type, settings), self._grpc_server)
         else:
             raise ConfigError('Invalid service type')

@@ -15,14 +15,13 @@
 from abc import ABC, abstractmethod
 
 from cogment.errors import InvalidRequestError
-from cogment.api.environment_pb2_grpc import EnvironmentEndpointServicer
+import cogment.api.environment_pb2_grpc as grpc_api
 
 import cogment.api.environment_pb2 as env_api
-from cogment.api.common_pb2 import Feedback, ObservationData, Observation
+import cogment.api.common_pb2 as common_api
 from cogment.utils import list_versions
 
 from types import SimpleNamespace, ModuleType
-from typing import Any, Dict, Tuple
 import grpc.experimental.aio
 
 from cogment.environment import _ServedEnvironmentSession, ENVIRONMENT_ACTOR_NAME
@@ -90,7 +89,7 @@ def pack_observations(env_session, observations, reply, tick_id):
             obs_key = len(reply.observation_set.observations)
 
             obs_content = actor_obs.SerializeToString()
-            observation_data = ObservationData(content=obs_content, snapshot=snapshots[actor_index])
+            observation_data = common_api.ObservationData(content=obs_content, snapshot=snapshots[actor_index])
             reply.observation_set.observations.append(observation_data)
 
             seen_observations[obs_id] = obs_key
@@ -101,7 +100,7 @@ def pack_observations(env_session, observations, reply, tick_id):
 def _process_reply(observations, env_session):
     rep = env_api.EnvActionReply()
 
-    rep.feedbacks.extend(env_session._trial._gather_all_feedback())
+    rep.rewards.extend(env_session._trial._gather_all_rewards())
     rep.messages.extend(env_session._trial._gather_all_messages(ENVIRONMENT_ACTOR_NAME))
     pack_observations(env_session, observations, rep, env_session._trial.tick_id)
 
@@ -161,7 +160,7 @@ async def read_actions(context, env_session):
         raise
 
 
-class EnvironmentServicer(EnvironmentEndpointServicer):
+class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
     def __init__(self, env_impls, cog_settings, prometheus_registry):
         self.__impls = env_impls
         self.__env_sessions = {}

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cogment.api.datalog_pb2_grpc import LogExporterServicer
-from cogment.api.datalog_pb2 import LogExporterSampleReply
+import cogment.api.datalog_pb2_grpc as grpc_api
+import cogment.api.datalog_pb2 as datalog_api
 from cogment.trial import Trial
 from cogment.datalog import _ServedDatalogSession
 from cogment.utils import raw_params_to_user_params, list_versions
@@ -22,7 +22,7 @@ import traceback
 import asyncio
 
 
-class LogExporterService(LogExporterServicer):
+class LogExporterService(grpc_api.LogExporterServicer):
 
     def __init__(self, impl, cog_settings):
         self.__impl = impl
@@ -54,7 +54,7 @@ class LogExporterService(LogExporterServicer):
             if not session._task.done():
                 session._end()
 
-            return LogExporterSampleReply()
+            return datalog_api.LogExporterSampleReply()
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

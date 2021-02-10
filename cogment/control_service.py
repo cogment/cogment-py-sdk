@@ -18,8 +18,8 @@ import traceback
 import grpc
 import grpc.experimental.aio
 
-import cogment.api.orchestrator_pb2 as orchestrator
-from cogment.api.orchestrator_pb2_grpc import TrialLifecycleStub
+import cogment.api.orchestrator_pb2 as orchestrator_api
+import cogment.api.orchestrator_pb2_grpc as grpc_api
 from cogment.trial import Trial
 from cogment.control import _ServedControlSession
 
@@ -28,10 +28,10 @@ class ControlServicer:
     def __init__(self, cog_settings, endpoint):
         self.cog_settings = cog_settings
         channel = grpc.experimental.aio.insecure_channel(endpoint)
-        self.lifecycle_stub = TrialLifecycleStub(channel)
+        self.lifecycle_stub = grpc_api.TrialLifecycleStub(channel)
 
     async def run(self, user_id, impl, trial_config):
-        req = orchestrator.TrialStartRequest()
+        req = orchestrator_api.TrialStartRequest()
         req.user_id = user_id
         if trial_config is not None:
             req.config.content = trial_config.SerializeToString()
