@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - Removal of "feedback" in rewards.
+- Changes to allow for TLS communication.
 
 ## v1.0.0-alpha5 - 2021-01-28
 

@@ -87,6 +87,30 @@ class Endpoint:
         self.root_certificates = None
         self.certificate_chain = None
 
+    def set_from_files(self, private_key_file=None, root_certificates_file=None, certificate_chain_file=None):
+        try:
+            if private_key_file:
+                with open(private_key_file) as fl:
+                    self.private_key = fl.read()
+                if not self.private_key:
+                    self.private_key = None
+
+            if root_certificates_file:
+                with open(root_certificates_file) as fl:
+                    self.root_certificates = fl.read()
+                if not self.root_certificates:
+                    self.root_certificates = None
+
+            if certificate_chain_file:
+                with open(certificate_chain_file) as fl:
+                    self.certificate_chain = fl.read()
+                if not self.certificate_chain:
+                    self.certificate_chain = None
+
+        except Exception:
+            logging.error(f"Failed loading file from CWD: {os.getcwd()}")
+            raise
+
 
 class ServedEndpoint:
 
@@ -94,7 +118,10 @@ class ServedEndpoint:
         self.port = port
         self.private_key_certificate_chain_pairs = None
         self.root_certificates = None
-        self.require_client_auth = False
+
+    # def set_from_files(private_key_certificate_chain_pairs_file=None, root_certificates_file=None):
+    # TODO: This function would need to parse the PEM encoded `private_key_certificate_chain_pairs_file`
+    #       to create the list of tuples required
 
 
 class Context:
@@ -187,9 +214,19 @@ class Context:
             if served_endpoint.private_key_certificate_chain_pairs is None:
                 self._grpc_server.add_insecure_port(address)
             else:
-                creds = grpc.ssl_server_credentials(served_endpoint.private_key_certificate_chain_pairs,
-                                                    served_endpoint.root_certificates,
-                                                    served_endpoint.require_client_auth)
+                if served_endpoint.root_certificates:
+                    require_client_auth = True
+                    root = bytes(served_endpoint.root_certificates, "utf-8")
+                else:
+                    require_client_auth = False
+                    root = None
+                certs = []
+                for (key, chain) in served_endpoint.private_key_certificate_chain_pairs:
+                    certs.append((bytes(key, "utf-8"), bytes(chain, "utf-8")))
+                if not certs:
+                    certs = None
+
+                creds = grpc.ssl_server_credentials(certs, root, require_client_auth)
                 self._grpc_server.add_secure_port(address, creds)
 
             await self._grpc_server.start()

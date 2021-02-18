@@ -1,5 +1,7 @@
+# Some of the ENV (and ARG) defintions are also used inside the test
 ARG COGMENT_ORCHESTRATOR_IMAGE=cogment/orchestrator:latest
 ARG COGMENT_IMAGE=cogment/cli:latest
+
 FROM $COGMENT_ORCHESTRATOR_IMAGE as orchestrator
 FROM $COGMENT_IMAGE as cogment
 FROM ubuntu:20.04
@@ -35,6 +37,7 @@ RUN poetry install --no-root
 COPY . ./
 # Install the cogment-py-sdk package
 RUN poetry install
+
 # Run the test with the local orchestrator
 ENTRYPOINT ["poetry", "run", "task", "test", "--launch-orchestrator"]
 

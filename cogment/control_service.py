@@ -30,9 +30,19 @@ class ControlServicer:
         if endpoint.private_key is None:
             channel = grpc.experimental.aio.insecure_channel(endpoint.url)
         else:
-            creds = grpc.ssl_channel_credentials(endpoint.root_certificates,
-                                                 endpoint.private_key,
-                                                 endpoint.certificate_chain)
+            if endpoint.root_certificates:
+                root = bytes(endpoint.root_certificates, "utf-8")
+            else:
+                root = None
+            if endpoint.private_key:
+                key = bytes(endpoint.private_key, "utf-8")
+            else:
+                key = None
+            if endpoint.certificate_chain:
+                certs = bytes(endpoint.certificate_chain, "utf-8")
+            else:
+                certs = None
+            creds = grpc.ssl_channel_credentials(root, key, certs)
             channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
 
         self.lifecycle_stub = grpc_api.TrialLifecycleStub(channel)
