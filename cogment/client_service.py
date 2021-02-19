@@ -174,7 +174,7 @@ class ClientServicer:
             config.ParseFromString(reply.config.content)
 
         new_session = _ClientActorSession(
-            impl, actor_class, trial, self_info.name, impl_name, config
+            impl, actor_class, trial, self_info.name, impl_name, config, self._actor_stub
         )
 
         metadata = (("trial-id", trial.id), ("actor-name", self_info.name))

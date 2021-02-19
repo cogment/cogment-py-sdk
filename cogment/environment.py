@@ -17,7 +17,7 @@ import importlib
 import logging
 import traceback
 from cogment.session import Session
-from abc import ABC, abstractmethod
+from abc import ABC
 
 ENVIRONMENT_ACTOR_NAME = "env"
 
@@ -43,10 +43,6 @@ class EnvironmentSession(Session):
         self.__started = False
         self.__event_queue = None
         self.__final_obs_future = None
-
-    @abstractmethod
-    async def _retrieve_obs(self):
-        pass
 
     def start(self, observations):
         assert not self.__started
@@ -97,6 +93,11 @@ class EnvironmentSession(Session):
         elif not self._ended:
             self._ended = True
             self._obs_queue.put_nowait((observations, True))
+
+    async def _retrieve_obs(self):
+        obs = await self._obs_queue.get()
+        self._obs_queue.task_done()
+        return obs
 
     async def _end_request(self, actions):
         logging.debug("Environment received an end request")
@@ -161,7 +162,10 @@ class _ServedEnvironmentSession(EnvironmentSession):
     def __init__(self, impl, trial, impl_name, config):
         super().__init__(impl, trial, impl_name, config)
 
-    async def _retrieve_obs(self):
-        obs = await self._obs_queue.get()
-        self._obs_queue.task_done()
-        return obs
+    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
+        assert self._trial is not None
+        self._trial.add_reward(value, confidence, to, tick_id, user_data)
+
+    def send_message(self, user_data, to, to_environment=False):
+        assert self._trial is not None
+        self._trial.send_message(user_data, to, to_environment)

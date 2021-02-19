@@ -16,8 +16,11 @@ import asyncio
 import importlib
 import logging
 import traceback
-from abc import ABC, abstractmethod
+from abc import ABC
 from cogment.session import Session
+
+import cogment.api.orchestrator_pb2 as orchestrator_api
+import cogment.api.common_pb2 as common_api
 
 
 _OBSERVATION = "observation"
@@ -113,10 +116,6 @@ class ActorSession(Session):
         self.__event_queue = None
         self.__obs_future = None
 
-    @abstractmethod
-    async def _retrieve_action(self):
-        pass
-
     def start(self):
         assert not self.__started
         assert not self._ended
@@ -152,6 +151,11 @@ class ActorSession(Session):
     def do_action(self, action):
         assert self.__started
         self._action_queue.put_nowait(action)
+
+    async def _retrieve_action(self):
+        action = await self._action_queue.get()
+        self._action_queue.task_done()
+        return action
 
     async def _end(self, package):
         logging.debug(f"Actor [{self.name}] received final data")
@@ -218,17 +222,38 @@ class _ServedActorSession(ActorSession):
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
 
-    async def _retrieve_action(self):
-        action = await self._action_queue.get()
-        self._action_queue.task_done()
-        return action
+    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
+        assert self._trial is not None
+        self._trial.add_reward(value, confidence, to, tick_id, user_data)
+
+    def send_message(self, user_data, to, to_environment=False):
+        assert self._trial is not None
+        self._trial.send_message(user_data, to, to_environment)
 
 
 class _ClientActorSession(ActorSession):
-    def __init__(self, impl, actor_class, trial, name, impl_name, config):
+    def __init__(self, impl, actor_class, trial, name, impl_name, config, actor_stub):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
+        self._actor_sub = actor_stub
 
-    async def _retrieve_action(self):
-        action = await self._action_queue.get()
-        self._action_queue.task_done()
-        return action
+    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
+        request = orchestrator_api.TrialRewardRequest()
+        for dest_actor in self._trial.get_actors(pattern_list=to):
+            reward = common_api.Reward(receiver_name=dest_actor.name, tick_id=-1, value=value)
+            reward_source = common_api.RewardSource(sender_name=self.name, value=value, confidence=confidence)
+            if user_data is not None:
+                reward_source.user_data.Pack(user_data)
+            reward.sources.append(reward_source)
+            request.rewards.append(reward)
+            metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
+            self._actor_sub.SendReward(request=request, metadata=metadata)
+
+    def send_message(self, user_data, to, to_environment=False):
+        message_req = orchestrator_api.TrialMessageRequest()
+        for dest_actor in self._trial.get_actors(pattern_list=to):
+            message = common_api.Message(tick_id=-1, receiver_name=dest_actor.name)
+            if user_data is not None:
+                message.payload.Pack(user_data)
+            message_req.messages.append(message)
+            metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
+            self._actor_sub.SendMessage(request=message_req, metadata=metadata)

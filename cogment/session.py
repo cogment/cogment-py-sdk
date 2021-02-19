@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 
 class Session(ABC):
@@ -44,10 +44,10 @@ class Session(ABC):
         assert self._trial is not None
         return self._active_actors
 
+    @abstractmethod
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
-        assert self._trial is not None
-        self._trial.add_reward(value, confidence, to, tick_id, user_data)
+        pass
 
+    @abstractmethod
     def send_message(self, user_data, to, to_environment=False):
-        assert self._trial is not None
-        self._trial.send_message(user_data, to, to_environment)
+        pass
