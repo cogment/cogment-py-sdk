@@ -78,12 +78,15 @@ class TestIntegration:
             environment_session.start([("*", data_pb2.Observation(observed_value=12))])
 
             async for event in environment_session.event_loop():
-                unittest_case.assertCountEqual(event.keys(), ["actions"])
+                if event.type == cogment.EventType.FINAL:
+                    continue
+
+                assert len(event.actions) == len(environment_session.get_active_actors())
                 environment_tick_count += 1
 
                 if environment_tick_count >= target_tick_count:
                     environment_session.end([("*", data_pb2.Observation(observed_value=12))])
-                elif "actions" in event and environment_tick_count == 1:
+                elif event.actions and environment_tick_count == 1:
                     actors = environment_session.get_active_actors()
                     for actor in actors:
                         user_data = data_pb2.MyFeedbackUserData(a_bool=False, a_float=3.0)
@@ -128,35 +131,26 @@ class TestIntegration:
             actor_session.start()
 
             async for event in actor_session.event_loop():
-
-                if "observation" in event:
-                    assert event["observation"].observed_value == 12
+                if event.observation:
+                    assert event.observation.snapshot.observed_value == 12
                     actor_session.do_action(data_pb2.Action(action_value=-1))
                     agent_observation_count += 1
 
-                elif "message" in event:
-                    message = event['message']
-
+                for message in event.messages:
                     mess = data_pb2.MyMessageUserData()
-                    mess.ParseFromString(message[1].value)
+                    mess.ParseFromString(message.payload.value)
                     agent_message_count += 1
                     if mess.an_int == 42:
                         had_universal_message = True
                     elif mess.an_int == 21:
                         had_personal_message = True
 
-                elif "reward" in event:
-                    reward = event['reward']
+                for reward in event.rewards:
                     total_reward += reward.value
                     assert reward.value == 21.0
 
-                elif "final_data" in event:
-                    assert len(event["final_data"].observations) == 1
-                    assert len(event["final_data"].messages) == 0
-                    assert len(event["final_data"].rewards) == 0
+                if event.type == cogment.EventType.FINAL:
                     agent_final_data_count += 1
-
-                    assert event["final_data"].observations[0].observed_value == 12
 
             agents_ended[actor_session.name].set_result(True)
 
@@ -213,14 +207,14 @@ class TestIntegration:
         assert environment_call_count == 1
         assert environment_tick_count == target_tick_count
         assert agent_call_count == 2
-        assert agent_observation_count / agent_call_count == target_tick_count
-        # TODO investigate why the final data are never received by the agent
-        #assert agent_final_data_count / agent_call_count == 1
+        assert agent_observation_count / agent_call_count == target_tick_count + 1
+        assert agent_final_data_count == 2
         assert had_universal_message
         assert had_personal_message
         assert agent_message_count == 4
         assert total_reward == 42.0
 
+        logging.info(f"test_environment_controlled_trial finished")
         await context._grpc_server.stop(grace=5.)  # To prepare for next test
 
     @pytest.mark.use_orchestrator
@@ -246,17 +240,23 @@ class TestIntegration:
             nonlocal environment_tick_count
 
             environment_call_count += 1
-            environment_session.start([("*", data_pb2.Observation(observed_value=0))])
+            environment_tick_count += 1
+            environment_session.start([("*", data_pb2.Observation(observed_value=environment_tick_count))])
 
             async for event in environment_session.event_loop():
-                # await asyncio.sleep(0.25) # Fails with this delay, why???
-                environment_tick_count += 1
+                if event.actions:
 
-                if "actions" in event:
+                    if event.type == cogment.EventType.ACTIVE:
+                        action0 = event.actions[0]
+                        assert action0.actor_index == 0
+                        assert action0.action.action_value == environment_tick_count
+                        action1 = event.actions[1]
+                        assert action1.actor_index == 1
+                        assert action1.action.action_value == environment_tick_count
+
+                    environment_tick_count += 1
                     environment_session.produce_observations(
                         [("*", data_pb2.Observation(observed_value=environment_tick_count))])
-                if "final_actions" in event:
-                    environment_session.end([("*", data_pb2.Observation(observed_value=environment_tick_count))])
 
 
         agent_call_count = 0
@@ -278,20 +278,18 @@ class TestIntegration:
 
             async for event in actor_session.event_loop():
 
-                if "observation" in event:
+                if event.observation:
                     agents_tick_count[actor_session.name] += 1
-                    assert event["observation"].observed_value == agents_tick_count[actor_session.name] - 1
+                    assert event.observation.snapshot.observed_value == agents_tick_count[actor_session.name]
                     actor_session.do_action(data_pb2.Action(action_value=agents_tick_count[actor_session.name]))
 
-                if "final_data" in event:
-                    assert len(event["final_data"].observations) == 1
-                    assert len(event["final_data"].messages) == 0
-                    assert len(event["final_data"].rewards) == 0
+                if event.type == cogment.EventType.ENDING:
+                    assert event.observation
+                    assert len(event.rewards) == 0
+                    assert len(event.messages) == 0
 
-                    assert event["final_data"].observations[0].observed_value == agents_tick_count[actor_session.name]
+                    assert event.observation.snapshot.observed_value == agents_tick_count[actor_session.name]
 
-
-            assert agents_tick_count[actor_session.name] == environment_tick_count
             agents_ended[actor_session.name].set_result(True)
 
 
@@ -324,4 +322,5 @@ class TestIntegration:
         assert agents_tick_count["actor_1"] == agents_tick_count["actor_2"]
         assert agents_tick_count["actor_1"] == environment_tick_count
 
+        logging.info(f"test_controller_controlled_trial finished")
         await context._grpc_server.stop(grace=5.)  # To prepare for next test

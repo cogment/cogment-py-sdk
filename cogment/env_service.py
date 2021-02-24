@@ -20,6 +20,7 @@ import cogment.api.environment_pb2_grpc as grpc_api
 import cogment.api.environment_pb2 as env_api
 import cogment.api.common_pb2 as common_api
 from cogment.utils import list_versions
+from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType
 
 from types import SimpleNamespace, ModuleType
 import grpc.experimental.aio
@@ -118,6 +119,8 @@ async def write_observations(context, env_session):
             await context.write(reply)
 
             if final:
+                env_session._trial.over = True
+                env_session._new_event(RecvEvent(EventType.FINAL))
                 break
 
     except asyncio.CancelledError:
@@ -135,10 +138,12 @@ def _process_actions(request, env_session):
     if len_actions != len_actors:
         raise Exception(f"Received {len_actions} actions but have {len_actors} actors")
 
+    recv_event = RecvEvent(EventType.ACTIVE)
     for i, action in enumerate(env_session._trial._actions_by_actor_id):
         action.ParseFromString(request.action_set.actions[i])
+        recv_event.actions.append(RecvAction(i, action))
 
-    return env_session._trial._actions_by_actor_id
+    return recv_event
 
 
 async def read_actions(context, env_session):
@@ -150,7 +155,7 @@ async def read_actions(context, env_session):
                 logging.info(f"The orchestrator disconnected the environment")
                 break
 
-            env_session._new_action(_process_actions(request, env_session))
+            env_session._new_event(_process_actions(request, env_session))
 
     except asyncio.CancelledError:
         logging.debug("Environment 'read_actions' coroutine cancelled")
@@ -245,7 +250,10 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
 
             new_session._task = asyncio.create_task(new_session._run())
 
-            observations, _ = await new_session._retrieve_obs()
+            observations, final = await new_session._retrieve_obs()
+            if final:
+                new_session._trial.over = True
+                new_session._new_event(RecvEvent(EventType.FINAL))
 
             reply = env_api.EnvStartReply()
             pack_observations(new_session, observations, reply, 0)
@@ -306,8 +314,10 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             env_session = self.__env_sessions[key]
 
             for message in request.messages:
+                recv_event = RecvEvent(EventType.ACTIVE)
+                recv_event.rewards = [RecvMessage(message)]
+                env_session._new_event(recv_event)
                 self.messages_received.labels(env_session.impl_name).inc()
-                env_session._new_message(message)
 
             return env_api.EnvMessageReply()
 
@@ -323,7 +333,12 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             key = trial_id
             env_session = self.__env_sessions[key]
 
-            obs = await env_session._end_request(_process_actions(request, env_session))
+            event = _process_actions(request, env_session)
+            event.type = EventType.ENDING
+            obs = await env_session._end_request(event)
+
+            env_session._trial.over = True
+            env_session._new_event(RecvEvent(EventType.FINAL))
 
             if obs:
                 reply = _process_reply(obs, env_session)

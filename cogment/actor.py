@@ -17,16 +17,10 @@ import importlib
 import logging
 import traceback
 from abc import ABC
-from cogment.session import Session
+from cogment.session import Session, EventType
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
 import cogment.api.common_pb2 as common_api
-
-
-_OBSERVATION = "observation"
-_FINAL_DATA = "final_data"
-_MESSAGE = "message"
-_REWARD = "reward"
 
 
 class ActorClass:
@@ -67,31 +61,6 @@ class ActorClassList:
 
     def get_class_by_index(self, index):
         return self._actor_classes_list[index]
-
-
-class RecvReward:
-    def __init__(self):
-        self.tick_id = -1
-        self.value = 0
-        self._sources = None
-
-    def _set_all(self, reward):
-        self.tick_id = reward.tick_id
-        self.value = reward.value
-        self._sources = reward.sources
-
-    def get_nb_sources(self):
-        return len(self._sources)
-
-    def all_sources(self):
-        assert self._sources
-        for src in self._sources:
-            yield (src.value, src.confidence, src.sender_name, src.user_data)
-
-    def __str__(self):
-        res = f"tick_id = {self.tick_id}, value = {self.value}"
-        res += f", sources = {self._sources}"
-        return res
 
 
 class ActorSession(Session):
@@ -136,12 +105,13 @@ class ActorSession(Session):
                 logging.debug(f"Coroutine for actor [{self.name}] cancelled while waiting for an event")
                 break
 
-            self._last_event_received = _FINAL_DATA in event
+            self._last_event_received = (event.type == EventType.FINAL)
             keep_looping = yield event
             self.__event_queue.task_done()
             loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
             if not loop_active:
                 if self._last_event_received:
+                    self._ended = True
                     logging.debug(f"Last event received, exiting event loop for actor [{self.name}]")
                 else:
                     logging.debug(f"End of event loop for actor [{self.name}] requested by user")
@@ -157,53 +127,14 @@ class ActorSession(Session):
         self._action_queue.task_done()
         return action
 
-    async def _end(self, package):
-        logging.debug(f"Actor [{self.name}] received final data")
-        if not self._ended:
-            self._ended = True
-
-        if self.__event_queue:
-            std_messages = []
-            for msg in package.messages:
-                std_messages.append((msg.sender_name(), msg.payload()))
-            package.messages = std_messages
-
-            event = {_FINAL_DATA : package}
-            await self.__event_queue.put(event)
-        else:
-            logging.warning(f"Actor [{self.name}] received final data that it was unable to handle.")
-
-    def _new_observation(self, obs):
+    def _new_event(self, event):
         if not self.__started or self._ended:
             return
 
         if self.__event_queue:
-            event = {_OBSERVATION : obs}
             self.__event_queue.put_nowait(event)
         else:
-            logging.warning(f"Actor [{self.name}] received an observation that it was unable to handle.")
-
-    def _new_reward(self, reward):
-        logging.debug(f"Actor [{self.name}] received a reward")
-        if not self.__started or self._ended:
-            return
-
-        if self.__event_queue:
-            event = {_REWARD : reward}
-            self.__event_queue.put_nowait(event)
-        else:
-            logging.warning(f"Actor [{self.name}] received a reward that it was unable to handle.")
-
-    def _new_message(self, message):
-        logging.debug(f"Actor [{self.name}] received a message")
-        if not self.__started or self._ended:
-            return
-
-        if self.__event_queue:
-            event = {_MESSAGE : (message.sender_name, message.payload)}
-            self.__event_queue.put_nowait(event)
-        else:
-            logging.warning(f"Actor [{self.name}] received a message that it was unable to handle.")
+            logging.warning(f"Actor [{self.name}] received an event that it was unable to handle.")
 
     async def _run(self):
         try:

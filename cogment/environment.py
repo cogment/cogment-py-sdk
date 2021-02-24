@@ -16,14 +16,10 @@ import asyncio
 import importlib
 import logging
 import traceback
-from cogment.session import Session
+from cogment.session import Session, EventType
 from abc import ABC
 
 ENVIRONMENT_ACTOR_NAME = "env"
-
-_ACTIONS = "actions"
-_FINAL_ACTIONS = "final_actions"
-_MESSAGE = "message"
 
 
 class EnvironmentSession(Session):
@@ -66,18 +62,14 @@ class EnvironmentSession(Session):
                 logging.debug("Coroutine cancelled while waiting for an event")
                 break
 
-            self._last_event_received = _FINAL_ACTIONS in event
+            self._last_event_received = (event.type == EventType.FINAL)
             keep_looping = yield event
             self.__event_queue.task_done()
-            loop_active = ((keep_looping is None or bool(keep_looping)) and
-                            not self._last_event_received and
-                            not self._ended)
-
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
             if not loop_active:
                 if self._last_event_received:
+                    self._ended = True
                     logging.debug(f"Last event received, exiting environment event loop")
-                elif self._ended:
-                    logging.debug(f"Last observation sent, exiting environment event loop")
                 else:
                     logging.debug(f"End of event loop for environment requested by user")
 
@@ -85,13 +77,15 @@ class EnvironmentSession(Session):
 
     def produce_observations(self, observations):
         assert self.__started
-        self._obs_queue.put_nowait((observations, False))
+        if self.__final_obs_future is not None:
+            self.__final_obs_future.set_result(observations)
+        elif not self._ended:
+            self._obs_queue.put_nowait((observations, False))
 
     def end(self, observations):
         if self.__final_obs_future is not None:
             self.__final_obs_future.set_result(observations)
         elif not self._ended:
-            self._ended = True
             self._obs_queue.put_nowait((observations, True))
 
     async def _retrieve_obs(self):
@@ -99,7 +93,7 @@ class EnvironmentSession(Session):
         self._obs_queue.task_done()
         return obs
 
-    async def _end_request(self, actions):
+    async def _end_request(self, event):
         logging.debug("Environment received an end request")
 
         if self._ended:
@@ -112,7 +106,6 @@ class EnvironmentSession(Session):
         if self.__event_queue:
             self.__final_obs_future = asyncio.get_running_loop().create_future()
 
-            event = {_FINAL_ACTIONS : actions}
             await self.__event_queue.put(event)
 
             result = await self.__final_obs_future
@@ -122,27 +115,14 @@ class EnvironmentSession(Session):
 
         return result
 
-    def _new_action(self, actions):
+    def _new_event(self, event):
         if not self.__started or self._ended:
             return
 
         if self.__event_queue:
-            event = {_ACTIONS : actions}
             self.__event_queue.put_nowait(event)
         else:
-            logging.warning("The environment received actions that it was unable to handle.")
-
-    def _new_message(self, message):
-        logging.debug("Environment received a message")
-
-        if not self.__started or self._ended:
-            return
-
-        if self.__event_queue:
-            event = {_MESSAGE : (message.sender_name(), message.payload())}
-            self.__event_queue.put_nowait(event)
-        else:
-            logging.warning("The environment received a message that it was unable to handle.")
+            logging.warning("The environment received an event that it was unable to handle.")
 
     async def _run(self):
         try:

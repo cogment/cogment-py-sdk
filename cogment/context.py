@@ -74,8 +74,8 @@ def _add_prehook_service(grpc_server, impls, cog_settings, prometheus_registry):
     add_TrialHooksServicer_to_server(servicer, grpc_server)
 
 
-def _add_datalog_service(grpc_server, impl, cog_settings, prometheus_registry):
-    servicer = LogExporterService(impl, cog_settings, prometheus_registry)
+def _add_datalog_service(grpc_server, impl, cog_settings):
+    servicer = LogExporterService(impl, cog_settings)
     add_LogExporterServicer_to_server(servicer, grpc_server)
 
 
@@ -204,8 +204,7 @@ class Context:
                 _add_datalog_service(
                     self._grpc_server,
                     self.__datalog_impl,
-                    self.__cog_settings,
-                    self._prometheus_registry
+                    self.__cog_settings
                 )
 
             start_http_server(prometheus_port, "", self._prometheus_registry)

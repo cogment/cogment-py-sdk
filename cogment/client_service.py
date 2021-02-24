@@ -16,7 +16,8 @@ import grpc
 import grpc.experimental.aio
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
-from cogment.actor import _ClientActorSession, RecvReward
+from cogment.actor import _ClientActorSession
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType
 import cogment.api.orchestrator_pb2_grpc as grpc_api
 from cogment.delta_encoding import DecodeObservationData
 from cogment.errors import InvalidRequestError
@@ -32,53 +33,49 @@ async def read_observations(client_session, reply_itor):
     try:
         async for reply in reply_itor:
             if not reply.final_data:
-                for obs_reply in reply.data.observations:
-                    tick_id = obs_reply.tick_id
-                    client_session._trial.tick_id = tick_id
-
-                    obs = DecodeObservationData(
-                        client_session._actor_class,
-                        obs_reply.data,
-                        client_session._latest_observation)
-                    client_session._latest_observation = obs
-                    client_session._new_observation(obs)
-
-                for rew_request in reply.data.rewards:
-                    reward = RecvReward()
-                    reward._set_all(rew_request)
-                    client_session._new_reward(reward)
-
-                for message in reply.data.messages:
-                    client_session._new_message(message)
-
+                event_type = EventType.ACTIVE
             else:
+                event_type = EventType.ENDING
                 client_session._trial.over = True
 
-                package = SimpleNamespace(observations=[], rewards=[], messages=[])
-                tick_id = None
+            events = {}
+            for obs_request in reply.data.observations:
+                snapshot = DecodeObservationData(
+                    client_session._actor_class,
+                    obs_request.data,
+                    client_session._latest_observation)
+                client_session._latest_observation = snapshot
 
-                for obs_reply in reply.data.observations:
-                    tick_id = obs_reply.tick_id
-                    obs = DecodeObservationData(
-                        client_session._actor_class,
-                        obs_reply.data,
-                        client_session._latest_observation)
-                    client_session._latest_observation = obs
-                    package.observations.append(obs)
+                evt = events.setdefault(obs_request.tick_id, RecvEvent(event_type))
+                if evt.observation:
+                    logging.warning(f"Client received two observations with the same tick_id: {obs_request.tick_id}")
+                else:
+                    evt.observation = RecvObservation(obs_request, snapshot)
 
-                for rew_request in reply.data.rewards:
-                    reward = RecvReward()
-                    reward._set_all(rew_request)
-                    package.rewards.append(reward)
+            for rew in reply.data.rewards:
+                evt = events.setdefault(rew.tick_id, RecvEvent(event_type))
+                evt.rewards.append(RecvReward(rew))
 
-                for msg_request in reply.data.messages:
-                    package.messages.append(msg_request)
+            for msg in reply.data.messages:
+                evt = events.setdefault(msg.tick_id, RecvEvent(event_type))
+                evt.messages.append(RecvMessage(msg))
 
-                if tick_id is not None:
-                    client_session._trial.tick_id = tick_id
+            ordered_ticks = sorted(events)
+            if ordered_ticks:
+                client_session._trial.tick_id = ordered_ticks[-1]
 
-                await client_session._end(package)
+            if not reply.final_data:
+                for tick_id in ordered_ticks:
+                    client_session._new_event(events[tick_id])
+            else:
+                evt = RecvEvent(EventType.FINAL)
+                for tick_id in ordered_ticks:
+                    evt = events.pop(tick_id)
+                    if events:  # Last event is handled after the loop
+                        client_session._new_event(evt)
 
+                evt.type = EventType.FINAL
+                client_session._new_event(evt)
                 break
 
     except asyncio.CancelledError:
@@ -174,8 +171,7 @@ class ClientServicer:
             config.ParseFromString(reply.config.content)
 
         new_session = _ClientActorSession(
-            impl, actor_class, trial, self_info.name, impl_name, config, self._actor_stub
-        )
+            impl, actor_class, trial, self_info.name, impl_name, config, self._actor_stub)
 
         metadata = (("trial-id", trial.id), ("actor-name", self_info.name))
         req_itor = write_actions(new_session)

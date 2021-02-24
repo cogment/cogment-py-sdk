@@ -20,7 +20,8 @@ from cogment.trial import Trial
 
 from cogment.errors import InvalidRequestError
 from cogment.delta_encoding import DecodeObservationData
-from cogment.actor import _ServedActorSession, RecvReward
+from cogment.actor import _ServedActorSession
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType
 
 from prometheus_client import Summary, Counter, Gauge
 
@@ -57,13 +58,16 @@ async def read_observations(context, agent_session):
 
             agent_session._trial.tick_id = request.observation.tick_id
 
-            obs = DecodeObservationData(
+            snapshot = DecodeObservationData(
                 agent_session._actor_class,
                 request.observation.data,
                 agent_session._latest_observation,
             )
-            agent_session._latest_observation = obs
-            agent_session._new_observation(obs)
+            agent_session._latest_observation = snapshot
+
+            recv_event = RecvEvent(EventType.ACTIVE)
+            recv_event.observation = RecvObservation(request.observation, snapshot)
+            agent_session._new_event(recv_event)
 
     except asyncio.CancelledError:
         logging.debug(f"Agent [{agent_session.name}] 'read_observations' coroutine cancelled")
@@ -77,17 +81,18 @@ async def write_actions(context, agent_session):
     try:
         while True:
             act = await agent_session._retrieve_action()
-            msg = agent_api.AgentActionReply()
+            reply = agent_api.AgentActionReply()
 
             if act is not None:
-                msg.action.content = act.SerializeToString()
+                reply.action.content = act.SerializeToString()
 
-            msg.rewards.extend(agent_session._trial._gather_all_rewards())
+            reply.rewards.extend(agent_session._trial._gather_all_rewards())
 
+            # TODO: Why can't we use agent_session.name instead?
             actor_name = dict(context.invocation_metadata())["actor-name"]
-            msg.messages.extend(agent_session._trial._gather_all_messages(actor_name))
+            reply.messages.extend(agent_session._trial._gather_all_messages(actor_name))
 
-            await context.write(msg)
+            await context.write(reply)
 
     except asyncio.CancelledError:
         logging.debug(f"Agent [{agent_session.name}] 'write_action' coroutine cancelled")
@@ -205,28 +210,49 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
     async def OnEnd(self, request, context):
         try:
             metadata = dict(context.invocation_metadata())
-            key = _trial_key(metadata["trial-id"], metadata["actor-name"])
+            trial_id = metadata["trial-id"]
+            actor_name = metadata["actor-name"]
+
+            key = _trial_key(trial_id, actor_name)
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:
-                package = SimpleNamespace(observations=[], rewards=[], messages=[])
-                for obs_request in request.final_data.observations:
-                    obs = DecodeObservationData(
+                agent_session._trial.over = True
+                data = request.final_data
+
+                events = {}
+                for obs_request in data.observations:
+                    snapshot = DecodeObservationData(
                         agent_session._actor_class,
                         obs_request.data,
                         agent_session._latest_observation)
-                    agent_session._latest_observation = obs
-                    package.observations.append(obs)
+                    agent_session._latest_observation = snapshot
 
-                for rew_request in request.final_data.rewards:
-                    reward = RecvReward()
-                    reward._set_all(rew_request)
-                    package.rewards.append(reward)
+                    evt = events.setdefault(obs_request.tick_id, RecvEvent(EventType.ENDING))
+                    if evt.observation:
+                        logging.warning(f"Agent received two observations with the same tick_id: {obs_request.tick_id}")
+                    else:
+                        evt.observation = RecvObservation(obs_request, snapshot)
 
-                for msg_request in request.final_data.messages:
-                    package.messages.append(msg_request)
+                for rew in data.rewards:
+                    evt = events.setdefault(rew.tick_id, RecvEvent(EventType.ENDING))
+                    evt.rewards.append(RecvReward(rew))
 
-                await agent_session._end(package)
+                for msg in data.messages:
+                    evt = events.setdefault(msg.tick_id, RecvEvent(EventType.ENDING))
+                    evt.messages.append(RecvMessage(msg))
+
+                if not events:
+                    agent_session._new_event(RecvEvent(EventType.FINAL))
+                else:
+                    ordered_ticks = sorted(events)
+                    agent_session._trial.tick_id = ordered_ticks[-1]
+
+                    for tick_id in ordered_ticks:
+                        evt = events.pop(tick_id)
+                        if not events:
+                            evt.type = EventType.FINAL
+                        agent_session._new_event(evt)
 
                 self.actors_ended.labels(agent_session.impl_name).inc()
 
@@ -246,7 +272,10 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
         writer_task = None
         try:
             metadata = dict(context.invocation_metadata())
-            key = _trial_key(metadata["trial-id"], metadata["actor-name"])
+            trial_id = metadata["trial-id"]
+            actor_name = metadata["actor-name"]
+
+            key = _trial_key(trial_id, actor_name)
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:
@@ -276,25 +305,29 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
     async def OnReward(self, request, context):
         try:
             metadata = dict(context.invocation_metadata())
-            actor_name = str(metadata["actor-name"])
             trial_id = metadata["trial-id"]
+            actor_name = metadata["actor-name"]
+
+            if not request.reward.sources:
+                logging.warning(f"Empty reward received for trial id [{trial_id}] and actor name [{actor_name}]")
+                return agent_api.AgentRewardReply()
 
             key = _trial_key(trial_id, actor_name)
-
-            reward = RecvReward()
-            reward._set_all(request.reward)
-
             agent_session = self.__agent_sessions.get(key)
-            if agent_session is not None:
-                self.rewards_counter.labels(agent_session.name, agent_session.impl_name).inc()
-                if reward.value < 0.0:
-                    self.rewards_received.labels(agent_session.name, agent_session.impl_name).dec(abs(reward.value))
-                else:
-                    self.rewards_received.labels(agent_session.name, agent_session.impl_name).inc(reward.value)
-
-                agent_session._new_reward(reward)
-            else:
+            if agent_session is None:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for reward")
+                return agent_api.AgentRewardReply()
+
+            recv_event = RecvEvent(EventType.ACTIVE)
+            recv_event.rewards = [RecvReward(request.reward)]
+            agent_session._new_event(recv_event)
+
+            value = recv_event.rewards[0].value
+            self.rewards_counter.labels(agent_session.name, agent_session.impl_name).inc()
+            if value < 0.0:
+                self.rewards_received.labels(agent_session.name, agent_session.impl_name).dec(abs(value))
+            else:
+                self.rewards_received.labels(agent_session.name, agent_session.impl_name).inc(value)
 
             return agent_api.AgentRewardReply()
 
@@ -305,15 +338,17 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
     async def OnMessage(self, request, context):
         try:
             metadata = dict(context.invocation_metadata())
-            actor_name = str(metadata["actor-name"])
             trial_id = metadata["trial-id"]
+            actor_name = metadata["actor-name"]
 
             key = _trial_key(trial_id, actor_name)
 
             agent_session = self.__agent_sessions.get(key)
             if agent_session is not None:
                 for message in request.messages:
-                    agent_session._new_message(message)
+                    recv_event = RecvEvent(EventType.ACTIVE)
+                    recv_event.messages = [RecvMessage(message)]
+                    agent_session._new_event(recv_event)
                     self.messages_received.labels(agent_session.name, agent_session.impl_name).inc()
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for message")
