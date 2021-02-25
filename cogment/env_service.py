@@ -66,7 +66,7 @@ def pack_observations(env_session, observations, reply, tick_id):
                     if class_name[1] == actor.name:
                         new_obs[actor_index] = obs
                     elif class_name[1] == "*":
-                        if actor.actor_class.id == class_name[0]:
+                        if actor.actor_class.name == class_name[0]:
                             new_obs[actor_index] = obs
 
     snapshots = [True] * len(env_session._trial.actors)

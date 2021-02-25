@@ -34,7 +34,7 @@ class ActorClass:
         observation_delta_apply_fn,
         feedback_space,
     ):
-        self.id = id
+        self.name = id
         self.config_type = config_type
         self.action_space = action_space
         self.observation_space = observation_space
@@ -48,7 +48,7 @@ class ActorClassList:
         self._actor_classes_list = list(args)
 
         for a_c in args:
-            setattr(self, a_c.id, a_c)
+            setattr(self, a_c.name, a_c)
 
     def __iter__(self):
         return iter(self._actor_classes_list)
@@ -68,7 +68,7 @@ class ActorSession(Session):
 
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
         super().__init__(trial)
-        self.class_name = actor_class.id
+        self.class_name = actor_class.name
         self.name = name
         self.impl_name = impl_name
         self.config = config

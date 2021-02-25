@@ -110,7 +110,7 @@ class Session(ABC):
         self._trial = trial
 
         # Pre-compute since it will be used regularly
-        self._active_actors = [self.ActiveActor(actor_name=actor.name, actor_class_name=actor.actor_class.id)
+        self._active_actors = [self.ActiveActor(actor_name=actor.name, actor_class_name=actor.actor_class.name)
                              for actor in trial.actors]
 
     def get_trial_id(self):

@@ -40,7 +40,7 @@ def _trial_key(trial_id, actor_name):
 def _impl_can_serve_actor_class(impl, actor_class):
     if impl.actor_classes:
         for ac in impl.actor_classes:
-            if ac == actor_class.id:
+            if ac == actor_class.name:
                 return True
         return False
     else:
@@ -88,7 +88,7 @@ async def write_actions(context, agent_session):
 
             reply.rewards.extend(agent_session._trial._gather_all_rewards())
 
-            # TODO: Why can't we use agent_session.name instead?
+            # TODO: Why can't we use agent_session.name instead?  Is the sender_name still necessary?
             actor_name = dict(context.invocation_metadata())["actor-name"]
             reply.messages.extend(agent_session._trial._gather_all_messages(actor_name))
 

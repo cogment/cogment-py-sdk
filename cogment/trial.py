@@ -21,7 +21,7 @@ from cogment.errors import Error
 
 
 class Trial:
-    class Environment:
+    class MinimalComponent:
         def __init__(self):
             self.name = ENVIRONMENT_ACTOR_NAME
             self._messages = deque()
@@ -29,6 +29,7 @@ class Trial:
         def add_prepared_message(self, payload):
             self._messages.append(payload)
 
+        # TODO: Remove the need for sender_name, let the orchestrator fill it in (e.g. rewards)
         def get_prepared_messages(self, sender_name):
             while len(self._messages) > 0:
                 payload = self._messages.popleft()
@@ -37,7 +38,7 @@ class Trial:
                     message.payload.Pack(payload)
                 yield message
 
-    class Actor(Environment):
+    class Component(MinimalComponent):
         def __init__(self, name, actor_class):
             super().__init__()
             self.name = name
@@ -71,7 +72,7 @@ class Trial:
         self.over = False
         self.cog_settings = cog_settings
         self.tick_id = -1
-        self.environment = self.Environment()
+        self.environment = self.MinimalComponent()
 
         self._actions = None  # Managed externally
         self._actions_by_actor_id = None  # Managed externally
@@ -88,7 +89,7 @@ class Trial:
             if actor_in_trial.actor_class not in self.cog_settings.actor_classes:
                 raise Error(f"class '{actor_in_trial.actor_class}' of actor '{actor_in_trial.name}' can not be found.")
             actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
-            actor = self.Actor(
+            actor = self.Component(
                 name=actor_in_trial.name,
                 actor_class=actor_class
             )
@@ -99,7 +100,7 @@ class Trial:
         self.actor_counts = [0] * len(class_list)
         for class_index, class_member in enumerate(class_list):
             for actor in self.actors:
-                if class_member.id == actor.actor_class.id:
+                if class_member.name == actor.actor_class.name:
                     self.actor_counts[class_index] += 1
 
     def get_actors(self, pattern_list: List[str]):
@@ -124,13 +125,12 @@ class Trial:
                             matched_actors.append(actor)
                             break
                         elif actor_name == "*":
-                            if actor.actor_class.id == class_name:
+                            if actor.actor_class.name == class_name:
                                 matched_actors.append(actor)
                                 break
 
         return matched_actors
 
-    # TODO: Add source actor to set in reward
     def add_reward(self, value, confidence, to, tick_id, user_data):
         for dest_actor in self.get_actors(pattern_list=to):
             dest_actor.add_prepared_reward_data(
