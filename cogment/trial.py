@@ -146,11 +146,11 @@ class Trial:
                 yield reward
 
     # We default `to` so users can provide a `to_environment=True` without a `to` parameter
-    def send_message(self, user_data, to=[], to_environment=False):
+    def send_message(self, payload, to=[], to_environment=False):
         if to_environment:
-            self.environment.add_prepared_message(payload=user_data)
+            self.environment.add_prepared_message(payload=payload)
         for actor in self.get_actors(pattern_list=to):
-            actor.add_prepared_message(payload=user_data)
+            actor.add_prepared_message(payload=payload)
 
     def _gather_all_messages(self, source_name):
         for actor in self.actors:

@@ -157,9 +157,9 @@ class _ServedActorSession(ActorSession):
         assert self._trial is not None
         self._trial.add_reward(value, confidence, to, tick_id, user_data)
 
-    def send_message(self, user_data, to, to_environment=False):
+    def send_message(self, payload, to, to_environment=False):
         assert self._trial is not None
-        self._trial.send_message(user_data, to, to_environment)
+        self._trial.send_message(payload, to, to_environment)
 
 
 class _ClientActorSession(ActorSession):
@@ -179,12 +179,12 @@ class _ClientActorSession(ActorSession):
             metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
             self._actor_sub.SendReward(request=request, metadata=metadata)
 
-    def send_message(self, user_data, to, to_environment=False):
+    def send_message(self, payload, to, to_environment=False):
         message_req = orchestrator_api.TrialMessageRequest()
         for dest_actor in self._trial.get_actors(pattern_list=to):
             message = common_api.Message(tick_id=-1, receiver_name=dest_actor.name)
-            if user_data is not None:
-                message.payload.Pack(user_data)
+            if payload is not None:
+                message.payload.Pack(payload)
             message_req.messages.append(message)
             metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
             self._actor_sub.SendMessage(request=message_req, metadata=metadata)

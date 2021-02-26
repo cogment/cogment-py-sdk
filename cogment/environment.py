@@ -146,6 +146,6 @@ class _ServedEnvironmentSession(EnvironmentSession):
         assert self._trial is not None
         self._trial.add_reward(value, confidence, to, tick_id, user_data)
 
-    def send_message(self, user_data, to, to_environment=False):
+    def send_message(self, payload, to, to_environment=False):
         assert self._trial is not None
-        self._trial.send_message(user_data, to, to_environment)
+        self._trial.send_message(payload, to, to_environment)

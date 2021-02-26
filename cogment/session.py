@@ -134,5 +134,5 @@ class Session(ABC):
         pass
 
     @abstractmethod
-    def send_message(self, user_data, to, to_environment=False):
+    def send_message(self, payload, to, to_environment=False):
         pass
