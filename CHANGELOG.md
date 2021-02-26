@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-alpha8 - 2021-02-26
+
 ### Changed
 
 - Session event loops now return classes
