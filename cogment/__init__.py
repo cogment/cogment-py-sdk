@@ -27,6 +27,7 @@ from cogment.version import __version__
 
 from cogment.context import Context, Endpoint, ServedEndpoint
 from cogment.session import EventType
+from cogment.control import TrialState
 
 # Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList

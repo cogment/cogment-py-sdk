@@ -108,6 +108,9 @@ async def write_actions(client_session):
     except asyncio.CancelledError:
         logging.debug(f"Client [{client_session.name}] 'write_actions' coroutine cancelled")
 
+    except GeneratorExit:
+        raise
+
     except Exception:
         logging.error(f"{traceback.format_exc()}")
         raise

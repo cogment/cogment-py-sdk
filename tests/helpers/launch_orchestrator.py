@@ -58,6 +58,7 @@ def launch_orchestrator(
         os.mkfifo(status_file)
 
     if docker_image:
+        logging.info(f"Launching Orchestrator Docker image [{docker_image}]")
         cwd = None
         launch_orchestator_args = [
             "docker", "run",
@@ -74,6 +75,7 @@ def launch_orchestrator(
         launch_orchestator_args.extend([docker_image, "--status_file=/status/cogment_orchestrator_status"])
 
     else:
+        logging.info(f"Launching Orchestrator binary [{binary}]")
         cwd = app_directory
         launch_orchestator_args = [binary, f"--status_file={status_file}"]
 

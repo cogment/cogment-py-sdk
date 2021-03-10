@@ -26,7 +26,10 @@ from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession
 from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
-from cogment.control import ControlSession
+from cogment.control import Controller
+
+# Controller
+import cogment.api.orchestrator_pb2_grpc as grpc_api
 
 # Agent
 from cogment.agent_service import AgentServicer
@@ -35,9 +38,6 @@ from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
 
 # Client
 from cogment.client_service import ClientServicer
-
-# Control
-from cogment.control_service import ControlServicer
 
 # Environment
 from cogment.env_service import EnvironmentServicer
@@ -232,12 +232,28 @@ class Context:
             await self._grpc_server.wait_for_termination()
             logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
 
-    async def start_trial(self,
-                          endpoint: Endpoint,
-                          impl: Callable[[ControlSession], Awaitable[None]],
-                          trial_config=None):
-        servicer = ControlServicer(self.__cog_settings, endpoint)
-        await servicer.run(self._user_id, impl, trial_config)
+    def get_controller(self, endpoint: Endpoint):
+        if endpoint.private_key is None:
+            channel = grpc.experimental.aio.insecure_channel(endpoint.url)
+        else:
+            if endpoint.root_certificates:
+                root = bytes(endpoint.root_certificates, "utf-8")
+            else:
+                root = None
+            if endpoint.private_key:
+                key = bytes(endpoint.private_key, "utf-8")
+            else:
+                key = None
+            if endpoint.certificate_chain:
+                certs = bytes(endpoint.certificate_chain, "utf-8")
+            else:
+                certs = None
+            creds = grpc.ssl_channel_credentials(root, key, certs)
+            channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
+
+        stub = grpc_api.TrialLifecycleStub(channel)
+
+        return Controller(stub)
 
     async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls.get(impl_name)

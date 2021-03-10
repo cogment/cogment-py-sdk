@@ -9,7 +9,7 @@ FROM ubuntu:20.04
 RUN apt-get update && apt-get install -y curl build-essential python3 python3-distutils python3-pip protobuf-compiler
 
 # Retrieve the orchestrator!
-COPY --from=orchestrator /usr/local/bin/orchestrator /usr/local/bin/
+COPY --from=orchestrator /usr/local/bin/orchestrator_dbg /usr/local/bin/orchestrator
 ENV COGMENT_ORCHESTRATOR /usr/local/bin/orchestrator
 
 # Retrieve the cli!
