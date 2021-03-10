@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-alpha9 - 2021-03-10
+
 ### Added
 
 - **Breaking** Introduce `Controller`, built for a given orchestrator endpoint it can be used to start and terminate trials. Previous ways of accessing the same such are discontinued.
