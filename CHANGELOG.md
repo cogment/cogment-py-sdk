@@ -7,13 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
-### Changed
-
-- New type of controller
-
 ### Added
 
-- WatchTrials function
+- **Breaking** Introduce `Controller`, built for a given orchestrator endpoint it can be used to start and terminate trials. Previous ways of accessing the same such are discontinued.
+- Introduce the ability to listen for trial events (startup, ending, ...) using `Controller.watch_trials`.
 
 ## v1.0.0-alpha8 - 2021-02-26
 
