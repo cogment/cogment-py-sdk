@@ -40,6 +40,19 @@ class RecvAction:
         return result
 
 
+class RecvRewardSource:
+    def __init__(self, src):
+        self.value = src.value
+        self.confidence = src.confidence
+        self.sender_name = src.sender_name
+        self.user_data = src.user_data
+
+    def __str__(self):
+        result = f"RecvRewardSource: value = {self.value}, confidence = {self.confidence}"
+        result += f", sender name = {self.sender_name}, user data = {self.user_data}"
+        return result
+
+
 class RecvReward:
     def __init__(self, reward):
         self.tick_id = reward.tick_id
@@ -52,7 +65,7 @@ class RecvReward:
     def all_sources(self):
         assert self._sources
         for src in self._sources:
-            yield (src.value, src.confidence, src.sender_name, src.user_data)
+            yield RecvRewardSource(src)
 
     def __str__(self):
         result = f"RecvReward: tick_id = {self.tick_id}, value = {self.value}"

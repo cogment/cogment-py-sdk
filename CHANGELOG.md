@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- The value returned from a `RecvReward.all_source` is now a class `RecvRewardSource` instead of a tuple
+
 ## v1.0.0-alpha9 - 2021-03-10
 
 ### Added
