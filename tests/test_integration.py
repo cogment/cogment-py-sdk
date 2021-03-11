@@ -198,7 +198,7 @@ class TestIntegration:
         asyncio.create_task(state_tracking(controller))
         await asyncio.sleep(1)
 
-        controller_trial_id = await controller.start_trial(user_id = "int_test", trial_config=data_pb2.TrialConfig())
+        controller_trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig())
 
         await trial_ended
         logging.info("--State reported trial ended")
@@ -335,7 +335,7 @@ class TestIntegration:
         endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         controller = context.get_controller(endpoint=endp)
         logging.info("--starting trial--")
-        trial_id = await controller.start_trial(user_id = "int_test2", trial_config=data_pb2.TrialConfig())
+        trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig())
         logging.info("--trial started--")
         await asyncio.sleep(3)
         logging.info("--requesting trial termination--")

@@ -49,8 +49,9 @@ class TrialInfo:
 #   - Send messages?
 #   - Request to receive every message?
 class Controller:
-    def __init__(self, stub):
+    def __init__(self, stub, user_id):
         self._lifecycle_stub = stub
+        self._user_id = user_id
         self._actors = {}
 
     def get_actors(self, trial_id):
@@ -61,9 +62,9 @@ class Controller:
 
         return result
 
-    async def start_trial(self, user_id, trial_config=None):
+    async def start_trial(self, trial_config=None):
         req = orchestrator_api.TrialStartRequest()
-        req.user_id = user_id
+        req.user_id = self._user_id
         if trial_config is not None:
             req.config.content = trial_config.SerializeToString()
 

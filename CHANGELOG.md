@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - The value returned from a `RecvReward.all_source` is now a class `RecvRewardSource` instead of a tuple
+- Removed parameter `user_id` from `start_trial` (it was not necessary)
 
 ## v1.0.0-alpha9 - 2021-03-10
 

@@ -253,7 +253,7 @@ class Context:
 
         stub = grpc_api.TrialLifecycleStub(channel)
 
-        return Controller(stub)
+        return Controller(stub, self._user_id)
 
     async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls.get(impl_name)
