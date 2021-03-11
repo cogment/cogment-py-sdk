@@ -41,6 +41,16 @@ class TrialInfo:
         return result
 
 
+class ActorInfo:
+    def __init__(self, name, class_name):
+        self.actor_name = name
+        self.actor_class_name = class_name
+
+    def __str__(self):
+        result = f"ActorInfo: actor name = {self.actor_name}, actor class name = {self.actor_class_name}"
+        return result
+
+
 # Future functionality (as a non-participant):
 #   - Accept/refuse actor connections
 #   - Diconnect actors
@@ -58,7 +68,7 @@ class Controller:
         # Keeping actor lists leaks memory ...
         # TODO: Replace this function with an explicit request for actors of a trial_id (in the API)
         actor_list = self._actors.get(trial_id, [])
-        result = [SimpleNamespace(actor_name=actor.name, actor_class_name=actor.actor_class) for actor in actor_list]
+        result = [ActorInfo(actor.name, actor.actor_class) for actor in actor_list]
 
         return result
 
