@@ -17,6 +17,16 @@ from enum import Enum
 import logging
 
 
+class ActorInfo:
+    def __init__(self, name, class_name):
+        self.actor_name = name
+        self.actor_class_name = class_name
+
+    def __str__(self):
+        result = f"ActorInfo: actor name = {self.actor_name}, actor class name = {self.actor_class_name}"
+        return result
+
+
 class RecvObservation:
     def __init__(self, obs, snapshot):
         self.tick_id = obs.tick_id
@@ -114,17 +124,11 @@ class RecvEvent:
 
 
 class Session(ABC):
-    class ActiveActor:
-        def __init__(self, actor_name, actor_class_name):
-            self.actor_name = actor_name
-            self.actor_class_name = actor_class_name
-
     def __init__(self, trial):
         self._trial = trial
 
         # Pre-compute since it will be used regularly
-        self._active_actors = [self.ActiveActor(actor_name=actor.name, actor_class_name=actor.actor_class.name)
-                             for actor in trial.actors]
+        self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
 
     def get_trial_id(self):
         assert self._trial is not None

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
+from cogment.session import ActorInfo
 
 import grpc
 import grpc.experimental.aio
@@ -38,16 +39,6 @@ class TrialInfo:
 
     def __str__(self):
         result = f"TrialInfo: trial_id = {self.trial_id}, state = {self.state}"
-        return result
-
-
-class ActorInfo:
-    def __init__(self, name, class_name):
-        self.actor_name = name
-        self.actor_class_name = class_name
-
-    def __str__(self):
-        result = f"ActorInfo: actor name = {self.actor_name}, actor class name = {self.actor_class_name}"
         return result
 
 
