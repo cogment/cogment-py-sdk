@@ -75,20 +75,22 @@ class TestIntegration:
                 assert len(event.actions) == len(environment_session.get_active_actors())
                 environment_tick_count += 1
 
-                if environment_tick_count >= target_tick_count:
-                    environment_session.end([("*", data_pb2.Observation(observed_value=12))])
-                elif event.actions and environment_tick_count == 1:
+                if environment_tick_count == 1:
+                    logging.debug(f"--Sending message and rewards to Actors")
+
                     actors = environment_session.get_active_actors()
                     for actor in actors:
                         user_data = data_pb2.MyFeedbackUserData(a_bool=False, a_float=3.0)
                         environment_session.add_reward(21.0, 1.0, [actor.actor_name], user_data=user_data)
 
-                        mess = data_pb2.MyMessageUserData(a_string="A personal string", an_int=21)
-                        environment_session.send_message(mess, [actor.actor_name])
+                        msg = data_pb2.MyMessageUserData(a_string="A personal string", an_int=21)
+                        environment_session.send_message(msg, [actor.actor_name])
 
-                    mess = data_pb2.MyMessageUserData(a_string="An universal string", an_int=42)
-                    environment_session.send_message(mess, ["*"])
-                    environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
+                    msg = data_pb2.MyMessageUserData(a_string="An universal string", an_int=42)
+                    environment_session.send_message(msg, ["*"])
+
+                if environment_tick_count >= target_tick_count:
+                    environment_session.end([("*", data_pb2.Observation(observed_value=12))])
                 else:
                     environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
 
@@ -121,19 +123,23 @@ class TestIntegration:
 
             actor_session.start()
 
+            last_tick_id = 0
             async for event in actor_session.event_loop():
                 if event.observation:
                     assert event.observation.snapshot.observed_value == 12
+                    assert last_tick_id == event.observation.tick_id
+                    last_tick_id += 1
+
                     actor_session.do_action(data_pb2.Action(action_value=-1))
                     agent_observation_count += 1
 
                 for message in event.messages:
-                    mess = data_pb2.MyMessageUserData()
-                    mess.ParseFromString(message.payload.value)
+                    msg = data_pb2.MyMessageUserData()
+                    msg.ParseFromString(message.payload.value)
                     agent_message_count += 1
-                    if mess.an_int == 42:
+                    if msg.an_int == 42:
                         had_universal_message = True
-                    elif mess.an_int == 21:
+                    elif msg.an_int == 21:
                         had_personal_message = True
 
                 for reward in event.rewards:

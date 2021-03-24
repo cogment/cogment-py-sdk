@@ -102,6 +102,7 @@ async def write_actions(client_session):
             action_req = orchestrator_api.TrialActionRequest()
             if act is not None:
                 action_req.action.content = act.SerializeToString()
+                action_req.action.tick_id = -1
 
             yield action_req
 

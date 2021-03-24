@@ -46,7 +46,7 @@ def new_actions_table(settings, trial):
     return actions_by_actor_class, actions_by_actor_id
 
 
-def pack_observations(env_session, observations, reply, tick_id):
+def pack_observations(env_session, observations, reply, tick_id=-1):
     timestamp = int(time() * 1000000000)
 
     new_obs = [None] * len(env_session._trial.actors)
@@ -103,7 +103,7 @@ def _process_reply(observations, env_session):
 
     rep.rewards.extend(env_session._trial._gather_all_rewards())
     rep.messages.extend(env_session._trial._gather_all_messages(ENVIRONMENT_ACTOR_NAME))
-    pack_observations(env_session, observations, rep, env_session._trial.tick_id)
+    pack_observations(env_session, observations, rep)
 
     return rep
 
@@ -112,7 +112,6 @@ async def write_observations(context, env_session):
     try:
         while True:
             observations, final = await env_session._retrieve_obs()
-            env_session._trial.tick_id += 1
 
             reply = _process_reply(observations, env_session)
             reply.final_update = final
@@ -132,6 +131,8 @@ async def write_observations(context, env_session):
 
 
 def _process_actions(request, env_session):
+    env_session._trial.tick_id = request.action_set.tick_id
+
     len_actions = len(request.action_set.actions)
     len_actors = len(env_session._trial._actions_by_actor_id)
 
@@ -230,7 +231,7 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             self.trials_started.labels(impl_name).inc()
 
             trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
-            trial.tick_id = 0
+            trial.tick_id = request.tick_id
 
             # action table time
             actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_settings, trial)
@@ -256,7 +257,7 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
                 new_session._new_event(RecvEvent(EventType.FINAL))
 
             reply = env_api.EnvStartReply()
-            pack_observations(new_session, observations, reply, 0)
+            pack_observations(new_session, observations, reply)
 
             return reply
 

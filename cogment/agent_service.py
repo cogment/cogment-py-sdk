@@ -85,6 +85,7 @@ async def write_actions(context, agent_session):
 
             if act is not None:
                 reply.action.content = act.SerializeToString()
+                reply.action.tick_id = -1
 
             reply.rewards.extend(agent_session._trial._gather_all_rewards())
 
