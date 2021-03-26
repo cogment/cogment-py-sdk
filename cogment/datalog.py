@@ -21,49 +21,37 @@ from abc import ABC, abstractmethod
 class DatalogSession(ABC):
     """This represents a datalogger working locally."""
 
-    def __init__(self, impl, trial, trial_params):
-        self.trial_id = trial.id
+    def __init__(self, impl, trial_id, trial_params):
+        self.trial_id = trial_id
         self.trial_params = trial_params
 
-        self.on_sample = None
-        self.on_trial_over = None
-
-        self._started = False
         self._task = None
-
         self.__impl = impl
-        self.__sample_future = None
+        self.__queue = None
 
     def start(self):
-        self._started = True
-
-    async def _end(self):
-        if self.on_trial_over is not None:
-            self.on_trial_over()
-        self.__sample_future = None
-
-    async def get_sample(self):
-        assert self.on_sample is None
-
-        self.__sample_future = asyncio.get_running_loop().create_future()
-        return await self.__sample_future
+        self.__queue = asyncio.Queue()
 
     async def get_all_samples(self):
-        while True:
-            sample = await self.get_sample()
-            if sample is None:
-                break
-            yield sample
+        if self.__queue is not None:
+            while True:
+                try:
+                    sample = await self.__queue.get()
+                    if sample is None:
+                        break
+                    yield sample
+
+                    self.__queue.task_done()
+
+                except asyncio.CancelledError:
+                    logging.debug("Datalog coroutine cancelled while waiting for a sample.")
+                    break
 
     def _new_sample(self, sample):
-        if self.on_sample is not None:
-            self.on_sample(sample)
-            self.__sample_future = None
-        elif self.__sample_future is not None:
-            self.__sample_future.set_result(sample)
-            self.__sample_future = None
+        if self.__queue is not None:
+            self.__queue.put_nowait(sample)
         else:
-            logging.warning("A sample was missed")
+            logging.warning("Datalog received a sample that it was unable to handle.")
 
     async def _run(self):
         try:
@@ -74,5 +62,5 @@ class DatalogSession(ABC):
 
 
 class _ServedDatalogSession(DatalogSession):
-    def __init__(self, impl, trial, trial_params):
-        super().__init__(impl, trial, trial_params)
+    def __init__(self, impl, trial_id, trial_params):
+        super().__init__(impl, trial_id, trial_params)

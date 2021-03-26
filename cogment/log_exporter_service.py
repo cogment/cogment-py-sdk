@@ -21,6 +21,33 @@ import logging
 import traceback
 import asyncio
 
+import grpc.experimental.aio
+
+
+async def read_sample(context, session):
+    try:
+        while True:
+            request = await context.read()
+
+            if request == grpc.experimental.aio.EOF:
+                logging.info(f"The orchestrator disconnected from LogExpoterService.")
+                break
+
+            elif request.HasField("sample"):
+                session._new_sample(request.sample)
+            else:
+                logging.warning(f"Invalid request received from the orchestrator : {request}")
+
+    except asyncio.CancelledError:
+        logging.debug(f"LogExporterService 'read_sample' coroutine cancelled.")
+
+    except Exception:
+        logging.error(f"{traceback.format_exc()}")
+        raise
+
+    # Exit the loop
+    session._new_sample(None)
+
 
 class LogExporterService(grpc_api.LogExporterServicer):
 
@@ -34,31 +61,30 @@ class LogExporterService(grpc_api.LogExporterServicer):
             metadata = dict(context.invocation_metadata())
             trial_id = metadata["trial-id"]
 
-            trial = Trial(trial_id, [], self.__cog_settings)
+            request = await context.read()
 
-            msg = await request_iterator.__anext__()
-            assert msg.HasField("trial_params")
-            trial_params = raw_params_to_user_params(msg.trial_params, self.__cog_settings)
+            if not request.HasField("trial_params"):
+                raise Exception(f"Initial logging request for [{trial_id}] does not contain parameters.")
 
-            session = _ServedDatalogSession(self.__impl, trial, trial_params)
-            loop = asyncio.get_running_loop()
-            session._task = loop.create_task(session._run())
+            trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
 
-            # TODO: Wait for session._started
-            async for msg in request_iterator:
-                if session._task.done():
-                    break
-                assert msg.HasField("sample")
-                session._new_sample(msg.sample)
+            session = _ServedDatalogSession(self.__impl, trial_id, trial_params)
+            session._task = asyncio.create_task(session._run())
 
-            if not session._task.done():
-                session._end()
+            reader_task = asyncio.create_task(read_sample(context, session))
 
-            return datalog_api.LogExporterSampleReply()
+            # TODO: It is required to bypass a probable bug in easy_grpc that expects a stream to be "used".
+            reply = datalog_api.LogExporterSampleReply()
+            await context.write(reply)
+
+            await session._task
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")
             raise
+        finally:
+            if reader_task is not None:
+                reader_task.cancel()
 
     async def Version(self, request, context):
         try:
