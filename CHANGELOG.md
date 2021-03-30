@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+- Technical release, updating dependencies to fixed versions.
+
 ## v1.0.0-alpha10 - 2021-03-30
 
 ### Added
 
-- Log exporter is now avaialble: trials param, observations, rewards, messages of every trials are sent to the log exporter service.
+- Log exporter is now available: trials param, observations, rewards, messages of every trials are sent to the log exporter service.
 
 ### Changed
 
