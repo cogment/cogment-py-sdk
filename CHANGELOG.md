@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Fixed
+
+- Remove unused `feedback_space` parameters from `ActorClass`.
+
 ## v1.0.0-alpha11 - 2021-03-30
 
 - Technical release, updating dependencies to fixed versions.
