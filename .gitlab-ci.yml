@@ -64,8 +64,19 @@ publish_to_pypi:
   extends: .base_poetry
   stage: publish
   script:
+    - poetry build -f sdist
     - poetry publish -u $PYPI_USERNAME -p $PYPI_PASSWORD
   only:
     - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(?:-[[:alnum:]]+)?$/
 
+publish_to_gitlab:
+  extends: .base_poetry
+  stage: publish
+  script:
+    - poetry config repositories.private https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/packages/pypi 
+    - poetry version $(poetry version --short)+${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}
+    - poetry build -f sdist
+    - poetry publish --repository private -u gitlab-ci-token -p $CI_JOB_TOKEN
+  only:
+    - develop
 
