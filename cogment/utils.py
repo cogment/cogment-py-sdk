@@ -104,7 +104,7 @@ class DecodeData():
         self.last_obs = []
 
         actor_classes_list = [
-            actor.id for actor in self.__cog_settings.actor_classes]
+            actor.name for actor in self.__cog_settings.actor_classes]
         trial_actor_list = [actor.actor_class for actor in trial_params.actors]
         self.actor_counts = [0] * len(actor_classes_list)
         for index, actor_class in enumerate(actor_classes_list):

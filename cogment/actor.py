@@ -25,14 +25,14 @@ import cogment.api.common_pb2 as common_api
 class ActorClass:
     def __init__(
         self,
-        id,
+        name,
         config_type,
         action_space,
         observation_space,
         observation_delta,
         observation_delta_apply_fn,
     ):
-        self.name = id
+        self.name = name
         self.config_type = config_type
         self.action_space = action_space
         self.observation_space = observation_space

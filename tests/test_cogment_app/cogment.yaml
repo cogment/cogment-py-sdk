@@ -12,12 +12,12 @@ trial:
 
 # Static configuration
 actor_classes:
-  - id: my_actor_class_1
+  - name: my_actor_class_1
     action:
       space: test_cogment_app.Action
     observation:
       space: test_cogment_app.Observation
-  - id: my_actor_class_2
+  - name: my_actor_class_2
     action:
       space: test_cogment_app.Action
     observation:

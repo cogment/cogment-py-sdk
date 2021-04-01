@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- ActorClass id is now name
+
 ### Fixed
 
 - Remove unused `feedback_space` parameters from `ActorClass`.
