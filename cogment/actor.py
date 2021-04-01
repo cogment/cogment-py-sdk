@@ -15,7 +15,6 @@
 import asyncio
 import importlib
 import logging
-import traceback
 from abc import ABC
 from cogment.session import Session, EventType
 
@@ -65,86 +64,29 @@ class ActorSession(Session):
     """This represents an actor being performed locally."""
 
     def __init__(self, impl, actor_class, trial, name, impl_name, config):
-        super().__init__(trial)
+        super().__init__(trial, name, impl, impl_name)
         self.class_name = actor_class.name
-        self.name = name
-        self.impl_name = impl_name
         self.config = config
 
         self._actor_class = actor_class
-        self._ended = False
         self._action_queue = asyncio.Queue()
-        self._task = None  # Task used to call _run()
         self._latest_observation = None
-        self._last_event_received = False
 
-        self.__impl = impl
-        self.__started = False
-        self.__event_queue = None
         self.__obs_future = None
 
     def start(self):
-        assert not self.__started
-        assert not self._ended
-
-        self.__event_queue = asyncio.Queue()
-        self.__started = True
-
-    async def event_loop(self):
-        assert self.__started
-        assert not self._ended
-
-        loop_active = not self._last_event_received
-        while loop_active:
-            try:
-                event = await self.__event_queue.get()
-
-            except asyncio.CancelledError as exc:
-                logging.debug(f"Coroutine for actor [{self.name}] cancelled while waiting for an event")
-                break
-
-            self._last_event_received = (event.type == EventType.FINAL)
-            keep_looping = yield event
-            self.__event_queue.task_done()
-            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
-            if not loop_active:
-                if self._last_event_received:
-                    self._ended = True
-                    logging.debug(f"Last event received, exiting event loop for actor [{self.name}]")
-                else:
-                    logging.debug(f"End of event loop for actor [{self.name}] requested by user")
-
-        logging.debug(f"Exiting actor [{self.name}] event loop generator")
+        self._start()
 
     def do_action(self, action):
-        assert self.__started
+        if self._event_queue is None:
+            logging.warning(f"Cannot send action until actor [{self.name}] is started.")
+            return
         self._action_queue.put_nowait(action)
 
     async def _retrieve_action(self):
         action = await self._action_queue.get()
         self._action_queue.task_done()
         return action
-
-    def _new_event(self, event):
-        if not self.__started or self._ended:
-            return
-
-        if self.__event_queue:
-            self.__event_queue.put_nowait(event)
-        else:
-            logging.warning(f"Actor [{self.name}] received an event that it was unable to handle.")
-
-    async def _run(self):
-        try:
-            await self.__impl(self)
-
-        except asyncio.CancelledError:
-            logging.debug(f"Actor [{self.name}] implementation coroutine cancelled")
-
-        except Exception:
-            logging.error(f"An exception occured in user actor implementation [{self.impl_name}]:\n"
-                          f"{traceback.format_exc()}")
-            raise
 
 
 class _ServedActorSession(ActorSession):

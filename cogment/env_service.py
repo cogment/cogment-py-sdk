@@ -287,11 +287,11 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
 
             self.update_count_per_trial.labels(env_session.impl_name).observe(env_session._trial.tick_id)
 
-            if env_session._ended:
+            if env_session.is_trial_over():
                 logging.debug(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}] returned")
             else:
-                logging.error(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
-                                f" running trial [{trial_id}] returned before end")
+                logging.info(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
+                             f" running trial [{trial_id}] returned before end of trial")
 
             self.__env_sessions.pop(key, None)
             self.trials_ended.labels(env_session.impl_name).inc()
@@ -348,6 +348,7 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             reply.final_update = True
 
             self.__env_sessions.pop(key, None)
+            self.trials_ended.labels(env_session.impl_name).inc()
 
             return reply
 

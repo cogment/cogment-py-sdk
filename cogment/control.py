@@ -55,6 +55,9 @@ class Controller:
         self._user_id = user_id
         self._actors = {}
 
+        # TODO: This should be removed once we have a stable release
+        logging.basicConfig(level=logging.DEBUG)
+
     def get_actors(self, trial_id):
         # Keeping actor lists leaks memory ...
         # TODO: Replace this function with an explicit request for actors of a trial_id (in the API)

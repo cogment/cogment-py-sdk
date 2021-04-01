@@ -15,7 +15,6 @@
 import asyncio
 import importlib
 import logging
-import traceback
 from cogment.session import Session, EventType
 from abc import ABC
 
@@ -26,67 +25,34 @@ class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 
     def __init__(self, impl, trial, impl_name, config):
-        super().__init__(trial)
-        self.impl_name = impl_name
+        super().__init__(trial, "environment", impl, impl_name)
         self.config = config
-
-        self._ended = False
         self._obs_queue = asyncio.Queue()
-        self._last_event_received = False
-        self._task = None  # Task used to call _run()
-
-        self.__impl = impl
-        self.__started = False
-        self.__event_queue = None
         self.__final_obs_future = None
 
     def start(self, observations):
-        assert not self.__started
-        assert not self._ended
-
-        self.__event_queue = asyncio.Queue()
-        self.__started = True
-
+        self._start()
         self._obs_queue.put_nowait((observations, False))
 
-    async def event_loop(self):
-        assert self.__started
-        assert not self._ended
-
-        loop_active = not self._last_event_received
-        while loop_active:
-            try:
-                event = await self.__event_queue.get()
-
-            except asyncio.CancelledError:
-                logging.debug("Coroutine cancelled while waiting for an event")
-                break
-
-            self._last_event_received = (event.type == EventType.FINAL)
-            keep_looping = yield event
-            self.__event_queue.task_done()
-            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_received
-            if not loop_active:
-                if self._last_event_received:
-                    self._ended = True
-                    logging.debug(f"Last event received, exiting environment event loop")
-                else:
-                    logging.debug(f"End of event loop for environment requested by user")
-
-        logging.debug(f"Exiting environment event loop generator")
-
     def produce_observations(self, observations):
-        assert self.__started
+        if self._event_queue is None:
+            logging.warning("Cannot send observations until the environment is started.")
+            return
+
         if self.__final_obs_future is not None:
             self.__final_obs_future.set_result(observations)
-        elif not self._ended:
+        elif not self.is_trial_over():
             self._obs_queue.put_nowait((observations, False))
+        else:
+            logging.warning("Cannot send observation because the trial has ended.")
 
     def end(self, observations):
         if self.__final_obs_future is not None:
             self.__final_obs_future.set_result(observations)
-        elif not self._ended:
+        elif not self.is_trial_over():
             self._obs_queue.put_nowait((observations, True))
+        else:
+            logging.warning("Cannot end the environment because the trial has already ended.")
 
     async def _retrieve_obs(self):
         obs = await self._obs_queue.get()
@@ -96,44 +62,20 @@ class EnvironmentSession(Session):
     async def _end_request(self, event):
         logging.debug("Environment received an end request")
 
-        if self._ended:
+        if self.is_trial_over():
             return None
-        self._ended = True
-        if not self.__started:
+        if self._event_queue is None:
+            logging.warning("The environment received an end request before it was started.")
             return None
 
-        result = None
-        if self.__event_queue:
-            self.__final_obs_future = asyncio.get_running_loop().create_future()
+        self.__final_obs_future = asyncio.get_running_loop().create_future()
 
-            await self.__event_queue.put(event)
+        await self._event_queue.put(event)
 
-            result = await self.__final_obs_future
-            self.__final_obs_future = None
-        else:
-            logging.warning("The environment received an end request that it was unable to handle.")
+        result = await self.__final_obs_future
+        self.__final_obs_future = None
 
         return result
-
-    def _new_event(self, event):
-        if not self.__started or self._ended:
-            return
-
-        if self.__event_queue:
-            self.__event_queue.put_nowait(event)
-        else:
-            logging.warning("The environment received an event that it was unable to handle.")
-
-    async def _run(self):
-        try:
-            await self.__impl(self)
-
-        except asyncio.CancelledError:
-            logging.debug("Environment implementation coroutine cancelled")
-
-        except Exception:
-            logging.error(f"An exception occured in user environment implementation:\n{traceback.format_exc()}")
-            raise
 
 
 class _ServedEnvironmentSession(EnvironmentSession):

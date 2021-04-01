@@ -29,6 +29,8 @@ import logging
 import traceback
 
 
+# TODO: The processing of the period data is nearly identical here and in AgentServicer.OnEnd
+#       we should make a function to remove duplication
 async def read_observations(client_session, reply_itor):
     try:
         async for reply in reply_itor:

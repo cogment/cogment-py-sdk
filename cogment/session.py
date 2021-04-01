@@ -15,6 +15,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import logging
+import traceback
+import asyncio
 
 
 class ActorInfo:
@@ -124,11 +126,81 @@ class RecvEvent:
 
 
 class Session(ABC):
-    def __init__(self, trial):
+    def __init__(self, trial, name, impl, impl_name):
         self._trial = trial
+        self.name = name
+        self.impl_name = impl_name
+        self._impl = impl
+        self._event_queue = None  # Also used to know if we started
+        self._last_event_delivered = False
+        self._last_event_received = False
+        self._task = None  # Task used to call _run()
 
         # Pre-compute since it will be used regularly
         self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
+
+    def _start(self):
+        if self._event_queue is not None:
+            logging.warning(f"Cannot start [{self.name}] more than once.")
+            return
+        if self._trial.over:
+            logging.warning(f"Cannot start [{self.name}] because the trial has ended.")
+            return
+
+        self._event_queue = asyncio.Queue()
+
+    async def _run(self):
+        try:
+            await self._impl(self)
+
+        except asyncio.CancelledError:
+            logging.debug(f"[{self.name}] implementation coroutine cancelled")
+
+        except Exception:
+            logging.error(f"An exception occured in user implementation of [{self.name}]:\n{traceback.format_exc()}")
+            raise
+
+    def _new_event(self, event):
+        if self._event_queue is None:
+            logging.warning(f"[{self.name}] received an event before session was started.")
+            return
+        if self._last_event_received:
+            logging.debug(f"Event received after final event: [{event}]")
+            return
+
+        if event is not None and event.type == EventType.FINAL:
+            self._last_event_received = True
+
+        self._event_queue.put_nowait(event)
+
+    async def event_loop(self):
+        if self._event_queue is None:
+            logging.warning(f"Event loop is not enabled until the [{self.name}] is started.")
+            return
+        if self._trial.over:
+            logging.info(f"No more events for [{self.name}] because the trial has ended.")
+            return
+
+        loop_active = not self._last_event_delivered
+        while loop_active:
+            try:
+                event = await self._event_queue.get()
+
+            except asyncio.CancelledError:
+                logging.debug(f"[{self.name}] coroutine cancelled while waiting for an event")
+                break
+
+            self._last_event_delivered = (event.type == EventType.FINAL)
+            keep_looping = yield event
+            self._event_queue.task_done()
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
+            if not loop_active:
+                if self._last_event_delivered:
+                    logging.debug(f"Last event delivered, exiting [{self.name}] event loop")
+                else:
+                    logging.debug(f"End of event loop for [{self.name}] requested by user")
+
+        logging.debug(f"Exiting [{self.name}] event loop generator")
 
     def get_trial_id(self):
         assert self._trial is not None
