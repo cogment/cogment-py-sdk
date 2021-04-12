@@ -66,18 +66,11 @@ async def read_observations(client_session, reply_itor):
             if ordered_ticks:
                 client_session._trial.tick_id = ordered_ticks[-1]
 
-            if not reply.final_data:
-                for tick_id in ordered_ticks:
-                    client_session._new_event(events[tick_id])
-            else:
-                evt = RecvEvent(EventType.FINAL)
-                for tick_id in ordered_ticks:
-                    evt = events.pop(tick_id)
-                    if events:  # Last event is handled after the loop
-                        client_session._new_event(evt)
+            for tick_id in ordered_ticks:
+                client_session._new_event(events[tick_id])
 
-                evt.type = EventType.FINAL
-                client_session._new_event(evt)
+            if reply.final_data:
+                client_session._new_event(RecvEvent(EventType.FINAL))
                 break
 
     except asyncio.CancelledError:
@@ -102,9 +95,9 @@ async def write_actions(client_session):
             act = await client_session._retrieve_action()
 
             action_req = orchestrator_api.TrialActionRequest()
+            action_req.action.tick_id = -1
             if act is not None:
                 action_req.action.content = act.SerializeToString()
-                action_req.action.tick_id = -1
 
             yield action_req
 

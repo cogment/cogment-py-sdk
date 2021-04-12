@@ -135,6 +135,16 @@ class Context:
         self._prometheus_registry = CollectorRegistry()
         self.__cog_settings = cog_settings
 
+        # Make sure we are running in a asyncio.Task.  Even if technically this init does not need
+        # to be in a Task, the whole of the SDK expects to be running in Tasks of the same event loop.
+        no_asyncio = False
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            no_asyncio = True
+        if no_asyncio:
+            raise RuntimeError("The Cogment SDK requires running in a Python.asyncio Task (e.g. `asyncio.run(Main())`)")
+
     def register_actor(self,
                        impl: Callable[[ActorSession], Awaitable[None]],
                        impl_name: str,
@@ -167,10 +177,8 @@ class Context:
 
         self.__datalog_impl = impl
 
-    async def serve_all_registered(self,
-                                   served_endpoint: ServedEndpoint,
+    async def serve_all_registered(self, served_endpoint: ServedEndpoint,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
-
         if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
             self._grpc_server = grpc.experimental.aio.server()
 

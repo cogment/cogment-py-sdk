@@ -82,10 +82,10 @@ async def write_actions(context, agent_session):
         while True:
             act = await agent_session._retrieve_action()
             reply = agent_api.AgentActionReply()
+            reply.action.tick_id = -1
 
             if act is not None:
                 reply.action.content = act.SerializeToString()
-                reply.action.tick_id = -1
 
             reply.rewards.extend(agent_session._trial._gather_all_rewards())
 
@@ -243,22 +243,18 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     evt = events.setdefault(msg.tick_id, RecvEvent(EventType.ENDING))
                     evt.messages.append(RecvMessage(msg))
 
-                if not events:
-                    agent_session._new_event(RecvEvent(EventType.FINAL))
-                else:
+                if events:
                     ordered_ticks = sorted(events)
                     agent_session._trial.tick_id = ordered_ticks[-1]
 
                     for tick_id in ordered_ticks:
                         evt = events.pop(tick_id)
-                        if not events:
-                            evt.type = EventType.FINAL
                         agent_session._new_event(evt)
 
-                self.actors_ended.labels(agent_session.impl_name).inc()
-
                 del self.__agent_sessions[key]
+                agent_session._new_event(RecvEvent(EventType.FINAL))
 
+                self.actors_ended.labels(agent_session.impl_name).inc()
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for end-of-trial")
 
@@ -288,7 +284,7 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     logging.debug(f"User agent implementation for [{agent_session.name}] returned")
 
                     if key in self.__agent_sessions:
-                        logging.error(f"User agent implementation for [{agent_session.name}] ended before required")
+                        logging.warning(f"User agent implementation for [{agent_session.name}] ended before required")
                         del self.__agent_sessions[key]
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for observation")
@@ -316,7 +312,8 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
             key = _trial_key(trial_id, actor_name)
             agent_session = self.__agent_sessions.get(key)
             if agent_session is None:
-                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for reward")
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for reward."
+                               " Was the user agent terminated before required?")
                 return agent_api.AgentRewardReply()
 
             recv_event = RecvEvent(EventType.ACTIVE)
@@ -352,7 +349,8 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     agent_session._new_event(recv_event)
                     self.messages_received.labels(agent_session.name, agent_session.impl_name).inc()
             else:
-                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for message")
+                logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for message."
+                               " Was the user agent terminated before required?")
 
             return agent_api.AgentMessageReply()
 

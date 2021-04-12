@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Add a bit of code to make sure we are running in an asyncio task
+- `EventType.FINAL` events do not contain data anymore
+- Fix when replies are `None`
+
 ## v1.0.0-beta1 - 2021-04-07
 
 - Initial beta release, no more breaking changes should be introduced.
