@@ -21,9 +21,10 @@ from abc import ABC, abstractmethod
 class DatalogSession(ABC):
     """This represents a datalogger working locally."""
 
-    def __init__(self, impl, trial_id, trial_params):
+    def __init__(self, impl, trial_id, trial_params, raw_trial_params):
         self.trial_id = trial_id
         self.trial_params = trial_params
+        self.raw_trial_params = raw_trial_params
 
         self._task = None
         self.__impl = impl
@@ -62,5 +63,5 @@ class DatalogSession(ABC):
 
 
 class _ServedDatalogSession(DatalogSession):
-    def __init__(self, impl, trial_id, trial_params):
-        super().__init__(impl, trial_id, trial_params)
+    def __init__(self, impl, trial_id, trial_params, raw_trial_params):
+        super().__init__(impl, trial_id, trial_params, raw_trial_params)

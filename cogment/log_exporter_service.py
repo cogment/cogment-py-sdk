@@ -67,8 +67,9 @@ class LogExporterService(grpc_api.LogExporterServicer):
                 raise Exception(f"Initial logging request for [{trial_id}] does not contain parameters.")
 
             trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
+            raw_trial_params = request.trial_params
 
-            session = _ServedDatalogSession(self.__impl, trial_id, trial_params)
+            session = _ServedDatalogSession(self.__impl, trial_id, trial_params, raw_trial_params)
             session._task = asyncio.create_task(session._run())
 
             reader_task = asyncio.create_task(read_sample(context, session))
