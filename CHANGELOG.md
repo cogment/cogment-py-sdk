@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add a bit of code to make sure we are running in an asyncio task
 - `EventType.FINAL` events do not contain data anymore
 - Fix when replies are `None`
+- Add raw_trial_params in the datalog session
 
 ## v1.0.0-beta1 - 2021-04-07
 
