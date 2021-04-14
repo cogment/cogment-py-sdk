@@ -113,28 +113,28 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
         self.decide_request_time = Summary(
             "actor_decide_processing_seconds",
             "Time spent by an actor on the decide function",
-            ["name", "actor_class"],
+            ["name", "impl_name"],
             registry=prometheus_registry
         )
         self.actors_started = Counter(
-            "actor_started", "Number of actors created", ["actor_class"],
+            "actor_started", "Number of actors created", ["impl_name"],
             registry=prometheus_registry
         )
 
         self.actors_ended = Counter(
-            "actor_ended", "Number of actors ended", ["actor_class"],
+            "actor_ended", "Number of actors ended", ["impl_name"],
             registry=prometheus_registry
         )
         self.messages_received = Counter(
-            "actor_received_messages", "Number of messages received", ["name", "actor_class"],
+            "actor_received_messages", "Number of messages received", ["name", "impl_name"],
             registry=prometheus_registry
         )
         self.rewards_received = Gauge(
-            "actor_reward_summation", "Cumulative rewards received", ["name", "actor_class"],
+            "actor_reward_summation", "Cumulative rewards received", ["name", "impl_name"],
             registry=prometheus_registry
         )
         self.rewards_counter = Counter(
-            "actor_rewards_count", "Number of rewards received", ["name", "actor_class"],
+            "actor_rewards_count", "Number of rewards received", ["name", "impl_name"],
             registry=prometheus_registry
         )
 

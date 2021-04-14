@@ -226,7 +226,7 @@ class TestIntegration:
 
         index = promethus_data.find("actor_decide_processing_seconds_count")
         assert index != -1
-        index = promethus_data.find("actor_class=\"test\"")
+        index = promethus_data.find("impl_name=\"test\"")
         assert index != -1
         index = promethus_data.find("name=\"actor_1\"")
         assert index != -1

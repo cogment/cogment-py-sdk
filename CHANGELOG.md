@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fix when replies are `None`
 - Add raw_trial_params in the datalog session
 
+### Fixed
+
+- actor implementations metrics are now reported under `impl_name`
+
 ## v1.0.0-beta1 - 2021-04-07
 
 - Initial beta release, no more breaking changes should be introduced.
