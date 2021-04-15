@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-beta2 - 2021-04-15
+
 ### Changed
 
 - Add a bit of code to make sure we are running in an asyncio task
