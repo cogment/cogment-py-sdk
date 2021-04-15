@@ -38,10 +38,10 @@ integration_test:
   extends: .base_docker
   stage: test
   variables:
-    #COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0-beta1"
-    #COGMENT_IMAGE: "cogment/cli:v1.0.0-alpha10"
-    COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
-    COGMENT_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-cli:latest
+    COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0-beta2"
+    COGMENT_IMAGE: "cogment/cli:v1.0.0-beta1"
+    #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
+    #COGMENT_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-cli:latest
   script:
     - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" --build-arg COGMENT_IMAGE="$COGMENT_IMAGE" -f integration_test.dockerfile .
     - docker run --rm  --volume $(pwd):/output  cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
