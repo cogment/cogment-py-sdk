@@ -12,24 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.session import ActorInfo
 
 import grpc
 import grpc.experimental.aio
-from types import SimpleNamespace
 from enum import Enum
 import logging
 import traceback
 
 
 class TrialState(Enum):
-    UNKNOWN = orchestrator_api.TrialState.UNKNOWN
-    INITIALIZING = orchestrator_api.TrialState.INITIALIZING
-    PENDING = orchestrator_api.TrialState.PENDING
-    RUNNING = orchestrator_api.TrialState.RUNNING
-    TERMINATING = orchestrator_api.TrialState.TERMINATING
-    ENDED = orchestrator_api.TrialState.ENDED
+    UNKNOWN = common_api.TrialState.UNKNOWN
+    INITIALIZING = common_api.TrialState.INITIALIZING
+    PENDING = common_api.TrialState.PENDING
+    RUNNING = common_api.TrialState.RUNNING
+    TERMINATING = common_api.TrialState.TERMINATING
+    ENDED = common_api.TrialState.ENDED
 
 
 class TrialInfo:
