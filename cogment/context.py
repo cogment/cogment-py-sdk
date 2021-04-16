@@ -125,7 +125,7 @@ class ServedEndpoint:
 
 
 class Context:
-    def __init__(self, user_id: str, cog_settings: ModuleType):
+    def __init__(self, user_id: str, cog_settings: ModuleType, asyncio_loop=None):
         self._user_id = user_id
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
@@ -135,15 +135,17 @@ class Context:
         self._prometheus_registry = CollectorRegistry()
         self.__cog_settings = cog_settings
 
-        # Make sure we are running in a asyncio.Task.  Even if technically this init does not need
-        # to be in a Task, the whole of the SDK expects to be running in Tasks of the same event loop.
-        no_asyncio = False
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            no_asyncio = True
-        if no_asyncio:
-            raise RuntimeError("The Cogment SDK requires running in a Python.asyncio Task (e.g. `asyncio.run(Main())`)")
+        if asyncio_loop is None:
+            # Make sure we are running in a asyncio.Task.  Even if technically this init does not need
+            # to be in a Task, the whole of the SDK expects to be running in Tasks of the same event loop.
+            try:
+                self.asyncio_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            if self.asyncio_loop is None:
+                raise RuntimeError("The Cogment SDK requires running in a Python.asyncio Task")
+        else:
+            self.asyncio_loop = asyncio_loop
 
     def register_actor(self,
                        impl: Callable[[ActorSession], Awaitable[None]],
@@ -152,9 +154,9 @@ class Context:
         assert impl_name not in self.__actor_impls
         assert self._grpc_server is None
 
-        self.__actor_impls[impl_name] = SimpleNamespace(
-            impl=impl, actor_classes=actor_classes
-        )
+        # TODO: Add test to make sure that if actor is added when _grps_server is not None, then
+        # it is a client actor (i.e. only client actors can be started after `serve_all_registered` was called)
+        self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, actor_classes=actor_classes)
 
     def register_environment(self,
                              impl: Callable[[EnvironmentSession], Awaitable[None]],
@@ -179,68 +181,75 @@ class Context:
 
     async def serve_all_registered(self, served_endpoint: ServedEndpoint,
                                    prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
-        if self.__actor_impls or self.__env_impls or self.__prehook_impls or self.__datalog_impl is not None:
-            self._grpc_server = grpc.experimental.aio.server()
+        if (len(self.__actor_impls) == 0 and
+                len(self.__env_impls) == 0 and
+                len(self.__prehook_impls) == 0 and
+                self.__datalog_impl is None):
+            raise RuntimeError("Nothing registered to serve!")
+        if self._grpc_server is not None:
+            raise RuntimeError("Cannot serve the same components twice")
 
-            service_names: List[str] = []
-            if self.__actor_impls:
-                _add_actor_service(
-                    self._grpc_server,
-                    self.__actor_impls,
-                    service_names,
-                    self.__cog_settings,
-                    self._prometheus_registry
-                )
+        self._grpc_server = grpc.experimental.aio.server()
 
-            if self.__env_impls:
-                _add_env_service(
-                    self._grpc_server,
-                    self.__env_impls,
-                    self.__cog_settings,
-                    self._prometheus_registry
-                )
+        service_names: List[str] = []
+        if self.__actor_impls:
+            _add_actor_service(
+                self._grpc_server,
+                self.__actor_impls,
+                service_names,
+                self.__cog_settings,
+                self._prometheus_registry
+            )
 
-            if self.__prehook_impls:
-                _add_prehook_service(
-                    self._grpc_server,
-                    self.__prehook_impls,
-                    self.__cog_settings,
-                    self._prometheus_registry
-                )
+        if self.__env_impls:
+            _add_env_service(
+                self._grpc_server,
+                self.__env_impls,
+                self.__cog_settings,
+                self._prometheus_registry
+            )
 
-            if self.__datalog_impl is not None:
-                _add_datalog_service(
-                    self._grpc_server,
-                    self.__datalog_impl,
-                    self.__cog_settings
-                )
+        if self.__prehook_impls:
+            _add_prehook_service(
+                self._grpc_server,
+                self.__prehook_impls,
+                self.__cog_settings,
+                self._prometheus_registry
+            )
 
-            start_http_server(prometheus_port, "", self._prometheus_registry)
+        if self.__datalog_impl is not None:
+            _add_datalog_service(
+                self._grpc_server,
+                self.__datalog_impl,
+                self.__cog_settings
+            )
 
-            address = f"[::]:{served_endpoint.port}"
-            if served_endpoint.private_key_certificate_chain_pairs is None:
-                self._grpc_server.add_insecure_port(address)
+        start_http_server(prometheus_port, "", self._prometheus_registry)
+
+        address = f"[::]:{served_endpoint.port}"
+        if served_endpoint.private_key_certificate_chain_pairs is None:
+            self._grpc_server.add_insecure_port(address)
+        else:
+            if served_endpoint.root_certificates:
+                require_client_auth = True
+                root = bytes(served_endpoint.root_certificates, "utf-8")
             else:
-                if served_endpoint.root_certificates:
-                    require_client_auth = True
-                    root = bytes(served_endpoint.root_certificates, "utf-8")
-                else:
-                    require_client_auth = False
-                    root = None
-                certs = []
-                for (key, chain) in served_endpoint.private_key_certificate_chain_pairs:
-                    certs.append((bytes(key, "utf-8"), bytes(chain, "utf-8")))
-                if not certs:
-                    certs = None
+                require_client_auth = False
+                root = None
+            certs = []
+            for (key, chain) in served_endpoint.private_key_certificate_chain_pairs:
+                certs.append((bytes(key, "utf-8"), bytes(chain, "utf-8")))
+            if not certs:
+                certs = None
 
-                creds = grpc.ssl_server_credentials(certs, root, require_client_auth)
-                self._grpc_server.add_secure_port(address, creds)
+            creds = grpc.ssl_server_credentials(certs, root, require_client_auth)
+            self._grpc_server.add_secure_port(address, creds)
 
-            await self._grpc_server.start()
-            await self._grpc_server.wait_for_termination()
-            logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
+        await self._grpc_server.start()
+        await self._grpc_server.wait_for_termination()
+        logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
 
-    def get_controller(self, endpoint: Endpoint):
+    def _get_control_stub(self, endpoint):
         if endpoint.private_key is None:
             channel = grpc.experimental.aio.insecure_channel(endpoint.url)
         else:
@@ -259,8 +268,10 @@ class Context:
             creds = grpc.ssl_channel_credentials(root, key, certs)
             channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
 
-        stub = grpc_api.TrialLifecycleStub(channel)
+        return grpc_api.TrialLifecycleStub(channel)
 
+    def get_controller(self, endpoint: Endpoint):
+        stub = self._get_control_stub(endpoint)
         return Controller(stub, self._user_id)
 
     async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
