@@ -16,6 +16,7 @@ import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.session import ActorInfo
 
+import asyncio
 import grpc
 import grpc.experimental.aio
 from enum import Enum
@@ -36,34 +37,31 @@ class TrialInfo:
     def __init__(self, trial_id):
         self.trial_id = trial_id
         self.state = TrialState.UNKNOWN
+        self.tick_id = None
+        self.duration = None
 
     def __str__(self):
         result = f"TrialInfo: trial_id = {self.trial_id}, state = {self.state}"
+        result += f", tick_id = {self.tick_id}, duration = {self.duration}"
         return result
 
 
-# Future functionality (as a non-participant):
-#   - Accept/refuse actor connections
-#   - Diconnect actors
-#   - Request tick updates?
-#   - Request any observation?
-#   - Send messages?
-#   - Request to receive every message?
 class Controller:
     def __init__(self, stub, user_id):
         self._lifecycle_stub = stub
         self._user_id = user_id
-        self._actors = {}
 
         # TODO: This should be removed once we have a stable release
         logging.basicConfig(level=logging.DEBUG)
 
-    def get_actors(self, trial_id):
-        # Keeping actor lists leaks memory ...
-        # TODO: Replace this function with an explicit request for actors of a trial_id (in the API)
-        actor_list = self._actors.get(trial_id, [])
-        result = [ActorInfo(actor.name, actor.actor_class) for actor in actor_list]
+    async def get_actors(self, trial_id):
+        req = orchestrator_api.TrialInfoRequest()
+        req.get_actor_list = True
+        metadata = [("trial-id", trial_id)]
+        rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
 
+        assert len(rep.trial) == 1
+        result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
         return result
 
     async def start_trial(self, trial_config=None):
@@ -75,7 +73,6 @@ class Controller:
         logging.debug(f"Requesting start of a trial with [{req}] ...")
         rep = await self._lifecycle_stub.StartTrial(req)
         logging.debug(f"Trial [{rep.trial_id}] started")
-        self._actors[rep.trial_id] = rep.actors_in_trial
 
         return rep.trial_id
 
@@ -86,8 +83,24 @@ class Controller:
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
         logging.debug(f"End of trial request accepted for {trial_id}")
 
-        if trial_id in self._actors:
-            del self._actors[trial_id]
+    async def get_trial_info(self, trial_id):
+        req = orchestrator_api.TrialInfoRequest()
+        if trial_id is not None:
+            metadata = [("trial-id", trial_id)]
+            rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+        else:
+            rep = await self._lifecycle_stub.GetTrialInfo(request=req)
+
+        result = []
+        for reply in rep.trial:
+            info_ex = TrialInfo(reply.trial_id)
+            info_ex.state = TrialState(reply.state)
+            info_ex.tick_id = reply.tick_id
+            info_ex.duration = reply.trial_duration
+
+            result.append(info_ex)
+
+        return result
 
     async def watch_trials(self, trial_state_filters=[]):
         request = orchestrator_api.TrialListRequest()

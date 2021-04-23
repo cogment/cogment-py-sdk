@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Fixed
+
+- `Controller.get_actors()` was fixed, but the fix is not backward compatible
+
+### Added
+
+- `Controller.get_trial_info()` added
+
 ## v1.0.0-beta2 - 2021-04-15
 
 ### Changed
@@ -14,7 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add a bit of code to make sure we are running in an asyncio task
 - `EventType.FINAL` events do not contain data anymore
 - Fix when replies are `None`
-- Add raw_trial_params in the datalog session
+- Add `raw_trial_params` in the datalog session
 
 ### Fixed
 
