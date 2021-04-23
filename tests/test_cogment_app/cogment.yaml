@@ -8,6 +8,8 @@ environment:
 
 trial:
   config_type: test_cogment_app.TrialConfig
+  pre_hooks: 
+    - grpc://localhost:9001
 
 
 # Static configuration
@@ -27,6 +29,8 @@ actor_classes:
 trial_params:
   environment:
     endpoint: grpc://localhost:9001
+    config:
+      env_config_value: 29
 
   actors:
     - name: actor_1
@@ -38,3 +42,8 @@ trial_params:
       actor_class: my_actor_class_1
       endpoint: grpc://localhost:9001
       implementation: test
+
+    - name: client_1
+      actor_class: my_actor_class_1
+      endpoint: client
+

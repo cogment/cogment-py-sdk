@@ -17,10 +17,12 @@ syntax = "proto3";
 package test_cogment_app;
 
 message EnvConfig {
+  int32 env_config_value = 1;
 }
 
 message TrialConfig {
-	EnvConfig env_config = 1;
+  EnvConfig env_config = 1;
+  int32 trial_config_value = 2;
 }
 
 message Observation {

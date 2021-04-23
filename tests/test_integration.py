@@ -94,6 +94,18 @@ class TestIntegration:
                 else:
                     environment_session.produce_observations([("*", data_pb2.Observation(observed_value=12))])
 
+        pre_hook_called_count = 0
+        async def pre_trial_hook(session):
+            nonlocal pre_hook_called_count
+
+            assert session.trial_config is not None
+            assert session.trial_config.trial_config_value == 31
+            assert session.environment_config is not None
+            assert session.environment_config.env_config_value == 29
+            assert session.trial_config.env_config is not None
+
+            pre_hook_called_count += 1
+
 
         agent_call_count = 0
         agent_observation_count = 0
@@ -101,6 +113,8 @@ class TestIntegration:
         agent_message_count = 0
         had_universal_message = False
         had_personal_message = False
+        had_message_from_client = 0
+        had_reward_from_client = 0
         agent_trial_id = {}
         total_reward = 0
         agents_ended = {}
@@ -114,6 +128,8 @@ class TestIntegration:
             nonlocal agent_message_count
             nonlocal had_universal_message
             nonlocal had_personal_message
+            nonlocal had_message_from_client
+            nonlocal had_reward_from_client
             nonlocal total_reward
             nonlocal agents_ended
             nonlocal agent_trial_id
@@ -136,18 +152,90 @@ class TestIntegration:
                 for message in event.messages:
                     msg = data_pb2.MyMessageUserData()
                     msg.ParseFromString(message.payload.value)
-                    agent_message_count += 1
-                    if msg.an_int == 42:
+                    if message.sender_name == "client_1":
+                        assert actor_session.name == "actor_2"
+                        had_message_from_client += 1
+                    elif msg.an_int == 42:
                         had_universal_message = True
+                        agent_message_count += 1
                     elif msg.an_int == 21:
                         had_personal_message = True
+                        agent_message_count += 1
 
                 for reward in event.rewards:
-                    total_reward += reward.value
-                    assert reward.value == 21.0
+                    for src in reward.all_sources():
+                        if src.sender_name == "client_1":
+                            had_reward_from_client += 1
+                            assert actor_session.name == "actor_1"
+                            assert src.value == 30
+                            assert src.confidence == 0.5
+                        else:
+                            total_reward += src.value
+                            assert src.value == 21.0
+
 
                 if event.type == cogment.EventType.FINAL:
                     agent_final_data_count += 1
+
+            agents_ended[actor_session.name].set_result(True)
+
+
+
+        client_call_count = 0
+        client_observation_count = 0
+        client_final_data_count = 0
+        client_message_count = 0
+        client_had_universal_message = False
+        client_had_personal_message = False
+        client_total_reward = 0
+        agents_ended["client_1"] = asyncio.get_running_loop().create_future()
+        
+        async def client_actor(actor_session):
+            nonlocal client_call_count
+            nonlocal client_observation_count
+            nonlocal client_final_data_count
+            nonlocal client_message_count
+            nonlocal client_had_universal_message
+            nonlocal client_had_personal_message
+            nonlocal client_total_reward
+            nonlocal agents_ended
+
+            assert actor_session.name in agents_ended
+            agent_trial_id[actor_session.name] = actor_session.get_trial_id()
+            client_call_count += 1
+
+            actor_session.start()
+
+            last_tick_id = 0
+            async for event in actor_session.event_loop():
+                if event.observation:
+                    assert event.observation.snapshot.observed_value == 12
+                    assert last_tick_id == event.observation.tick_id
+                    last_tick_id += 1
+
+                    actor_session.do_action(data_pb2.Action(action_value=-1))
+                    client_observation_count += 1
+
+                    msg = data_pb2.MyMessageUserData(a_string="A message from aclient", an_int=2)
+                    actor_session.send_message(msg, ["actor_2"])
+
+                    actor_session.add_reward(30.0, 0.5, ["actor_1"])
+
+                for message in event.messages:
+                    msg = data_pb2.MyMessageUserData()
+                    msg.ParseFromString(message.payload.value)
+                    client_message_count += 1
+                    if msg.an_int == 42:
+                        client_had_universal_message = True
+                    elif msg.an_int == 21:
+                        client_had_personal_message = True
+
+                for reward in event.rewards:
+                    client_total_reward += reward.value
+                    assert reward.value == 21.0
+
+                if event.type == cogment.EventType.FINAL:
+                    client_final_data_count += 1
 
             agents_ended[actor_session.name].set_result(True)
 
@@ -155,6 +243,8 @@ class TestIntegration:
 
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
+        context.register_actor(impl_name="client", impl=client_actor, actor_classes=["my_actor_class_1", ])
+        context.register_pre_trial_hook(pre_trial_hook)
 
         prometheus_port = find_free_port()
         served_endp = cogment.ServedEndpoint(cogment_test_setup["test_port"]) 
@@ -204,7 +294,8 @@ class TestIntegration:
         asyncio.create_task(state_tracking(controller))
         await asyncio.sleep(1)
 
-        controller_trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig())
+        controller_trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig(trial_config_value=31))
+        await context.join_trial(trial_id=controller_trial_id, endpoint=endp, impl_name="client")
 
         await trial_ended
         logging.info("--State reported trial ended")
@@ -216,7 +307,7 @@ class TestIntegration:
             assert id == controller_trial_id
 
         # Although the trial has ended, the agents could still be processing the last observation
-        assert len(agents_ended) == 2
+        assert len(agents_ended) == 3
         await asyncio.wait(agents_ended.values())
 
         prometheus_connection = urllib.request.urlopen("http://localhost:" + str(prometheus_port))
@@ -256,6 +347,18 @@ class TestIntegration:
         assert had_personal_message
         assert agent_message_count == 4
         assert total_reward == 42.0
+        assert had_message_from_client == 10
+        assert had_reward_from_client == 10
+
+        assert client_call_count == 1
+        assert client_observation_count == target_tick_count + 1
+        assert client_final_data_count == 1
+        assert client_had_universal_message
+        assert client_had_personal_message
+        assert client_message_count == 2
+        assert client_total_reward == 21.0
+
+        assert pre_hook_called_count == 1
 
         logging.info(f"test_environment_controlled_trial finished")
         await context._grpc_server.stop(grace=5.)  # To prepare for next test
