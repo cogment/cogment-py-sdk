@@ -40,9 +40,14 @@ class DatalogSession(ABC):
                     sample = await self.__queue.get()
                     if sample is None:
                         break
-                    yield sample
+                    keep_looping = yield sample
+                    if keep_looping is not None and not bool(keep_looping):
+                        break
 
                     self.__queue.task_done()
+
+                except GeneratorExit:
+                    raise
 
                 except asyncio.CancelledError:
                     logging.debug("Datalog coroutine cancelled while waiting for a sample.")

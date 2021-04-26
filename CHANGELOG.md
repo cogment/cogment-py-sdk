@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - `Controller.get_actors()` was fixed, but the fix is not backward compatible
+- Fix unecessary exception in `watch_trial` when async is cancelled
 
 ### Added
 

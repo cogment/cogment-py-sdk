@@ -84,9 +84,19 @@ class ActorSession(Session):
         self._action_queue.put_nowait(action)
 
     async def _retrieve_action(self):
-        action = await self._action_queue.get()
-        self._action_queue.task_done()
-        return action
+        try:
+            action = await self._action_queue.get()
+            self._action_queue.task_done()
+            return action
+
+        except RuntimeError as exc:
+            # Unfortunatelty asyncio returns a standard RuntimeError in this case
+            if exc.args[0] != "Event loop is closed":
+                raise
+            else:
+                logging.debug(f"Normal exception on retrieving action at close: [{exc}]")
+
+        return None
 
 
 class _ServedActorSession(ActorSession):

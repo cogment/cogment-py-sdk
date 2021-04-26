@@ -130,6 +130,9 @@ class Controller:
         except GeneratorExit:
             raise
 
+        except asyncio.CancelledError:
+            logging.debug(f"watch_trial coroutine cancelled while waiting for trial info")
+
         except Exception:
             logging.error(f"{traceback.format_exc()}")
             raise
