@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
-- `Controller.get_actors()` was fixed, but the fix is not backward compatible
-- Fix unecessary exception in `watch_trial` when async is cancelled
+- **Breaking Change** Fix `Controller.get_actors()`, now properly retrieves the actor in a given trial, the function is now `async`.
+- Fix unecessary exception thrown in `watch_trial` when async is cancelled
 
 ### Added
 
-- `Controller.get_trial_info()` added
+- Add `Controller.get_trial_info()` to retrieve the information of a given trial.
 
 ## v1.0.0-beta2 - 2021-04-15
 
