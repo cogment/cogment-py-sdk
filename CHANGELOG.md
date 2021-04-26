@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.0.0-beta3 - 2021-04-26
+
 ### Fixed
 
 - **Breaking Change** Fix `Controller.get_actors()`, now properly retrieves the actor in a given trial, the function is now `async`.
