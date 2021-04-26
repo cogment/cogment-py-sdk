@@ -101,6 +101,7 @@ publish_branch_to_github:
   extends: .base_gh_ssh_agent
   stage: publish
   script:
+    - git checkout ${CI_COMMIT_BRANCH} # Checkout the branch not the sha1
     - git remote add downstream git@github.com:cogment/cogment-py-sdk.git
     - git fetch downstream ${CI_COMMIT_BRANCH}
     - git push --tags downstream ${CI_COMMIT_BRANCH}:${CI_COMMIT_BRANCH}
