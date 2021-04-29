@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Using _caret_ requirements for the dependencies of the library to avoid conflicts (cf. https://python-poetry.org/docs/dependency-specification/#caret-requirements)
+
 ## v1.0.0-beta3 - 2021-04-26
 
 ### Fixed

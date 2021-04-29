@@ -22,10 +22,10 @@ exclude = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-grpcio = "==1.30"
-grpcio-reflection = ">==1.19"
-protobuf = ">=3.7"
-prometheus-client = "^0.8.0"
+grpcio = "^1.30"
+grpcio-reflection = "^1.19"
+protobuf = "^3.7"
+prometheus-client = "^0.8"
 
 [tool.poetry.dev-dependencies]
 taskipy = "^1.4.0"
