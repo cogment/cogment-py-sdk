@@ -90,13 +90,3 @@ Build the source package (this step will only be succesfull if `poetry install` 
 ```
 poetry build -f sdist
 ```
-
-### Build a Docker image
-
-Navigate to the python SDK directory and run the following in order to create an image that can be used by a cogment project:
-
-```
-docker build -t image_name .
-```
-
-
