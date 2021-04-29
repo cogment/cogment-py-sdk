@@ -69,8 +69,8 @@ These tests can also be launched in a docker image.
 ```
 docker build \
   -t cogment/cogment-py-sdk-integration-test:latest \
-  --build-arg COGMENT_IMAGE="<PATH_TO_COGMENT_IMAGE" \
-  --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE" \
+  --build-arg COGMENT_IMAGE="<PATH_TO_COGMENT_IMAGE>" \
+  --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE>" \
   -f integration_test.dockerfile .
 docker run --rm cogment/cogment-py-sdk-integration-test:latest
 ```

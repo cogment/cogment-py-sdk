@@ -5,16 +5,16 @@ ARG COGMENT_IMAGE=cogment/cli:latest
 FROM $COGMENT_ORCHESTRATOR_IMAGE as orchestrator
 FROM $COGMENT_IMAGE as cogment
 FROM ubuntu:20.04
+ARG PYTHON_VERSION=3.7.10
 
-RUN apt-get update && apt-get install -y curl build-essential python3 python3-distutils python3-pip protobuf-compiler
+RUN apt-get update && apt-get install -y curl build-essential git protobuf-compiler bzip2 libreadline-dev libssl-dev libffi-dev
 
-# Retrieve the orchestrator!
-COPY --from=orchestrator /usr/local/bin/orchestrator /usr/local/bin/orchestrator
-ENV COGMENT_ORCHESTRATOR /usr/local/bin/orchestrator
-
-# Retrieve the cli!
-COPY --from=cogment /usr/local/bin/cogment /usr/local/bin/
-ENV COGMENT /usr/local/bin/cogment
+## Pyenv setup and install the desired pythong version
+ENV PYENV_ROOT $HOME/.pyenv
+ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+RUN git clone https://github.com/pyenv/pyenv.git $PYENV_ROOT
+RUN pyenv install $PYTHON_VERSION
+RUN pyenv global $PYTHON_VERSION
 
 ## Poetry setup
 ENV POETRY_VERSION=1.1.3 \
@@ -29,6 +29,14 @@ ENV POETRY_VERSION=1.1.3 \
 ENV PATH="$POETRY_HOME/bin:$PATH"
 # Download and install poetry
 RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3 -
+
+# Retrieve the cli!
+COPY --from=cogment /usr/local/bin/cogment /usr/local/bin/
+ENV COGMENT /usr/local/bin/cogment
+
+# Retrieve the orchestrator!
+COPY --from=orchestrator /usr/local/bin/orchestrator /usr/local/bin/orchestrator
+ENV COGMENT_ORCHESTRATOR /usr/local/bin/orchestrator
 
 WORKDIR /cogment-py-sdk
 COPY pyproject.toml poetry.lock ./
