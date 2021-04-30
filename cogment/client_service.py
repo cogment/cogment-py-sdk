@@ -17,11 +17,12 @@ import grpc.experimental.aio
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.actor import _ClientActorSession
-from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType
+from cogment.session import RecvEvent, EventType
 import cogment.api.orchestrator_pb2_grpc as grpc_api
 from cogment.delta_encoding import DecodeObservationData
 from cogment.errors import InvalidRequestError
 from cogment.trial import Trial
+import cogment.utils as utils
 from types import SimpleNamespace
 
 import asyncio
@@ -29,8 +30,6 @@ import logging
 import traceback
 
 
-# TODO: The processing of the period data is nearly identical here and in AgentServicer.OnEnd
-#       we should make a function to remove duplication
 async def read_observations(client_session, reply_itor):
     try:
         async for reply in reply_itor:
@@ -40,28 +39,7 @@ async def read_observations(client_session, reply_itor):
                 event_type = EventType.ENDING
                 client_session._trial.over = True
 
-            events = {}
-            for obs_request in reply.data.observations:
-                snapshot = DecodeObservationData(
-                    client_session._actor_class,
-                    obs_request.data,
-                    client_session._latest_observation)
-                client_session._latest_observation = snapshot
-
-                evt = events.setdefault(obs_request.tick_id, RecvEvent(event_type))
-                if evt.observation:
-                    logging.warning(f"Client received two observations with the same tick_id: {obs_request.tick_id}")
-                else:
-                    evt.observation = RecvObservation(obs_request, snapshot)
-
-            for rew in reply.data.rewards:
-                evt = events.setdefault(rew.tick_id, RecvEvent(event_type))
-                evt.rewards.append(RecvReward(rew))
-
-            for msg in reply.data.messages:
-                evt = events.setdefault(msg.tick_id, RecvEvent(event_type))
-                evt.messages.append(RecvMessage(msg))
-
+            events = utils.decode_period_data(client_session, reply.data, event_type)
             ordered_ticks = sorted(events)
             if ordered_ticks:
                 client_session._trial.tick_id = ordered_ticks[-1]
@@ -76,7 +54,7 @@ async def read_observations(client_session, reply_itor):
     except asyncio.CancelledError:
         logging.debug(f"Client [{client_session.name}] 'read_observations' coroutine cancelled")
 
-    except grpc.experimental.aio._call.AioRpcError as exc:
+    except grpc.experimental.aio.AioRpcError as exc:
         if exc.code() == grpc.StatusCode.UNAVAILABLE:
             logging.error(f"Orchestrator communication lost: [{exc.details()}]")
             logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
@@ -181,6 +159,7 @@ class ClientServicer:
         try:
             new_session._task = asyncio.create_task(new_session._run())
             await new_session._task
+
             logging.debug(f"User client implementation for [{new_session.name}] returned")
 
         except Exception:

@@ -29,11 +29,11 @@ class Trial:
         def add_prepared_message(self, payload):
             self._messages.append(payload)
 
-        # TODO: Remove the need for sender_name, let the orchestrator fill it in (e.g. rewards)
-        def get_prepared_messages(self, sender_name):
+        def get_prepared_messages(self):
             while len(self._messages) > 0:
                 payload = self._messages.popleft()
-                message = common_api.Message(tick_id=-1, sender_name=sender_name, receiver_name=self.name)
+                # sender_name is not needed for sending messages
+                message = common_api.Message(tick_id=-1, receiver_name=self.name)
                 if payload is not None:
                     message.payload.Pack(payload)
                 yield message
@@ -141,8 +141,8 @@ class Trial:
             )
 
     def _gather_all_rewards(self):
-        for actor in self.actors:
-            for reward in actor.get_prepared_rewards():
+        for dest_actor in self.actors:
+            for reward in dest_actor.get_prepared_rewards():
                 yield reward
 
     # We default `to` so users can provide a `to_environment=True` without a `to` parameter
@@ -152,10 +152,10 @@ class Trial:
         for actor in self.get_actors(pattern_list=to):
             actor.add_prepared_message(payload=payload)
 
-    def _gather_all_messages(self, source_name):
-        for actor in self.actors:
-            for message in actor.get_prepared_messages(source_name):
+    def _gather_all_messages(self):
+        for dest_actor in self.actors:
+            for message in dest_actor.get_prepared_messages():
                 yield message
 
-        for message in self.environment.get_prepared_messages(source_name):
+        for message in self.environment.get_prepared_messages():
             yield message

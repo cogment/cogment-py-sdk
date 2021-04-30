@@ -121,7 +121,7 @@ class ServedEndpoint:
 
     # def set_from_files(private_key_certificate_chain_pairs_file=None, root_certificates_file=None):
     # TODO: This function would need to parse the PEM encoded `private_key_certificate_chain_pairs_file`
-    #       to create the list of tuples required
+    #       to create the list of tuples required (see simpler version in `Endpoint` class above).
 
 
 class Context:
@@ -154,7 +154,7 @@ class Context:
         assert impl_name not in self.__actor_impls
         assert self._grpc_server is None
 
-        # TODO: Add test to make sure that if actor is added when _grps_server is not None, then
+        # TODO: Add test to make sure that if actor is added when _grpc_server is not None, then
         # it is a client actor (i.e. only client actors can be started after `serve_all_registered` was called)
         self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, actor_classes=actor_classes)
 

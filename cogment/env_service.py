@@ -102,7 +102,7 @@ def _process_reply(observations, env_session):
     rep = env_api.EnvActionReply()
 
     rep.rewards.extend(env_session._trial._gather_all_rewards())
-    rep.messages.extend(env_session._trial._gather_all_messages(ENVIRONMENT_ACTOR_NAME))
+    rep.messages.extend(env_session._trial._gather_all_messages())
     pack_observations(env_session, observations, rep)
 
     return rep

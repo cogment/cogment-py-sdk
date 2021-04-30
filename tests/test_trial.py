@@ -88,28 +88,28 @@ class TestTrial:
         trial.send_message(data_pb2.MyMessageUserData(a_string="baz", an_int=29), to_environment=True)
 
         messages_as_tuples = []
-        for m in trial._gather_all_messages("test_source"):
+        for m in trial._gather_all_messages():
             payload = data_pb2.MyMessageUserData()
             assert m.payload.Unpack(payload)
-            messages_as_tuples.append((m.sender_name, m.receiver_name, payload))
+            messages_as_tuples.append((m.receiver_name, payload))
 
         assert len(messages_as_tuples) == 5
         unittest_case.assertCountEqual(messages_as_tuples, [
-            ("test_source", "agent_2", data_pb2.MyMessageUserData(a_string="foo", an_int=42)),
-            ("test_source", "agent_3", data_pb2.MyMessageUserData(a_string="foo", an_int=42)),
-            ("test_source", "agent_1", data_pb2.MyMessageUserData(a_string="bar", an_int=32)),
-            ("test_source", "agent_3", data_pb2.MyMessageUserData(a_string="bar", an_int=32)),
-            ("test_source", "env", data_pb2.MyMessageUserData(a_string="baz", an_int=29))
+            ("agent_2", data_pb2.MyMessageUserData(a_string="foo", an_int=42)),
+            ("agent_3", data_pb2.MyMessageUserData(a_string="foo", an_int=42)),
+            ("agent_1", data_pb2.MyMessageUserData(a_string="bar", an_int=32)),
+            ("agent_3", data_pb2.MyMessageUserData(a_string="bar", an_int=32)),
+            ("env", data_pb2.MyMessageUserData(a_string="baz", an_int=29))
         ])
 
-        assert len([m for m in trial._gather_all_messages("test_source")]) == 0
+        assert len([m for m in trial._gather_all_messages()]) == 0
 
     def test_send_messages_bad_payload(self, trial):
         trial.send_message({"a_string": "foo", "an_int": 42}, to=["agent_3", "agent_2"])
 
         # Maybe this should be caught earlier
         with pytest.raises(AttributeError):
-            [m for m in trial._gather_all_messages("test_source")]
+            [m for m in trial._gather_all_messages()]
 
     def test_add_feedback(self, trial, unittest_case, data_pb2):
         trial.add_reward(

@@ -15,6 +15,7 @@
 import cogment.api.common_pb2 as common_api
 from cogment.version import __version__
 from cogment.delta_encoding import DecodeObservationData
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward
 
 import logging
 import importlib
@@ -95,6 +96,32 @@ def user_params_to_raw_params(params, settings):
             actor_pb.config.content = actor_data["config"].SerializeToString()
 
     return result
+
+
+def decode_period_data(session, data, event_type):
+    events = {}
+    for obs_request in data.observations:
+        snapshot = DecodeObservationData(
+            session._actor_class,
+            obs_request.data,
+            session._latest_observation)
+        session._latest_observation = snapshot
+
+        evt = events.setdefault(obs_request.tick_id, RecvEvent(event_type))
+        if evt.observation:
+            logging.warning(f"Agent received two observations with the same tick_id: {obs_request.tick_id}")
+        else:
+            evt.observation = RecvObservation(obs_request, snapshot)
+
+    for rew in data.rewards:
+        evt = events.setdefault(rew.tick_id, RecvEvent(event_type))
+        evt.rewards.append(RecvReward(rew))
+
+    for msg in data.messages:
+        evt = events.setdefault(msg.tick_id, RecvEvent(event_type))
+        evt.messages.append(RecvMessage(msg))
+
+    return events
 
 
 class DecodeData():

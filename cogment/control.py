@@ -51,9 +51,6 @@ class Controller:
         self._lifecycle_stub = stub
         self._user_id = user_id
 
-        # TODO: This should be removed once we have a stable release
-        logging.basicConfig(level=logging.DEBUG)
-
     async def get_actors(self, trial_id):
         req = orchestrator_api.TrialInfoRequest()
         req.get_actor_list = True
@@ -119,7 +116,7 @@ class Controller:
                 if keep_looping is not None and not bool(keep_looping):
                     break
 
-        except grpc.experimental.aio._call.AioRpcError as exc:
+        except grpc.experimental.aio.AioRpcError as exc:
             logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
                 logging.error(f"Orchestrator communication lost: [{exc.details()}]")

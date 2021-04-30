@@ -22,6 +22,7 @@ from cogment.errors import InvalidRequestError
 from cogment.delta_encoding import DecodeObservationData
 from cogment.actor import _ServedActorSession
 from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType
+import cogment.utils as utils
 
 from prometheus_client import Summary, Counter, Gauge
 
@@ -88,10 +89,7 @@ async def write_actions(context, agent_session):
                 reply.action.content = act.SerializeToString()
 
             reply.rewards.extend(agent_session._trial._gather_all_rewards())
-
-            # TODO: Why can't we use agent_session.name instead?  Is the sender_name still necessary?
-            actor_name = dict(context.invocation_metadata())["actor-name"]
-            reply.messages.extend(agent_session._trial._gather_all_messages(actor_name))
+            reply.messages.extend(agent_session._trial._gather_all_messages())
 
             await context.write(reply)
 
@@ -221,28 +219,7 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                 agent_session._trial.over = True
                 data = request.final_data
 
-                events = {}
-                for obs_request in data.observations:
-                    snapshot = DecodeObservationData(
-                        agent_session._actor_class,
-                        obs_request.data,
-                        agent_session._latest_observation)
-                    agent_session._latest_observation = snapshot
-
-                    evt = events.setdefault(obs_request.tick_id, RecvEvent(EventType.ENDING))
-                    if evt.observation:
-                        logging.warning(f"Agent received two observations with the same tick_id: {obs_request.tick_id}")
-                    else:
-                        evt.observation = RecvObservation(obs_request, snapshot)
-
-                for rew in data.rewards:
-                    evt = events.setdefault(rew.tick_id, RecvEvent(EventType.ENDING))
-                    evt.rewards.append(RecvReward(rew))
-
-                for msg in data.messages:
-                    evt = events.setdefault(msg.tick_id, RecvEvent(EventType.ENDING))
-                    evt.messages.append(RecvMessage(msg))
-
+                events = utils.decode_period_data(agent_session, data, EventType.ENDING)
                 if events:
                     ordered_ticks = sorted(events)
                     agent_session._trial.tick_id = ordered_ticks[-1]
@@ -251,7 +228,6 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                         evt = events.pop(tick_id)
                         agent_session._new_event(evt)
 
-                del self.__agent_sessions[key]
                 agent_session._new_event(RecvEvent(EventType.FINAL))
 
                 self.actors_ended.labels(agent_session.impl_name).inc()
@@ -281,11 +257,14 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     writer_task = asyncio.create_task(write_actions(context, agent_session))
 
                     await agent_session._task
-                    logging.debug(f"User agent implementation for [{agent_session.name}] returned")
 
-                    if key in self.__agent_sessions:
-                        logging.warning(f"User agent implementation for [{agent_session.name}] ended before required")
-                        del self.__agent_sessions[key]
+                    if not agent_session._last_event_received:
+                        logging.warning(f"User agent implementation for [{agent_session.name}]"
+                                         " returned before required")
+                    else:
+                        logging.debug(f"User agent implementation for [{agent_session.name}] returned")
+
+                    del self.__agent_sessions[key]
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for observation")
 

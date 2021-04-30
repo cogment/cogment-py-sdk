@@ -74,7 +74,7 @@ class LogExporterService(grpc_api.LogExporterServicer):
 
             reader_task = asyncio.create_task(read_sample(context, session))
 
-            # TODO: It is required to bypass a probable bug in easy_grpc that expects a stream to be "used".
+            # TODO: Investigate probable bug in easy_grpc that expects a stream to be "used"
             reply = datalog_api.LogExporterSampleReply()
             await context.write(reply)
 
@@ -83,6 +83,7 @@ class LogExporterService(grpc_api.LogExporterServicer):
         except Exception:
             logging.error(f"{traceback.format_exc()}")
             raise
+
         finally:
             if reader_task is not None:
                 reader_task.cancel()
