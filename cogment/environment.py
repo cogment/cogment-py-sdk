@@ -25,7 +25,7 @@ class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 
     def __init__(self, impl, trial, impl_name, config):
-        super().__init__(trial, "environment", impl, impl_name)
+        super().__init__(trial, ENVIRONMENT_ACTOR_NAME, impl, impl_name)
         self.config = config
         self._obs_queue = asyncio.Queue()
         self.__final_obs_future = None

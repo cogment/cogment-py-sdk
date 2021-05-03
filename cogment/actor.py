@@ -17,6 +17,7 @@ import importlib
 import logging
 from abc import ABC
 from cogment.session import Session, EventType
+from cogment.environment import ENVIRONMENT_ACTOR_NAME
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
 import cogment.api.common_pb2 as common_api
@@ -119,6 +120,7 @@ class _ClientActorSession(ActorSession):
 
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         request = orchestrator_api.TrialRewardRequest()
+
         for dest_actor in self._trial.get_actors(pattern_list=to):
             reward = common_api.Reward(receiver_name=dest_actor.name, tick_id=-1, value=value)
             reward_source = common_api.RewardSource(sender_name=self.name, value=value, confidence=confidence)
@@ -126,15 +128,26 @@ class _ClientActorSession(ActorSession):
                 reward_source.user_data.Pack(user_data)
             reward.sources.append(reward_source)
             request.rewards.append(reward)
+
+        if request.rewards:
             metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
             self._actor_sub.SendReward(request=request, metadata=metadata)
 
     def send_message(self, payload, to, to_environment=False):
         message_req = orchestrator_api.TrialMessageRequest()
+
         for dest_actor in self._trial.get_actors(pattern_list=to):
             message = common_api.Message(tick_id=-1, receiver_name=dest_actor.name)
             if payload is not None:
                 message.payload.Pack(payload)
             message_req.messages.append(message)
+
+        if to_environment:
+            message = common_api.Message(tick_id=-1, receiver_name=ENVIRONMENT_ACTOR_NAME)
+            if payload is not None:
+                message.payload.Pack(payload)
+            message_req.messages.append(message)
+
+        if message_req.messages:
             metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
             self._actor_sub.SendMessage(request=message_req, metadata=metadata)

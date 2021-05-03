@@ -19,7 +19,7 @@ import os
 import asyncio
 from types import SimpleNamespace
 import grpc
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 from prometheus_client import start_http_server, CollectorRegistry
 
 from cogment.actor import ActorSession, ActorClass
@@ -189,7 +189,7 @@ class Context:
         if self._grpc_server is not None:
             raise RuntimeError("Cannot serve the same components twice")
 
-        self._grpc_server = grpc.experimental.aio.server()
+        self._grpc_server = grpc.aio.server()
 
         service_names: List[str] = []
         if self.__actor_impls:
@@ -251,7 +251,7 @@ class Context:
 
     def _get_control_stub(self, endpoint):
         if endpoint.private_key is None:
-            channel = grpc.experimental.aio.insecure_channel(endpoint.url)
+            channel = grpc.aio.insecure_channel(endpoint.url)
         else:
             if endpoint.root_certificates:
                 root = bytes(endpoint.root_certificates, "utf-8")
@@ -266,7 +266,7 @@ class Context:
             else:
                 certs = None
             creds = grpc.ssl_channel_credentials(root, key, certs)
-            channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
+            channel = grpc.aio.secure_channel(endpoint.url, creds)
 
         return grpc_api.TrialLifecycleStub(channel)
 

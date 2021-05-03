@@ -23,7 +23,7 @@ from cogment.utils import list_versions
 from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType
 
 from types import SimpleNamespace, ModuleType
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 
 from cogment.environment import _ServedEnvironmentSession, ENVIRONMENT_ACTOR_NAME
 
@@ -152,7 +152,7 @@ async def read_actions(context, env_session):
         while True:
             request = await context.read()
 
-            if request == grpc.experimental.aio.EOF:
+            if request == grpc.aio.EOF:
                 logging.info(f"The orchestrator disconnected the environment")
                 break
 
@@ -314,11 +314,13 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             key = trial_id
             env_session = self.__env_sessions[key]
 
+            recv_event = RecvEvent(EventType.ACTIVE)
             for message in request.messages:
-                recv_event = RecvEvent(EventType.ACTIVE)
-                recv_event.rewards = [RecvMessage(message)]
-                env_session._new_event(recv_event)
+                recv_event.messages.append(RecvMessage(message))
                 self.messages_received.labels(env_session.impl_name).inc()
+
+            if recv_event.messages:
+                env_session._new_event(recv_event)
 
             return env_api.EnvMessageReply()
 

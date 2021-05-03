@@ -18,7 +18,7 @@ from cogment.session import ActorInfo
 
 import asyncio
 import grpc
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 from enum import Enum
 import logging
 import traceback
@@ -116,7 +116,7 @@ class Controller:
                 if keep_looping is not None and not bool(keep_looping):
                     break
 
-        except grpc.experimental.aio.AioRpcError as exc:
+        except grpc.aio.AioRpcError as exc:
             logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
                 logging.error(f"Orchestrator communication lost: [{exc.details()}]")

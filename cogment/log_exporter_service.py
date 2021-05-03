@@ -21,7 +21,7 @@ import logging
 import traceback
 import asyncio
 
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 
 
 async def read_sample(context, session):
@@ -29,7 +29,7 @@ async def read_sample(context, session):
         while True:
             request = await context.read()
 
-            if request == grpc.experimental.aio.EOF:
+            if request == grpc.aio.EOF:
                 logging.info(f"The orchestrator disconnected from LogExpoterService.")
                 break
 

@@ -31,7 +31,7 @@ import traceback
 import atexit
 import logging
 import asyncio
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 
 
 def _trial_key(trial_id, actor_name):
@@ -53,7 +53,7 @@ async def read_observations(context, agent_session):
         while True:
             request = await context.read()
 
-            if request == grpc.experimental.aio.EOF:
+            if request == grpc.aio.EOF:
                 logging.info(f"The orchestrator disconnected agent [{agent_session.name}]")
                 break
 

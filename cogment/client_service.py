@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import grpc
-import grpc.experimental.aio
+import grpc.aio  # type: ignore
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.actor import _ClientActorSession
@@ -54,7 +54,7 @@ async def read_observations(client_session, reply_itor):
     except asyncio.CancelledError:
         logging.debug(f"Client [{client_session.name}] 'read_observations' coroutine cancelled")
 
-    except grpc.experimental.aio.AioRpcError as exc:
+    except grpc.aio.AioRpcError as exc:
         if exc.code() == grpc.StatusCode.UNAVAILABLE:
             logging.error(f"Orchestrator communication lost: [{exc.details()}]")
             logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
@@ -95,7 +95,7 @@ class ClientServicer:
         self.cog_settings = cog_settings
 
         if endpoint.private_key is None:
-            channel = grpc.experimental.aio.insecure_channel(endpoint.url)
+            channel = grpc.aio.insecure_channel(endpoint.url)
         else:
             if endpoint.root_certificates:
                 root = bytes(endpoint.root_certificates, "utf-8")
@@ -110,7 +110,7 @@ class ClientServicer:
             else:
                 certs = None
             creds = grpc.ssl_channel_credentials(root, key, certs)
-            channel = grpc.experimental.aio.secure_channel(endpoint.url, creds)
+            channel = grpc.aio.secure_channel(endpoint.url, creds)
 
         self._actor_stub = grpc_api.ClientActorStub(channel)
 

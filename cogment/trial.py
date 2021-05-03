@@ -22,8 +22,8 @@ from cogment.errors import Error
 
 class Trial:
     class MinimalComponent:
-        def __init__(self):
-            self.name = ENVIRONMENT_ACTOR_NAME
+        def __init__(self, name):
+            self.name = name
             self._messages = deque()
 
         def add_prepared_message(self, payload):
@@ -40,8 +40,7 @@ class Trial:
 
     class Component(MinimalComponent):
         def __init__(self, name, actor_class):
-            super().__init__()
-            self.name = name
+            super().__init__(name)
             self.actor_class = actor_class
             self._reward_data = deque()
 
@@ -72,7 +71,7 @@ class Trial:
         self.over = False
         self.cog_settings = cog_settings
         self.tick_id = -1
-        self.environment = self.MinimalComponent()
+        self.environment = self.MinimalComponent(ENVIRONMENT_ACTOR_NAME)
 
         self._actions = None  # Managed externally
         self._actions_by_actor_id = None  # Managed externally
@@ -89,10 +88,7 @@ class Trial:
             if actor_in_trial.actor_class not in self.cog_settings.actor_classes:
                 raise Error(f"class '{actor_in_trial.actor_class}' of actor '{actor_in_trial.name}' can not be found.")
             actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
-            actor = self.Component(
-                name=actor_in_trial.name,
-                actor_class=actor_class
-            )
+            actor = self.Component(name=actor_in_trial.name, actor_class=actor_class)
             self.actors.append(actor)
 
     def _add_actor_counts(self):
