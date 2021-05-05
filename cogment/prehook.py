@@ -40,6 +40,16 @@ class PrehookSession(ABC):
         return self._trial.id
 
     def validate(self):
+        unknowns = []
+        for name in dir(self):
+            if name and name[0] != "_":
+                if (name != "trial_config" and name != "trial_max_steps" and name != "trial_max_inactivity" and
+                        name != "environment_config" and name != "environment_endpoint" and name != "actors" and
+                        name != "get_trial_id" and name != "validate"):
+                    unknowns.append(name)
+        if unknowns:
+            raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
+
         self._recode()
 
 
