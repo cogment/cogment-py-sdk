@@ -1,18 +1,10 @@
-# cogment python SDK
-
-> ⚠️ 🚧 This is part of an upcoming release of cogment and still unstable.
->
-> Current stable version can be found at <https://gitlab.com/cogment/cogment>
+# cogment-py-sdk
 
 [![Latest final release](https://img.shields.io/pypi/v/cogment?style=flat-square)](https://pypi.org/project/cogment/) [![Apache 2 License](https://img.shields.io/badge/license-Apache%202-green?style=flat-square)](./LICENSE) [![Changelog](https://img.shields.io/badge/-Changelog%20-blueviolet?style=flat-square)](./CHANGELOG.md)
 
-## Introduction
+[Cogment](https://cogment.ai) is an innovative open source AI platform designed to leverage the advent of AI to benefit humankind through human-AI collaboration developed by [AI Redefined](https://ai-r.com). Cogment enables AI researchers and engineers to build, train and operate AI agents in simulated or real environments shared with humans. For the full user documentation visit <https://docs.cogment.ai>
 
-The Cogment framework is a high-efficiency, open source framework designed to enable the training of models in environments where humans and agents interact with the environment and each other continuously. It’s capable of distributed, multi-agent, multi-model training.
-
-This is the python API for making use of the cogment framework when working with the Python programming language.
-
-For further Cogment information, check out the documentation at <https://docs.cogment.ai>
+This module, `cogment-py-sdk`, is the Python SDK for making use of Cogment when working with Python. It's full documentation can be consulted at <https://docs.cogment.ai/cogment/cogment-api-reference/python/>.
 
 ## Developers
 

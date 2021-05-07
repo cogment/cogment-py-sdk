@@ -6,5 +6,5 @@ ignore:
   - "**/*_pb2*.py"
   - "**/cog_settings.py"
 license:
-  CopyrightYear: 2020
+  CopyrightYear: 2021
   Author: "Artificial Intelligence Redefined <dev+cogment@ai-r.com>"
