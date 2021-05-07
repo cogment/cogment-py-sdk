@@ -39,7 +39,7 @@ stages:
     - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
 
-lint:
+python_lint:
   extends: .base_poetry
   stage: lint
   script:
@@ -50,6 +50,22 @@ apache_licenses_check:
   image: registry.gitlab.com/ai-r/apache-license-checker:latest
   script:
     - apache-license-checker
+
+shellcheck:
+  image: koalaman/shellcheck-alpine:stable
+  stage: lint
+  before_script:
+    - shellcheck --version
+  script:
+    - shellcheck ./scripts/*.sh
+
+shfmt:
+  image: mvdan/shfmt:v3.1.0-alpine
+  stage: lint
+  before_script:
+    - shfmt -version
+  script:
+    - shfmt -i 2 -ci -d ./scripts
 
 integration_test:
   extends: .base_docker
