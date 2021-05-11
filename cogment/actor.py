@@ -105,11 +105,9 @@ class _ServedActorSession(ActorSession):
         super().__init__(impl, actor_class, trial, name, impl_name, config)
 
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
-        assert self._trial is not None
         self._trial.add_reward(value, confidence, to, tick_id, user_data)
 
     def send_message(self, payload, to, to_environment=False):
-        assert self._trial is not None
         self._trial.send_message(payload, to, to_environment)
 
 

@@ -56,8 +56,9 @@ class Controller:
         req.get_actor_list = True
         metadata = [("trial-id", trial_id)]
         rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+        if len(rep.trial) != 1:
+            raise RuntimeError(f"Unexpected response from orchestraotr [{len(rep.trial)}]")
 
-        assert len(rep.trial) == 1
         result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
         return result
 

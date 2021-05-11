@@ -151,31 +151,36 @@ class Context:
                        impl: Callable[[ActorSession], Awaitable[None]],
                        impl_name: str,
                        actor_classes: List[str] = []):
-        assert impl_name not in self.__actor_impls
-        assert self._grpc_server is None
+        if self._grpc_server is not None:
+            raise RuntimeError("Cannot register an actor after the server is started")
+        if impl_name in self.__actor_impls:
+            raise RuntimeError(f"The actor implementation name must be unique: [{impl_name}]")
 
-        # TODO: Add test to make sure that if actor is added when _grpc_server is not None, then
-        # it is a client actor (i.e. only client actors can be started after `serve_all_registered` was called)
         self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, actor_classes=actor_classes)
 
     def register_environment(self,
                              impl: Callable[[EnvironmentSession], Awaitable[None]],
                              impl_name: str = "default"):
-        assert impl_name not in self.__env_impls
-        assert self._grpc_server is None
+        if self._grpc_server is not None:
+            raise RuntimeError("Cannot register an environment after the server is started")
+        if impl_name in self.__env_impls:
+            raise RuntimeError(f"The environment implementation name must be unique: [{impl_name}]")
 
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl)
 
     def register_pre_trial_hook(self,
                                 impl: Callable[[PrehookSession], Awaitable[None]]):
-        assert self._grpc_server is None
+        if self._grpc_server is not None:
+            raise RuntimeError("Cannot register a pre-trial hook after the server is started")
 
         self.__prehook_impls.append(impl)
 
     def register_datalog(self,
                          impl: Callable[[DatalogSession], Awaitable[None]]):
-        assert self._grpc_server is None
-        assert self.__datalog_impl is None
+        if self._grpc_server is not None:
+            raise RuntimeError("Cannot register a datalog after the server is started")
+        if self.__datalog_impl is not None:
+            raise RuntimeError("Only one datalog service can be registered")
 
         self.__datalog_impl = impl
 

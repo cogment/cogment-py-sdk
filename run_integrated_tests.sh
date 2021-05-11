@@ -6,8 +6,8 @@ poetry run task lint
 CLI="cogment/cli:latest"
 #CLI="registry.gitlab.com/ai-r/cogment-cli:latest"
 
-ORCHESTRATOR="cogment/orchestrator:latest"
-#ORCHESTRATOR="local/orchestrator:latest"
+#ORCHESTRATOR="cogment/orchestrator:latest"
+ORCHESTRATOR="local/orchestrator:latest"
 #ORCHESTRATOR="registry.gitlab.com/ai-r/cogment-orchestrator:latest"
 
 

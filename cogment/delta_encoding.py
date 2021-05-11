@@ -13,13 +13,14 @@
 # limitations under the License.
 
 from cogment.actor import ActorClass
+import logging
 
 
 # This is the default delta application function that is used when the
-# Observation space and Observation delta of an actor is class is of the same
-# type
+# Observation space and Observation delta of an actor is a class of the same type
 def _apply_delta_replace(observation, delta):
-    assert type(observation) == type(delta)
+    if type(observation) != type(delta):
+        logging.error(f"Unexpected type difference for observation [{type(observation)}] and delta [{type(delta)}]")
     return delta
 
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Internal update to change `assert` into more useful statements
+
 ## v1.0.0 - 2021-05-10
 
 - Initial public release.

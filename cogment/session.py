@@ -75,7 +75,8 @@ class RecvReward:
         return len(self._sources)
 
     def all_sources(self):
-        assert self._sources
+        if not self._sources:
+            raise RuntimeError("Unexpected reward with no source")
         for src in self._sources:
             yield RecvRewardSource(src)
 
@@ -203,19 +204,15 @@ class Session(ABC):
         logging.debug(f"Exiting [{self.name}] event loop generator")
 
     def get_trial_id(self):
-        assert self._trial is not None
         return self._trial.id
 
     def get_tick_id(self):
-        assert self._trial is not None
         return self._trial.tick_id
 
     def is_trial_over(self):
-        assert self._trial is not None
         return self._trial.over
 
     def get_active_actors(self):
-        assert self._trial is not None
         return self._active_actors
 
     @abstractmethod
