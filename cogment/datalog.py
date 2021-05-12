@@ -66,6 +66,11 @@ class DatalogSession(ABC):
             logging.error(f"An exception occured in user datalog implementation:\n{traceback.format_exc()}")
             raise
 
+    def __str__(self):
+        result = f"DatalogSession: trial_id = {self.trial_id}, trial_params = {self.trial_params}"
+        result += f", raw_trial_params = {self.raw_trial_params}"
+        return result
+
 
 class _ServedDatalogSession(DatalogSession):
     def __init__(self, impl, trial_id, trial_params, raw_trial_params):

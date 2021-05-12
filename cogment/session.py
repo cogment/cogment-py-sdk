@@ -222,3 +222,7 @@ class Session(ABC):
     @abstractmethod
     def send_message(self, payload, to, to_environment=False):
         pass
+
+    def __str__(self):
+        result = f"Session: name = {self.name}, impl_name = {self.impl_name}"
+        return result

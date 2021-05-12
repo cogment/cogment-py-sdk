@@ -52,6 +52,15 @@ class PrehookSession(ABC):
 
         self._recode()
 
+    def __str__(self):
+        result = f"PreHookSession: trial_config = {self.trial_config}"
+        result += f", trial_max_steps = {self.trial_max_steps}"
+        result += f", trial_max_inactivity = {self.trial_max_inactivity}"
+        result += f", environment_config = {self.environment_config}"
+        result += f", environment_endpoint = {self.environment_endpoint}"
+        result += f", actors = {self.actors}"
+        return result
+
 
 class _ServedPrehookSession(PrehookSession):
     def __init__(self, params, trial):

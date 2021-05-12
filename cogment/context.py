@@ -111,6 +111,11 @@ class Endpoint:
             logging.error(f"Failed loading file from CWD: {os.getcwd()}")
             raise
 
+    def __str__(self):
+        result = f"Endpoint: url = {self.url}, private_key = {self.private_key}"
+        result += f", root_certificates = {self.root_certificates}, certificate_chain = {self.certificate_chain}"
+        return result
+
 
 class ServedEndpoint:
 
@@ -122,6 +127,12 @@ class ServedEndpoint:
     # def set_from_files(private_key_certificate_chain_pairs_file=None, root_certificates_file=None):
     # TODO: This function would need to parse the PEM encoded `private_key_certificate_chain_pairs_file`
     #       to create the list of tuples required (see simpler version in `Endpoint` class above).
+
+    def __str__(self):
+        result = f"ServedEndpoint: port = {self.port}"
+        result += f", private_key_certificate_chain_pairs = {self.private_key_certificate_chain_pairs}"
+        result += f", root_certificates = {self.root_certificates}"
+        return result
 
 
 class Context:
@@ -286,3 +297,7 @@ class Context:
 
         servicer = ClientServicer(self.__cog_settings, endpoint)
         await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)
+
+    def __str__(self):
+        result = f"Context:"
+        return result

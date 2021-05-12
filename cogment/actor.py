@@ -40,6 +40,12 @@ class ActorClass:
         self.observation_delta = observation_delta
         self.observation_delta_apply_fn = observation_delta_apply_fn
 
+    def __str__(self):
+        result = f"ActorClass: name = {self.name}, config_type = {type(self.config_type)}"
+        result += f", action_space = {type(self.action_space)}, observation_space = {type(self.observation_space)}"
+        result += f", observation_delta = {type(self.observation_delta)}"
+        return result
+
 
 class ActorClassList:
     def __init__(self, *args):
@@ -59,6 +65,12 @@ class ActorClassList:
 
     def get_class_by_index(self, index):
         return self._actor_classes_list[index]
+
+    def __str__(self):
+        result = f"ActorClassList:"
+        for ac in self._actor_classes_list:
+            result += f" {ac.name} = {{{ac}}},"
+        return result
 
 
 class ActorSession(Session):
@@ -98,6 +110,11 @@ class ActorSession(Session):
                 logging.debug(f"Normal exception on retrieving action at close: [{exc}]")
 
         return None
+
+    def __str__(self):
+        result = super().__str__()
+        result += f" --- ActorSession: class_name = {self.class_name}, config = {self.config}"
+        return result
 
 
 class _ServedActorSession(ActorSession):

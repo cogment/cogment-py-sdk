@@ -134,3 +134,7 @@ class Controller:
         except Exception:
             logging.error(f"{traceback.format_exc()}")
             raise
+
+    def __str__(self):
+        result = f"Controller:"
+        return result

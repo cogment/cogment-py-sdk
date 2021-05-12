@@ -77,6 +77,11 @@ class EnvironmentSession(Session):
 
         return result
 
+    def __str__(self):
+        result = super().__str__()
+        result += f" --- EnvironmentSession: config = {self.config}"
+        return result
+
 
 class _ServedEnvironmentSession(EnvironmentSession):
     """An environment session that is served from an environment service."""

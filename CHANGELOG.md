@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 
 - Internal update to change `assert` into more useful statements
+- Internal update to add `__str__` to user accessible classes
 
 ## v1.0.0 - 2021-05-10
 
