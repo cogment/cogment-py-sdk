@@ -158,9 +158,16 @@ class ClientServicer:
 
         try:
             new_session._task = asyncio.create_task(new_session._run())
-            await new_session._task
+            normal_return = await new_session._task
 
-            logging.debug(f"User client implementation for [{new_session.name}] returned")
+            if normal_return:
+                if not new_session._last_event_received:
+                    logging.warning(f"User client implementation for [{new_session.name}]"
+                                    " returned before required")
+                else:
+                    logging.debug(f"User client implementation for [{new_session.name}] returned")
+            else:
+                logging.debug(f"User client implementation for [{new_session.name}] was cancelled")
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

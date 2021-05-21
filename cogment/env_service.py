@@ -25,7 +25,7 @@ from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType
 from types import SimpleNamespace, ModuleType
 import grpc.aio  # type: ignore
 
-from cogment.environment import _ServedEnvironmentSession, ENVIRONMENT_ACTOR_NAME
+from cogment.environment import _ServedEnvironmentSession
 
 from cogment.trial import Trial
 
@@ -283,15 +283,18 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             writer_task = asyncio.create_task(write_observations(context, env_session))
 
             with self.trial_duration.labels(env_session.impl_name).time():
-                await env_session._task
+                normal_return = await env_session._task
 
             self.update_count_per_trial.labels(env_session.impl_name).observe(env_session._trial.tick_id)
 
-            if env_session.is_trial_over():
-                logging.debug(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}] returned")
+            if normal_return:
+                if not env_session._last_event_received:
+                    logging.warning(f"User environment implementation for [{env_session.name}]"
+                                    f" running trial [{trial_id}] returned before end of trial")
+                else:
+                    logging.debug(f"User environment implementation for [{env_session.name}] returned")
             else:
-                logging.info(f"User environment implementation for [{ENVIRONMENT_ACTOR_NAME}]"
-                             f" running trial [{trial_id}] returned before end of trial")
+                logging.debug(f"User environment implementation for [{env_session.name}] was cancelled")
 
             self.__env_sessions.pop(key, None)
             self.trials_ended.labels(env_session.impl_name).inc()
@@ -312,7 +315,11 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             trial_id = metadata["trial-id"]
 
             key = trial_id
-            env_session = self.__env_sessions[key]
+            env_session = self.__env_sessions.get(key)
+            if env_session is None:
+                logging.warning(f"Trial [{trial_id}] has ended or does not exist: "
+                                f"[{len(request.messages)}] messages dropped")
+                return env_api.EnvMessageReply()
 
             recv_event = RecvEvent(EventType.ACTIVE)
             for message in request.messages:
@@ -334,7 +341,10 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
             trial_id = metadata["trial-id"]
 
             key = trial_id
-            env_session = self.__env_sessions[key]
+            env_session = self.__env_sessions.get(key)
+            if env_session is None:
+                logging.warning(f"Trial [{trial_id}] has already ended or does not exist: cannot terminate")
+                return env_api.EnvActionReply()
 
             event = _process_actions(request, env_session)
             event.type = EventType.ENDING

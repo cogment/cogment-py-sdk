@@ -256,13 +256,16 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     reader_task = asyncio.create_task(read_observations(context, agent_session))
                     writer_task = asyncio.create_task(write_actions(context, agent_session))
 
-                    await agent_session._task
+                    normal_return = await agent_session._task
 
-                    if not agent_session._last_event_received:
-                        logging.warning(f"User agent implementation for [{agent_session.name}]"
-                                         " returned before required")
+                    if normal_return:
+                        if not agent_session._last_event_received:
+                            logging.warning(f"User agent implementation for [{agent_session.name}]"
+                                            " returned before required")
+                        else:
+                            logging.debug(f"User agent implementation for [{agent_session.name}] returned")
                     else:
-                        logging.debug(f"User agent implementation for [{agent_session.name}] returned")
+                        logging.debug(f"User agent implementation for [{agent_session.name}] was cancelled")
 
                     del self.__agent_sessions[key]
             else:

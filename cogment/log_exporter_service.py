@@ -50,9 +50,8 @@ async def read_sample(context, session):
 
 
 class LogExporterService(grpc_api.LogExporterServicer):
-
     def __init__(self, impl, cog_settings):
-        self.__impl = impl
+        self._impl = impl
         self.__cog_settings = cog_settings
         logging.info("Log Exporter Service started")
 
@@ -69,7 +68,7 @@ class LogExporterService(grpc_api.LogExporterServicer):
             trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
             raw_trial_params = request.trial_params
 
-            session = _ServedDatalogSession(self.__impl, trial_id, trial_params, raw_trial_params)
+            session = _ServedDatalogSession(self._impl, trial_id, trial_params, raw_trial_params)
             session._task = asyncio.create_task(session._run())
 
             reader_task = asyncio.create_task(read_sample(context, session))
@@ -78,7 +77,12 @@ class LogExporterService(grpc_api.LogExporterServicer):
             reply = datalog_api.LogExporterSampleReply()
             await context.write(reply)
 
-            await session._task
+            normal_return = await session._task
+
+            if normal_return:
+                logging.debug(f"User datalog implementation returned")
+            else:
+                logging.debug(f"User datalog implementation was cancelled")
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

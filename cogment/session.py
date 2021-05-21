@@ -153,9 +153,11 @@ class Session(ABC):
     async def _run(self):
         try:
             await self._impl(self)
+            return True
 
         except asyncio.CancelledError:
             logging.debug(f"[{self.name}] implementation coroutine cancelled")
+            return False
 
         except Exception:
             logging.error(f"An exception occured in user implementation of [{self.name}]:\n{traceback.format_exc()}")

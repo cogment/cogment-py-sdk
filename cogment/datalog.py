@@ -27,7 +27,7 @@ class DatalogSession(ABC):
         self.raw_trial_params = raw_trial_params
 
         self._task = None
-        self.__impl = impl
+        self._impl = impl
         self.__queue = None
 
     def start(self):
@@ -61,7 +61,13 @@ class DatalogSession(ABC):
 
     async def _run(self):
         try:
-            await self.__impl(self)
+            await self._impl(self)
+            return True
+
+        except asyncio.CancelledError:
+            logging.debug(f"Datalog implementation coroutine cancelled")
+            return False
+
         except Exception:
             logging.error(f"An exception occured in user datalog implementation:\n{traceback.format_exc()}")
             raise
