@@ -81,6 +81,14 @@ class Controller:
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
         logging.debug(f"End of trial request accepted for {trial_id}")
 
+    async def get_remote_versions(self):
+        req = common_api.VersionRequest()
+        info = await self._lifecycle_stub.Version(request=req)
+        result = {}
+        for ver in info.versions:
+            result[ver.name] = ver.version
+        return result
+
     async def get_trial_info(self, trial_id):
         req = orchestrator_api.TrialInfoRequest()
         if trial_id is not None:

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Internal update to add `__str__` to user accessible classes
 - Improve some log output
 
+### Added
+
+- Add function `get_remote_versions` to controller retrieving the remote versions including api and orchestrator versions.
+
 ## v1.0.0 - 2021-05-10
 
 - Initial public release.
