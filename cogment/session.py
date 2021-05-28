@@ -142,13 +142,14 @@ class Session(ABC):
 
     def _start(self):
         if self._event_queue is not None:
-            logging.warning(f"Cannot start [{self.name}] more than once.")
-            return
+            logging.warning(f"Cannot start [{self.name}] more than once. Data dropped.")
+            return False
         if self._trial.over:
-            logging.warning(f"Cannot start [{self.name}] because the trial has ended.")
-            return
+            logging.error(f"Cannot start [{self.name}] because the trial has ended.")
+            return False
 
         self._event_queue = asyncio.Queue()
+        return True
 
     async def _run(self):
         try:

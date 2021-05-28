@@ -31,8 +31,8 @@ class EnvironmentSession(Session):
         self.__final_obs_future = None
 
     def start(self, observations):
-        self._start()
-        self._obs_queue.put_nowait((observations, False))
+        if self._start():
+            self._obs_queue.put_nowait((observations, False))
 
     def produce_observations(self, observations):
         if self._event_queue is None:
