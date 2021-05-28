@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from collections import deque
-from typing import List
+from typing import List, Any
 
 import cogment.api.common_pb2 as common_api
 from cogment.environment import ENVIRONMENT_ACTOR_NAME
@@ -102,30 +103,52 @@ class Trial:
     def get_actors(self, pattern_list: List[str]):
         if not isinstance(pattern_list, list):
             raise TypeError(f"The pattern_list must be a list: {type(pattern_list)}")
-        matched_actors = []
-        for actor in self.actors:
-            for pattern in pattern_list:
-                if not isinstance(pattern, str):
-                    raise TypeError(f"The pattern must be a string: {type(pattern)}")
-                if pattern == "*":
-                    matched_actors.append(actor)
-                    break
-                else:
-                    if "." not in pattern:
-                        if actor.name == pattern:
-                            matched_actors.append(actor)
-                            break
-                    else:
-                        [class_name, actor_name] = pattern.split(".")
-                        if actor_name == actor.name:
-                            matched_actors.append(actor)
-                            break
-                        elif actor_name == "*":
-                            if actor.actor_class.name == class_name:
-                                matched_actors.append(actor)
-                                break
 
-        return matched_actors
+        matched_indexes = set()
+        for pattern in pattern_list:
+            if not isinstance(pattern, str):
+                raise TypeError(f"The pattern must be a string: {type(pattern)}")
+
+            elif pattern == "*":
+                if len(pattern_list) > 1:
+                    logging.warning("Redundant actors in pattern_list since the wildcard (*) is used")
+                return self.actors
+
+            elif "." not in pattern:
+                match = None
+                for index, actor in enumerate(self.actors):
+                    if actor.name == pattern:
+                        match = index
+                        break
+                if match is not None:
+                    matched_indexes.add(match)
+                else:
+                    logging.warning(f"Unknown actor name in pattern_list [{pattern}]")
+
+            else:
+                [class_name, actor_name] = pattern.split(".")
+
+                if actor_name == "*":
+                    matches = set()
+                    for index, actor in enumerate(self.actors):
+                        if actor.actor_class.name == class_name:
+                            matches.add(index)
+                    if matches:
+                        matched_indexes |= matches
+                    else:
+                        logging.warning(f"Unknown actor class in pattern_list [{class_name}]")
+                else:
+                    match = None
+                    for index, actor in enumerate(self.actors):
+                        if actor.name == actor_name and actor.actor_class.name == class_name:
+                            match = index
+                            break
+                    if match is not None:
+                        matched_indexes.add(match)
+                    else:
+                        logging.warning(f"Unknown actor and class in pattern_list [{pattern}]")
+
+        return [self.actors[i] for i in matched_indexes]
 
     def add_reward(self, value, confidence, to, tick_id, user_data):
         for dest_actor in self.get_actors(pattern_list=to):

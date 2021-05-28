@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Internal update to change `assert` into more useful statements
 - Internal update to add `__str__` to user accessible classes
-- Improve some log output
+- Improve log output
+- Improve/add error reporting
 
 ### Added
 
