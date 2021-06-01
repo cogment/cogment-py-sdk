@@ -7,4 +7,4 @@ ignore:
   - "**/cog_settings.py"
 license:
   CopyrightYear: 2021
-  Author: "Artificial Intelligence Redefined <dev+cogment@ai-r.com>"
+  Author: "AI Redefined Inc. <dev+cogment@ai-r.com>"
