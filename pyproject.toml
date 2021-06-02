@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cogment"
-version = "1.0.0"
+version = "1.1.0"
 description = "Cogment python SDK"
 authors = ["Artificial Intelligence Redefined <dev+cogment@ai-r.com>"]
 license = "Apache-2.0"
