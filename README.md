@@ -11,8 +11,9 @@ This module, `cogment-py-sdk`, is the Python SDK for making use of Cogment when 
 ### Local setup
 
 Make sure you have the following installed:
-  - [Python](https://www.python.org) (any version >=3.7 should work),
-  - [Poetry](https://python-poetry.org).
+
+-   [Python](https://www.python.org) (any version >=3.7 should work),
+-   [Poetry](https://python-poetry.org).
 
 Install the dependencies, including downloading and building the cogment protobuf API, by navigating to the python SDK directory and run the following
 
@@ -24,15 +25,15 @@ poetry install
 
 The version of the used cogment protobuf API is defined in the `.cogment-api.yaml` file at the root of the repository. The following can be defined:
 
-- `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
-- `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
-- `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
+-   `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
+-   `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
+-   `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
 
 > ⚠️ when building a docker image, `cogment_api_path` needs to exists in the docker file system. In practice it means it should be a subdirectory of the current directory.
 
 ### Tests
 
-To run them the first step is to configure the way to launch the orchestrator and the cli in a `.env` file. 
+To run them the first step is to configure the way to launch the orchestrator and the cli in a `.env` file.
 
 You can copy `.env.template` for an example of what's expected.
 
@@ -48,7 +49,7 @@ poetry run task test
 
 #### Integration tests
 
-These tests launch and use an orchestrator they are slower but more in depth. 
+These tests launch and use an orchestrator they are slower but more in depth.
 
 Then, to execute the integration tests (as well as the module tests), simply run
 
@@ -88,7 +89,10 @@ poetry build -f sdist
 People having mainteners rights of the repository can follow these steps to release a version **MAJOR.MINOR.PATCH**. The versioning scheme follows [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 1. Run `./scripts/create_release_branch.sh MAJOR.MINOR.PATCH` to create the release branch and update the version of the package,
-2. On the release branch, check and update the changelog if needed, update internal dependencies, and make sure everything's fine on CI,
-3. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
+2. On the release branch, check and update the changelog if needed
+3. Update .cogment-api.yaml
+4. Update .gitlab-ci.yml (integration_test > variables > \*)
+5. Make sure everything's fine on CI,
+6. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
 
 The rest, publishing the package to PyPI and updating the mirror repositories, is handled directly by the CI.

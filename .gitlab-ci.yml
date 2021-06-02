@@ -1,125 +1,125 @@
 stages:
-  - lint
-  - test
-  - build
-  - publish
+    - lint
+    - test
+    - build
+    - publish
 
 .base_poetry:
-  image: python:3.7
-  before_script:
-    - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-    - source $HOME/.poetry/env
-    - poetry install
+    image: python:3.7
+    before_script:
+        - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+        - source $HOME/.poetry/env
+        - poetry install
 
 .base_docker:
-  image: docker:19.03.1
-  services:
-    - docker:19.03.1-dind
-  variables:
-      # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
-      DOCKER_HOST: tcp://docker:2376
-      DOCKER_TLS_CERTDIR: "/certs"
-  before_script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    image: docker:19.03.1
+    services:
+        - docker:19.03.1-dind
+    variables:
+        # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
+        DOCKER_HOST: tcp://docker:2376
+        DOCKER_TLS_CERTDIR: "/certs"
+    before_script:
+        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
 
 .base_gh_ssh_agent:
-  before_script:
-    ## _Inspired by https://docs.gitlab.com/ee/ci/ssh_keys/_
-    ##
-    ## Install ssh-agent if not already installed.
-    - "command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )"
-    ## Run ssh-agent
-    - eval $(ssh-agent -s)
-    ## Add the private key file to ssh-agent
-    - echo "$GH_REPO_SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    ## Create the SSH directory and give it the right permissions
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    ## Using the set $SSH_KNOWN_HOSTS to be able to verify remote servers public keys
-    - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-    - chmod 644 ~/.ssh/known_hosts
+    before_script:
+        ## _Inspired by https://docs.gitlab.com/ee/ci/ssh_keys/_
+        ##
+        ## Install ssh-agent if not already installed.
+        - "command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )"
+        ## Run ssh-agent
+        - eval $(ssh-agent -s)
+        ## Add the private key file to ssh-agent
+        - echo "$GH_REPO_SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+        ## Create the SSH directory and give it the right permissions
+        - mkdir -p ~/.ssh
+        - chmod 700 ~/.ssh
+        ## Using the set $SSH_KNOWN_HOSTS to be able to verify remote servers public keys
+        - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+        - chmod 644 ~/.ssh/known_hosts
 
 python_lint:
-  extends: .base_poetry
-  stage: lint
-  script:
-    - poetry run task lint
+    extends: .base_poetry
+    stage: lint
+    script:
+        - poetry run task lint
 
 apache_licenses_check:
-  stage: lint
-  image: registry.gitlab.com/ai-r/apache-license-checker:latest
-  script:
-    - apache-license-checker
+    stage: lint
+    image: registry.gitlab.com/ai-r/apache-license-checker:latest
+    script:
+        - apache-license-checker
 
 shellcheck:
-  image: koalaman/shellcheck-alpine:stable
-  stage: lint
-  before_script:
-    - shellcheck --version
-  script:
-    - shellcheck ./scripts/*.sh
+    image: koalaman/shellcheck-alpine:stable
+    stage: lint
+    before_script:
+        - shellcheck --version
+    script:
+        - shellcheck ./scripts/*.sh
 
 shfmt:
-  image: mvdan/shfmt:v3.1.0-alpine
-  stage: lint
-  before_script:
-    - shfmt -version
-  script:
-    - shfmt -i 2 -ci -d ./scripts
+    image: mvdan/shfmt:v3.1.0-alpine
+    stage: lint
+    before_script:
+        - shfmt -version
+    script:
+        - shfmt -i 2 -ci -d ./scripts
 
 integration_test:
-  extends: .base_docker
-  stage: test
-  variables:
-    COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.0"
-    COGMENT_IMAGE: "cogment/cli:v1.0.0-beta1"
-    #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
-    #COGMENT_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-cli:latest
-  script:
-    - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" --build-arg COGMENT_IMAGE="$COGMENT_IMAGE" -f integration_test.dockerfile .
-    - docker run --rm  --volume $(pwd):/output  cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
-  artifacts:
-    when: always
-    reports:
-      junit: integration_test_report.xml
+    extends: .base_docker
+    stage: test
+    variables:
+        COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.1"
+        COGMENT_IMAGE: "cogment/cli:v1.0.0"
+        #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
+        #COGMENT_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-cli:latest
+    script:
+        - docker build -t cogment/cogment-py-sdk-integration-test:$CI_JOB_ID --build-arg COGMENT_ORCHESTRATOR_IMAGE="$COGMENT_ORCHESTRATOR_IMAGE" --build-arg COGMENT_IMAGE="$COGMENT_IMAGE" -f integration_test.dockerfile .
+        - docker run --rm  --volume $(pwd):/output  cogment/cogment-py-sdk-integration-test:$CI_JOB_ID
+    artifacts:
+        when: always
+        reports:
+            junit: integration_test_report.xml
 
 build_sdist:
-  extends: .base_poetry
-  stage: build
-  script:
-    - poetry build -f sdist
-  artifacts:
-    expire_in: 1 week
-    paths:
-      - dist/*.tar.gz
+    extends: .base_poetry
+    stage: build
+    script:
+        - poetry build -f sdist
+    artifacts:
+        expire_in: 1 week
+        paths:
+            - dist/*.tar.gz
 
 publish_to_pypi:
-  extends: .base_poetry
-  stage: publish
-  script:
-    - poetry build -f sdist
-    - poetry publish -u $PYPI_USERNAME -p $PYPI_PASSWORD
-  only:
-    - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(?:-[[:alnum:]]+)?$/
+    extends: .base_poetry
+    stage: publish
+    script:
+        - poetry build -f sdist
+        - poetry publish -u $PYPI_USERNAME -p $PYPI_PASSWORD
+    only:
+        - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(?:-[[:alnum:]]+)?$/
 
 publish_to_gitlab:
-  extends: .base_poetry
-  stage: publish
-  script:
-    - poetry config repositories.private https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/packages/pypi 
-    - poetry version $(poetry version --short)+${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}
-    - poetry build -f sdist
-    - poetry publish --repository private -u gitlab-ci-token -p $CI_JOB_TOKEN
-  only:
-    - develop
+    extends: .base_poetry
+    stage: publish
+    script:
+        - poetry config repositories.private https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/packages/pypi
+        - poetry version $(poetry version --short)+${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}
+        - poetry build -f sdist
+        - poetry publish --repository private -u gitlab-ci-token -p $CI_JOB_TOKEN
+    only:
+        - develop
 
 publish_branch_to_github:
-  extends: .base_gh_ssh_agent
-  stage: publish
-  script:
-    - git checkout ${CI_COMMIT_BRANCH} # Checkout the branch not the sha1
-    - git remote add downstream git@github.com:cogment/cogment-py-sdk.git
-    - git fetch downstream ${CI_COMMIT_BRANCH}
-    - git push --tags downstream ${CI_COMMIT_BRANCH}:${CI_COMMIT_BRANCH}
-  only:
-    - main
+    extends: .base_gh_ssh_agent
+    stage: publish
+    script:
+        - git checkout ${CI_COMMIT_BRANCH} # Checkout the branch not the sha1
+        - git remote add downstream git@github.com:cogment/cogment-py-sdk.git
+        - git fetch downstream ${CI_COMMIT_BRANCH}
+        - git push --tags downstream ${CI_COMMIT_BRANCH}:${CI_COMMIT_BRANCH}
+    only:
+        - main
