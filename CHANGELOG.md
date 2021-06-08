@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Internal update to add `__str__` to user accessible classes
 - Improve log output
 - Improve/add error reporting
-- Update copyright notive to use the legal name of AI Redefined Inc.
+- Update copyright notice to use the legal name of AI Redefined Inc.
 
 ### Added
 
