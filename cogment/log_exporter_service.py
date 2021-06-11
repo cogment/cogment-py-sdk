@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cogment.api.common_pb2 as common_api
 import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
 from cogment.trial import Trial
@@ -34,7 +35,10 @@ async def read_sample(context, session):
                 break
 
             elif request.HasField("sample"):
+                trial_ended = (request.sample.trial_data.state == common_api.TrialState.ENDED)
                 session._new_sample(request.sample)
+                if trial_ended:
+                    break
             else:
                 logging.warning(f"Invalid request received from the orchestrator : {request}")
 

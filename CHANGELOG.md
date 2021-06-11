@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Update copyright notice to use the legal name of AI Redefined Inc.
 
+### Fixed
+
+- Exit datalog loop on receiving the trial `ended` state
+
 ## v1.1.0 - 2021-06-04
 
 ### Changed
