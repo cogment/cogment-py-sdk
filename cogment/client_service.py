@@ -67,27 +67,35 @@ async def read_observations(client_session, reply_itor):
         raise
 
 
-async def write_actions(client_session):
-    try:
-        while True:
-            act = await client_session._retrieve_action()
+class WriteActions:
+    def __init__(self, client_session):
+        self.session = client_session
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            act = await self.session._retrieve_action()
 
             action_req = orchestrator_api.TrialActionRequest()
             action_req.action.tick_id = -1
             if act is not None:
                 action_req.action.content = act.SerializeToString()
 
-            yield action_req
+            return action_req
 
-    except asyncio.CancelledError:
-        logging.debug(f"Client [{client_session.name}] 'write_actions' coroutine cancelled")
+        except asyncio.CancelledError:
+            logging.debug(f"Client [{self.session.name}] 'WriteActions' coroutine cancelled")
 
-    except GeneratorExit:
-        raise
+        except GeneratorExit:
+            raise
 
-    except Exception:
-        logging.error(f"{traceback.format_exc()}")
-        raise
+        except Exception:
+            logging.error(f"{traceback.format_exc()}")
+            raise
+
+        raise StopAsyncIteration
 
 
 class ClientServicer:
@@ -151,7 +159,7 @@ class ClientServicer:
             impl, actor_class, trial, self_info.name, impl_name, config, self._actor_stub)
 
         metadata = (("trial-id", trial.id), ("actor-name", self_info.name))
-        req_itor = write_actions(new_session)
+        req_itor = WriteActions(new_session)
         reply_itor = self._actor_stub.ActionStream(request_iterator=req_itor, metadata=metadata)
 
         reader_task = asyncio.create_task(read_observations(new_session, reply_itor))
