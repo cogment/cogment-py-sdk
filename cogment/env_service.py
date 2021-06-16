@@ -39,13 +39,6 @@ import asyncio
 from time import time
 
 
-def new_actions_table(settings, trial):
-    actions_by_actor_class = settings.ActionsTable(trial)
-    actions_by_actor_id = actions_by_actor_class.all_actions()
-
-    return actions_by_actor_class, actions_by_actor_id
-
-
 def pack_observations(env_session, observations, reply, tick_id=-1):
     timestamp = int(time() * 1000000000)
 
@@ -134,13 +127,14 @@ def _process_actions(request, env_session):
     env_session._trial.tick_id = request.action_set.tick_id
 
     len_actions = len(request.action_set.actions)
-    len_actors = len(env_session._trial._actions_by_actor_id)
+    len_actors = len(env_session._trial.actors)
 
     if len_actions != len_actors:
         raise Exception(f"Received {len_actions} actions but have {len_actors} actors")
 
     recv_event = RecvEvent(EventType.ACTIVE)
-    for i, action in enumerate(env_session._trial._actions_by_actor_id):
+    for i, actor in enumerate(env_session._trial.actors):
+        action = actor.actor_class.action_space()
         action.ParseFromString(request.action_set.actions[i])
         recv_event.actions.append(RecvAction(i, action))
 
@@ -232,12 +226,6 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
 
             trial = Trial(trial_id, request.actors_in_trial, self.__cog_settings)
             trial.tick_id = request.tick_id
-
-            # action table time
-            actions_by_actor_class, actions_by_actor_id = new_actions_table(self.__cog_settings, trial)
-
-            trial._actions = actions_by_actor_class
-            trial._actions_by_actor_id = actions_by_actor_id
 
             config = None
             if request.HasField("config"):

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Exit datalog loop on receiving the trial `ended` state
 - Simulatenous trials with client actors
+- Fix index in RecvAction to match the actor list
 
 ## v1.1.0 - 2021-06-04
 

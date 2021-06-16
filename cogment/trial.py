@@ -74,9 +74,6 @@ class Trial:
         self.tick_id = -1
         self.environment = self.MinimalComponent(ENVIRONMENT_ACTOR_NAME)
 
-        self._actions = None  # Managed externally
-        self._actions_by_actor_id = None  # Managed externally
-
         self.__actor_by_name = {}
 
         self.actors = []
