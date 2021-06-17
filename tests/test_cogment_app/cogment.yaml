@@ -43,7 +43,3 @@ trial_params:
       endpoint: grpc://localhost:9001
       implementation: test
 
-    - name: client_1
-      actor_class: my_actor_class_1
-      endpoint: client
-

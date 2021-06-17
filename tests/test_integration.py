@@ -16,20 +16,19 @@ import asyncio
 import os
 import logging
 import unittest
+import urllib.request
 
 import pytest
+import mock
 
 import cogment
 
-from helpers.launch_orchestrator import launch_orchestrator
 from helpers.find_free_port import find_free_port
-import urllib.request
-
+from helpers.launch_orchestrator import launch_orchestrator
 
 @pytest.fixture(scope="function")
 def unittest_case():
     return unittest.TestCase()
-
 
 @pytest.fixture(scope="function")
 def cogment_test_setup(test_cogment_app_dir):
@@ -48,6 +47,9 @@ def cogment_test_setup(test_cogment_app_dir):
     # Terminate the orchestrator
     terminate_orchestrator()
 
+# Base implementations
+async def default_pre_trial_hook(session):
+    session.validate()
 
 class TestIntegration:
     @pytest.mark.use_orchestrator
@@ -104,7 +106,17 @@ class TestIntegration:
             assert session.environment_config.env_config_value == 29
             assert session.trial_config.env_config is not None
 
+            session.actors.append({
+                "name": "client_1",
+                "actor_class": "my_actor_class_1",
+                "endpoint": "client",
+                "implementation": "",
+                "config": None
+            })
+
             pre_hook_called_count += 1
+
+            session.validate()
 
 
         agent_call_count = 0
@@ -365,9 +377,7 @@ class TestIntegration:
 
     @pytest.mark.use_orchestrator
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="It is working on its own, but when launched after the first one, failure occurs.")
     async def test_controller_controlled_trial(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
-
         environment_call_count = 0
         environment_tick_count = 0
 
@@ -431,6 +441,8 @@ class TestIntegration:
 
         context = cogment.Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial')
 
+        pre_trial_hook = mock.AsyncMock(wraps=default_pre_trial_hook)
+        context.register_pre_trial_hook(pre_trial_hook)
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
@@ -441,12 +453,18 @@ class TestIntegration:
         ))
         await asyncio.sleep(1)
 
+    
         endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         controller = context.get_controller(endpoint=endp)
         logging.info("--starting trial--")
         trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig())
         logging.info("--trial started--")
+
+        pre_trial_hook.assert_called_once()
+        pre_trial_hook.assert_awaited_once()
+
         await asyncio.sleep(3)
+
         logging.info("--requesting trial termination--")
         await controller.terminate_trial(trial_id)
         logging.info("--trial termination request sent--")
@@ -459,8 +477,8 @@ class TestIntegration:
         assert environment_tick_count > 0
 
         unittest_case.assertCountEqual(agents_tick_count.keys(), ["actor_1", "actor_2"])
-        assert agents_tick_count["actor_1"] == agents_tick_count["actor_2"]
-        assert agents_tick_count["actor_1"] == environment_tick_count
+        unittest_case.assertEqual(agents_tick_count["actor_1"], agents_tick_count["actor_2"])
+        unittest_case.assertGreaterEqual(environment_tick_count, agents_tick_count["actor_1"])
 
         logging.info(f"test_controller_controlled_trial finished")
         await context._grpc_server.stop(grace=5.)  # To prepare for next test
