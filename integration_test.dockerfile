@@ -1,9 +1,9 @@
 # Some of the ENV (and ARG) defintions are also used inside the test
 ARG COGMENT_ORCHESTRATOR_IMAGE=cogment/orchestrator:latest
-ARG COGMENT_IMAGE=cogment/cli:latest
+ARG COGMENT_CLI_IMAGE=cogment/cli:latest
 
 FROM $COGMENT_ORCHESTRATOR_IMAGE as orchestrator
-FROM $COGMENT_IMAGE as cogment
+FROM $COGMENT_CLI_IMAGE as cogment
 FROM ubuntu:20.04
 ARG PYTHON_VERSION=3.7.10
 
@@ -32,7 +32,7 @@ RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-
 
 # Retrieve the cli!
 COPY --from=cogment /usr/local/bin/cogment /usr/local/bin/
-ENV COGMENT /usr/local/bin/cogment
+ENV COGMENT_CLI /usr/local/bin/cogment
 
 # Retrieve the orchestrator!
 COPY --from=orchestrator /usr/local/bin/orchestrator /usr/local/bin/orchestrator

@@ -51,22 +51,29 @@ poetry run task test
 
 These tests launch and use an orchestrator they are slower but more in depth.
 
-Then, to execute the integration tests (as well as the module tests), simply run
+##### Run in a docker image
+
+This is the easiest way to run the tests.
+
+```
+./scripts/run_integration_test.sh
+```
+
+By default it will use the latest public version of `cogment/cli` and `cogment/orchestrator` released on [DockerHub](https://hub.docker.com/u/cogment). To use specific versions define `COGMENT_CLI_IMAGE` and/or `COGMENT_ORCHESTRATOR_IMAGE`.
+
+```
+COGMENT_CLI_IMAGE=<COGMENT_CLI_IMAGE_NAME_AND_TAG> COGMENT_CLI_IMAGE=<COGMENT_ORCHESTRATOR_IMAGE_NAME_AND_TAG> ./scripts/run_integration_test.sh
+```
+
+##### Run locally
 
 ```
 poetry run task test --launch-orchestrator
 ```
 
-These tests can also be launched in a docker image.
-
-```
-docker build \
-  -t cogment/cogment-py-sdk-integration-test:latest \
-  --build-arg COGMENT_IMAGE="<PATH_TO_COGMENT_IMAGE>" \
-  --build-arg COGMENT_ORCHESTRATOR_IMAGE="<PATH_TO_COGMENT_ORCHESTRATOR_IMAGE>" \
-  -f integration_test.dockerfile .
-docker run --rm cogment/cogment-py-sdk-integration-test:latest
-```
+You'll need to define:
+- Either `COGMENT_CLI_IMAGE` (as above) or `COGMENT_CLI` as the path to a locally built Cogment cli executable.
+- Either `COGMENT_ORCHESTRATOR_IMAGE` (as above) or `COGMENT_ORCHESTRATOR` as the path to a locally built Cogment orchestrator executable.
 
 ### Lint
 

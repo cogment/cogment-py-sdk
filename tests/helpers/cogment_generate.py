@@ -15,13 +15,13 @@
 import subprocess
 import os
 
-COGMENT_IMAGE = os.environ.get("COGMENT_IMAGE")
-COGMENT = os.environ.get("COGMENT")
+COGMENT_CLI_IMAGE = os.environ.get("COGMENT_CLI_IMAGE")
+COGMENT_CLI = os.environ.get("COGMENT_CLI")
 
 def cogment_generate(
     app_directory,
-    docker_image=COGMENT_IMAGE,
-    binary=COGMENT
+    docker_image=COGMENT_CLI_IMAGE,
+    binary=COGMENT_CLI
 ):
     if docker_image:
         assert subprocess.run(["docker", "pull",  docker_image]).returncode == 0
