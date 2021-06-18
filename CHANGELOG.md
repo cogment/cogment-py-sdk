@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- The default Prometheus registry is now used by default, it was previously a custom built registry.
+  Furthermore, any prometheus registry can be passed to the constructor for `cogment.Context`.
+  If `None` is passed prometheus metrics are disabled entirely.
+- Passing `None` as the `prometheus_port` in the constructor for `cogment.Context` disables the launch of the Prometheus server.
+
 ## v1.1.1 - 2021-06-17
 
 ### Changed

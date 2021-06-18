@@ -21,6 +21,7 @@ from types import SimpleNamespace
 import grpc
 import grpc.aio  # type: ignore
 from prometheus_client import start_http_server, CollectorRegistry
+from prometheus_client.core import REGISTRY  # type: ignore
 
 from cogment.actor import ActorSession, ActorClass
 from cogment.environment import EnvironmentSession
@@ -136,14 +137,14 @@ class ServedEndpoint:
 
 
 class Context:
-    def __init__(self, user_id: str, cog_settings: ModuleType, asyncio_loop=None):
+    def __init__(self, user_id: str, cog_settings: ModuleType, asyncio_loop=None, prometheus_registry=REGISTRY):
         self._user_id = user_id
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
         self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
         self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
         self._grpc_server = None  # type: Any
-        self._prometheus_registry = CollectorRegistry()
+        self._prometheus_registry = prometheus_registry
         self.__cog_settings = cog_settings
 
         if asyncio_loop is None:
@@ -196,7 +197,7 @@ class Context:
         self.__datalog_impl = impl
 
     async def serve_all_registered(self, served_endpoint: ServedEndpoint,
-                                   prometheus_port: int = DEFAULT_PROMETHEUS_PORT):
+                                   prometheus_port=DEFAULT_PROMETHEUS_PORT):
         if (len(self.__actor_impls) == 0 and
                 len(self.__env_impls) == 0 and
                 len(self.__prehook_impls) == 0 and
@@ -240,7 +241,8 @@ class Context:
                 self.__cog_settings
             )
 
-        start_http_server(prometheus_port, "", self._prometheus_registry)
+        if self._prometheus_registry is not None and prometheus_port is not None:
+            start_http_server(prometheus_port, "", self._prometheus_registry)
 
         address = f"[::]:{served_endpoint.port}"
         if served_endpoint.private_key_certificate_chain_pairs is None:

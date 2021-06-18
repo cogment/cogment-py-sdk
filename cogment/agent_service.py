@@ -102,7 +102,7 @@ async def write_actions(context, agent_session):
 
 
 class AgentServicer(grpc_api.AgentEndpointServicer):
-    def __init__(self, agent_impls, cog_settings, prometheus_registry):
+    def __init__(self, agent_impls, cog_settings, prometheus_registry=None):
         self.__impls = agent_impls
         self.__agent_sessions = {}
         self.__cog_settings = cog_settings

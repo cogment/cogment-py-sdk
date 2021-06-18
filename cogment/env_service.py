@@ -161,7 +161,7 @@ async def read_actions(context, env_session):
 
 
 class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
-    def __init__(self, env_impls, cog_settings, prometheus_registry):
+    def __init__(self, env_impls, cog_settings, prometheus_registry=None):
         self.__impls = env_impls
         self.__env_sessions = {}
         self.__cog_settings = cog_settings

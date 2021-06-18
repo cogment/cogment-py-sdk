@@ -438,21 +438,24 @@ class TestIntegration:
 
             agents_ended[actor_session.name].set_result(True)
 
-
-        context = cogment.Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial')
+        # Explicitely disabling prometheus by not provideing any registry
+        context = cogment.Context(cog_settings=cog_settings, user_id='test_controller_controlled_trial', prometheus_registry=None)
 
         pre_trial_hook = mock.AsyncMock(wraps=default_pre_trial_hook)
         context.register_pre_trial_hook(pre_trial_hook)
         context.register_environment(impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
+        prometheus_port = find_free_port()
         served_endp = cogment.ServedEndpoint(cogment_test_setup["test_port"]) 
         asyncio.create_task(context.serve_all_registered(
             served_endpoint=served_endp,
-            prometheus_port=find_free_port()
+            prometheus_port=prometheus_port
         ))
         await asyncio.sleep(1)
 
+        with unittest_case.assertRaises(urllib.error.URLError):
+            urllib.request.urlopen(f"http://localhost:{prometheus_port}")
     
         endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         controller = context.get_controller(endpoint=endp)
