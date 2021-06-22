@@ -47,7 +47,7 @@ def launch_orchestrator(
     with open(os.path.join(app_directory, config_file_template), "r") as cogment_yaml_in:
         with open(os.path.join(app_directory, config_file), "w") as cogment_yaml_out:
             for line in cogment_yaml_in:
-                cogment_yaml_out.write(line.replace("grpc://localhost:9001", test_host))
+                cogment_yaml_out.write(line.replace("<<token_placeholder>>", test_host))
 
     status_dir = tempfile.mkdtemp()
     status_file = os.path.join(status_dir, "cogment_orchestrator_status")

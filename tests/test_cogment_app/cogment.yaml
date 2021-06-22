@@ -9,7 +9,7 @@ environment:
 trial:
   config_type: test_cogment_app.TrialConfig
   pre_hooks: 
-    - grpc://localhost:9001
+    - <<token_placeholder>>
 
 
 # Static configuration
@@ -28,18 +28,18 @@ actor_classes:
 # Dynamic configuration (could be changed by a pre-hook)
 trial_params:
   environment:
-    endpoint: grpc://localhost:9001
+    endpoint: <<token_placeholder>>
     config:
       env_config_value: 29
 
   actors:
     - name: actor_1
       actor_class: my_actor_class_1
-      endpoint: grpc://localhost:9001
+      endpoint: <<token_placeholder>>
       implementation: test
 
     - name: actor_2
       actor_class: my_actor_class_1
-      endpoint: grpc://localhost:9001
+      endpoint: <<token_placeholder>>
       implementation: test
 

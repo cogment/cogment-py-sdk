@@ -485,3 +485,98 @@ class TestIntegration:
 
         logging.info(f"test_controller_controlled_trial finished")
         await context._grpc_server.stop(grace=5.)  # To prepare for next test
+
+    @pytest.mark.use_orchestrator
+    @pytest.mark.asyncio
+    async def test_actor_order(self, cogment_test_setup, unittest_case, cog_settings, data_pb2):
+        agents = ["actor_A", "actor_B", "actor_C", "actor_D"]
+
+        async def pre_trial_hook(session):
+            host = "grpc://localhost:" + str(cogment_test_setup["test_port"])
+            session.actors = [{
+                "name": agents[0],
+                "actor_class": "my_actor_class_2",
+                "endpoint": host,
+                "implementation": "basic",
+                "config": None
+            }, {
+                "name": agents[1],
+                "actor_class": "my_actor_class_1",
+                "endpoint": host,
+                "implementation": "basic",
+                "config": None
+            }, {
+                "name": agents[2],
+                "actor_class": "my_actor_class_2",
+                "endpoint": host,
+                "implementation": "basic",
+                "config": None
+            }, {
+                "name": agents[3],
+                "actor_class": "my_actor_class_1",
+                "endpoint": host,
+                "implementation": "basic",
+                "config": None
+            }]
+
+            session.validate()
+
+
+        async def environment(environment_session):
+            actors = environment_session.get_active_actors()
+            assert len(actors) == len(agents)
+            for i in range(len(agents)):
+                assert actors[i].actor_name == agents[i]
+
+            environment_session.start([("*", data_pb2.Observation(observed_value=1))])
+
+            async for event in environment_session.event_loop():
+                if event.actions and event.type == cogment.EventType.ACTIVE:
+                    for i in range(len(event.actions)):
+                        action_i = event.actions[i]
+                        assert action_i.actor_index == i  # This may not always be true
+                        assert action_i.action.action_value == action_i.actor_index + 100
+
+                    if environment_session.get_tick_id() < 3:
+                        environment_session.produce_observations([("*", data_pb2.Observation(observed_value=1))])
+                    elif environment_session.get_tick_id() == 3:
+                        environment_session.end([("*", data_pb2.Observation(observed_value=1))])
+
+
+        agents_ended = {}
+        for name in agents:
+            agents_ended[name] = asyncio.get_running_loop().create_future()
+
+        async def basic_agent(actor_session):
+            nonlocal agents_ended
+            assert actor_session.name in agents
+            assert actor_session.name in agents_ended
+
+            actor_session.start()
+
+            async for event in actor_session.event_loop():
+                if event.observation and event.type == cogment.EventType.ACTIVE:
+                    agent_index = agents.index(actor_session.name)
+                    actor_session.do_action(data_pb2.Action(action_value=agent_index + 100))
+
+            agents_ended[actor_session.name].set_result(True)
+
+
+        context = cogment.Context(cog_settings=cog_settings, user_id='test_actor_order', prometheus_registry=None)
+
+        context.register_environment(impl=environment)
+        context.register_actor(impl_name="basic", impl=basic_agent)
+        context.register_pre_trial_hook(pre_trial_hook)
+
+        served_endp = cogment.ServedEndpoint(cogment_test_setup["test_port"]) 
+        asyncio.create_task(context.serve_all_registered(served_endpoint=served_endp, prometheus_port=None))
+        await asyncio.sleep(1)
+
+        endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
+        controller = context.get_controller(endpoint=endp)
+        await controller.start_trial(trial_config=data_pb2.TrialConfig(trial_config_value=31))
+
+        await asyncio.wait(agents_ended.values())
+
+        logging.info(f"test_actor_order_trial finished")
+        await context._grpc_server.stop(grace=5.)  # To prepare for next test
