@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.2.0 - 2021-06-23
+
 ### Changed
 
 - The default Prometheus registry is now used by default, it was previously a custom built registry.
