@@ -96,9 +96,9 @@ poetry build -f sdist
 People having mainteners rights of the repository can follow these steps to release a version **MAJOR.MINOR.PATCH**. The versioning scheme follows [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 1. Run `./scripts/create_release_branch.sh MAJOR.MINOR.PATCH` to create the release branch and update the version of the package,
-2. On the release branch, check and update the changelog if needed
-3. Update .cogment-api.yaml
-4. Update .gitlab-ci.yml (integration_test > variables > \*)
+2. On the release branch, check and update the changelog if needed,
+3. Update `./.cogment-api.yaml` to use the public release of the API,
+4. Update `./.gitlab-ci.yml`, `integration_test`, `COGMENT_ORCHESTRATOR_IMAGE` and `COGMENT_CLI_IMAGE` to match the latest public releases of the orchestrator and cli
 5. Make sure everything's fine on CI,
 6. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
 

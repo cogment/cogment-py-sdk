@@ -72,7 +72,7 @@ integration_test:
     stage: test
     variables:
         COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.1"
-        COGMENT_CLI_IMAGE: "cogment/cli:v1.0.0"
+        COGMENT_CLI_IMAGE: "cogment/cli:v1.0.2"
         #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
         #COGMENT_CLI_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-cli:latest
     script:
