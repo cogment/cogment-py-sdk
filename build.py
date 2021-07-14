@@ -61,18 +61,14 @@ class RetrieveCogmentApi(Command):
 
         protos_dir = path.join(package_dir, "cogment/api")
 
-        # honor the --dry-run flag
-        if not self.dry_run:
-            rmtree(protos_dir, ignore_errors=True)
-            makedirs(protos_dir, exist_ok=True)
-
         if cogment_api_path:
             cogment_api_absolute_path = path.normpath(
                 path.join(package_dir, cogment_api_path)
             )
             # honor the --dry-run flag
             if not self.dry_run:
-                copytree(cogment_api_absolute_path, protos_dir, dirs_exist_ok=True)
+                rmtree(protos_dir, ignore_errors=True)
+                copytree(cogment_api_absolute_path, protos_dir)
             retrieve_cogment_api_logs += (
                 f"cogment api copied from '{cogment_api_absolute_path}'\n"
             )
@@ -88,7 +84,6 @@ class RetrieveCogmentApi(Command):
             # honor the --dry-run flag
             if not self.dry_run:
                 rmtree(protos_dir, ignore_errors=True)
-
                 makedirs(protos_dir, exist_ok=True)
 
                 unpack_archive(temp_local_filename, protos_dir, "gztar")
