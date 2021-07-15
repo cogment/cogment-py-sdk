@@ -120,7 +120,7 @@ class ClientServicer:
             creds = grpc.ssl_channel_credentials(root, key, certs)
             channel = grpc.aio.secure_channel(endpoint.url, creds)
 
-        self._actor_stub = grpc_api.ClientActorStub(channel)
+        self._actor_stub = grpc_api.ClientActorSPStub(channel)
 
     async def run(self, trial_id, impl, impl_name, actor_classes, actor_name):
 

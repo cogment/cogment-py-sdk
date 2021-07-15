@@ -53,7 +53,7 @@ async def read_sample(context, session):
     session._new_sample(None)
 
 
-class LogExporterService(grpc_api.LogExporterServicer):
+class LogExporterService(grpc_api.LogExporterSPServicer):
     def __init__(self, impl, cog_settings):
         self._impl = impl
         self.__cog_settings = cog_settings

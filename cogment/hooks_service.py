@@ -24,7 +24,7 @@ import logging
 import traceback
 
 
-class PrehookServicer(grpc_api.TrialHooksServicer):
+class PrehookServicer(grpc_api.TrialHooksSPServicer):
 
     def __init__(self, impls, cog_settings, prometheus_registry=None):
 

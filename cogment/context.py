@@ -34,23 +34,23 @@ import cogment.api.orchestrator_pb2_grpc as grpc_api
 
 # Agent
 from cogment.agent_service import AgentServicer
-from cogment.api.agent_pb2 import _AGENTENDPOINT as agent_endpoint_descriptor
-from cogment.api.agent_pb2_grpc import add_AgentEndpointServicer_to_server
+from cogment.api.agent_pb2 import _SERVICEACTORSP as service_actor_descriptor
+from cogment.api.agent_pb2_grpc import add_ServiceActorSPServicer_to_server
 
 # Client
 from cogment.client_service import ClientServicer
 
 # Environment
 from cogment.env_service import EnvironmentServicer
-from cogment.api.environment_pb2_grpc import add_EnvironmentEndpointServicer_to_server
+from cogment.api.environment_pb2_grpc import add_EnvironmentSPServicer_to_server
 
 # Prehook
 from cogment.hooks_service import PrehookServicer
-from cogment.api.hooks_pb2_grpc import add_TrialHooksServicer_to_server
+from cogment.api.hooks_pb2_grpc import add_TrialHooksSPServicer_to_server
 
 # Log Exporter
 from cogment.log_exporter_service import LogExporterService
-from cogment.api.datalog_pb2_grpc import add_LogExporterServicer_to_server
+from cogment.api.datalog_pb2_grpc import add_LogExporterSPServicer_to_server
 
 
 DEFAULT_MAX_WORKERS = 1
@@ -61,23 +61,23 @@ DEFAULT_PROMETHEUS_PORT = 8000
 
 def _add_actor_service(grpc_server, impls, service_names, cog_settings, prometheus_registry):
     servicer = AgentServicer(impls, cog_settings, prometheus_registry)
-    add_AgentEndpointServicer_to_server(servicer, grpc_server)
-    service_names.append(agent_endpoint_descriptor.full_name)
+    add_ServiceActorSPServicer_to_server(servicer, grpc_server)
+    service_names.append(service_actor_descriptor.full_name)
 
 
 def _add_env_service(grpc_server, impls, cog_settings, prometheus_registry):
     servicer = EnvironmentServicer(impls, cog_settings, prometheus_registry)
-    add_EnvironmentEndpointServicer_to_server(servicer, grpc_server)
+    add_EnvironmentSPServicer_to_server(servicer, grpc_server)
 
 
 def _add_prehook_service(grpc_server, impls, cog_settings, prometheus_registry):
     servicer = PrehookServicer(impls, cog_settings, prometheus_registry)
-    add_TrialHooksServicer_to_server(servicer, grpc_server)
+    add_TrialHooksSPServicer_to_server(servicer, grpc_server)
 
 
 def _add_datalog_service(grpc_server, impl, cog_settings):
     servicer = LogExporterService(impl, cog_settings)
-    add_LogExporterServicer_to_server(servicer, grpc_server)
+    add_LogExporterSPServicer_to_server(servicer, grpc_server)
 
 
 class Endpoint:
@@ -286,7 +286,7 @@ class Context:
             creds = grpc.ssl_channel_credentials(root, key, certs)
             channel = grpc.aio.secure_channel(endpoint.url, creds)
 
-        return grpc_api.TrialLifecycleStub(channel)
+        return grpc_api.TrialLifecycleSPStub(channel)
 
     def get_controller(self, endpoint: Endpoint):
         stub = self._get_control_stub(endpoint)
