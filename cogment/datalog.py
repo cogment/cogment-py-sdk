@@ -49,8 +49,8 @@ class DatalogSession(ABC):
                 except GeneratorExit:
                     raise
 
-                except asyncio.CancelledError:
-                    logging.debug("Datalog coroutine cancelled while waiting for a sample.")
+                except asyncio.CancelledError as exc:
+                    logging.debug(f"Datalog coroutine cancelled while waiting for a sample: [{exc}]")
                     break
 
     def _new_sample(self, sample):
@@ -64,8 +64,8 @@ class DatalogSession(ABC):
             await self._impl(self)
             return True
 
-        except asyncio.CancelledError:
-            logging.debug(f"Datalog implementation coroutine cancelled")
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
             return False
 
         except Exception:

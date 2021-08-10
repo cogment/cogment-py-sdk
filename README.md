@@ -83,6 +83,14 @@ Run the linter using
 poetry run task lint
 ```
 
+### Check conflicting dependencies with "popular" Python packages
+
+```
+./scripts/check_dependencies_conflicts.sh
+```
+
+This script will check for conflicts required by the cogment-py-sdk and the popular Python packages in the AI/ML/Data ecosystem.
+
 ### Build the source package
 
 Build the source package (this step will only be succesfull if `poetry install` succeeded)

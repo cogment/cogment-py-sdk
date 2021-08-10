@@ -115,8 +115,8 @@ async def write_observations(context, env_session):
                 env_session._new_event(RecvEvent(EventType.FINAL))
                 break
 
-    except asyncio.CancelledError:
-        logging.debug("Environment 'write_observations' coroutine cancelled")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Environment 'write_observations' coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -152,8 +152,8 @@ async def read_actions(context, env_session):
 
             env_session._new_event(_process_actions(request, env_session))
 
-    except asyncio.CancelledError:
-        logging.debug("Environment 'read_actions' coroutine cancelled")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Environment 'read_actions' coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -286,6 +286,10 @@ class EnvironmentServicer(grpc_api.EnvironmentEndpointServicer):
 
             self.__env_sessions.pop(key, None)
             self.trials_ended.labels(env_session.impl_name).inc()
+
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Environment [{env_session.name}] implementation coroutine cancelled: [{exc}]")
+            raise
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

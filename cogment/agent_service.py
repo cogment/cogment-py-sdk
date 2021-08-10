@@ -70,8 +70,8 @@ async def read_observations(context, agent_session):
             recv_event.observation = RecvObservation(request.observation, snapshot)
             agent_session._new_event(recv_event)
 
-    except asyncio.CancelledError:
-        logging.debug(f"Agent [{agent_session.name}] 'read_observations' coroutine cancelled")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Agent [{agent_session.name}] 'read_observations' coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -93,8 +93,8 @@ async def write_actions(context, agent_session):
 
             await context.write(reply)
 
-    except asyncio.CancelledError:
-        logging.debug(f"Agent [{agent_session.name}] 'write_action' coroutine cancelled")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Agent [{agent_session.name}] 'write_action' coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -243,6 +243,7 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
     async def OnObservation(self, request_iterator, context):
         reader_task = None
         writer_task = None
+        agent_session = None
         try:
             metadata = dict(context.invocation_metadata())
             trial_id = metadata["trial-id"]
@@ -270,6 +271,13 @@ class AgentServicer(grpc_api.AgentEndpointServicer):
                     del self.__agent_sessions[key]
             else:
                 logging.error(f"Unknown trial id [{trial_id}] or actor name [{actor_name}] for observation")
+
+        except asyncio.CancelledError as exc:
+            if agent_session is not None:
+                logging.debug(f"Agent [{agent_session.name}] user coroutine cancelled: [{exc}]")
+            else:
+                logging.debug(f"Agent unknown user coroutine cancelled: [{exc}]")
+            raise
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

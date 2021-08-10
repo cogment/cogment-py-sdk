@@ -156,8 +156,8 @@ class Session(ABC):
             await self._impl(self)
             return True
 
-        except asyncio.CancelledError:
-            logging.debug(f"[{self.name}] implementation coroutine cancelled")
+        except asyncio.CancelledError as exc:
+            logging.debug(f"[{self.name}] implementation coroutine cancelled: [{exc}]")
             return False
 
         except Exception:
@@ -190,8 +190,8 @@ class Session(ABC):
             try:
                 event = await self._event_queue.get()
 
-            except asyncio.CancelledError:
-                logging.debug(f"[{self.name}] coroutine cancelled while waiting for an event")
+            except asyncio.CancelledError as exc:
+                logging.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
                 break
 
             self._last_event_delivered = (event.type == EventType.FINAL)

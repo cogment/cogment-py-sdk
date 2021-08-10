@@ -42,8 +42,8 @@ async def read_sample(context, session):
             else:
                 logging.warning(f"Invalid request received from the orchestrator : {request}")
 
-    except asyncio.CancelledError:
-        logging.debug(f"LogExporterService 'read_sample' coroutine cancelled.")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"LogExporterService 'read_sample' coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.error(f"{traceback.format_exc()}")
@@ -87,6 +87,10 @@ class LogExporterService(grpc_api.LogExporterServicer):
                 logging.debug(f"User datalog implementation returned")
             else:
                 logging.debug(f"User datalog implementation was cancelled")
+
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
+            raise
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")

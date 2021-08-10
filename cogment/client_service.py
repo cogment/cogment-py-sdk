@@ -51,8 +51,8 @@ async def read_observations(client_session, reply_itor):
                 client_session._new_event(RecvEvent(EventType.FINAL))
                 break
 
-    except asyncio.CancelledError:
-        logging.debug(f"Client [{client_session.name}] 'read_observations' coroutine cancelled")
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Client [{client_session.name}] 'read_observations' coroutine cancelled: [{exc}]")
 
     except grpc.aio.AioRpcError as exc:
         if exc.code() == grpc.StatusCode.UNAVAILABLE:
@@ -85,8 +85,8 @@ class WriteActions:
 
             return action_req
 
-        except asyncio.CancelledError:
-            logging.debug(f"Client [{self.session.name}] 'WriteActions' coroutine cancelled")
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Client [{self.session.name}] 'WriteActions' coroutine cancelled: [{exc}]")
 
         except GeneratorExit:
             raise
@@ -176,6 +176,10 @@ class ClientServicer:
                     logging.debug(f"User client implementation for [{new_session.name}] returned")
             else:
                 logging.debug(f"User client implementation for [{new_session.name}] was cancelled")
+
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Agent [{new_session.name}] user coroutine cancelled: [{exc}]")
+            raise
 
         except Exception:
             logging.error(f"{traceback.format_exc()}")
