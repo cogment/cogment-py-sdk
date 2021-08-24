@@ -17,9 +17,9 @@ import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
 from cogment.trial import Trial
 from cogment.datalog import _ServedDatalogSession
+from cogment.errors import CogmentError
 from cogment.utils import raw_params_to_user_params, list_versions
 import logging
-import traceback
 import asyncio
 
 import grpc.aio  # type: ignore
@@ -46,7 +46,7 @@ async def read_sample(context, session):
         logging.debug(f"LogExporterService 'read_sample' coroutine cancelled: [{exc}]")
 
     except Exception:
-        logging.error(f"{traceback.format_exc()}")
+        logging.exception("read_sample")
         raise
 
     # Exit the loop
@@ -67,7 +67,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             request = await context.read()
 
             if not request.HasField("trial_params"):
-                raise Exception(f"Initial logging request for [{trial_id}] does not contain parameters.")
+                raise CogmentError(f"Initial logging request for [{trial_id}] does not contain parameters.")
 
             trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
             raw_trial_params = request.trial_params
@@ -93,7 +93,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             raise
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnLogSample")
             raise
 
         finally:
@@ -104,5 +104,5 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
         try:
             return list_versions()
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("Version")
             raise

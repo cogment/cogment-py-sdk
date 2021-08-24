@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-class Error(Exception):
+class CogmentError(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
 
 
-class InvalidRequestError(Error):
+class InvalidRequestError(CogmentError):
 
     def __init__(self, message, request):
         self.request = request
         super().__init__(message)
 
 
-class InvalidParamsError(Error):
+class InvalidParamsError(CogmentError):
 
     def __init__(self, msg):
         super().__init__(msg)

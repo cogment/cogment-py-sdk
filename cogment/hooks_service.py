@@ -21,7 +21,6 @@ from cogment.trial import Trial
 from cogment.prehook import _ServedPrehookSession
 
 import logging
-import traceback
 
 
 class PrehookServicer(grpc_api.TrialHooksSPServicer):
@@ -36,6 +35,7 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
     async def OnPreTrial(self, request, context):
         try:
             metadata = dict(context.invocation_metadata())
+            logging.debug(f"Received metadata: [{metadata}]")
             trial_id = metadata["trial-id"]
 
             trial = Trial(trial_id, [], self.__cog_settings)
@@ -46,8 +46,7 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
                 try:
                     await impl(prehook)
                 except Exception:
-                    logging.error(
-                        f"An exception occured in user pre-trial hook implementation:\n{traceback.format_exc()}")
+                    logging.exception("An exception occured in user pre-trial hook implementation:")
                     raise
 
                 prehook._recode()
@@ -58,5 +57,5 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             return reply
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnPreTrial")
             raise

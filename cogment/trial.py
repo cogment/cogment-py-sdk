@@ -18,7 +18,7 @@ from typing import List, Any
 
 import cogment.api.common_pb2 as common_api
 from cogment.environment import ENVIRONMENT_ACTOR_NAME
-from cogment.errors import Error
+from cogment.errors import CogmentError
 
 
 class Trial:
@@ -84,7 +84,8 @@ class Trial:
     def _add_actors(self, actors_in_trial):
         for actor_in_trial in actors_in_trial:
             if actor_in_trial.actor_class not in self.cog_settings.actor_classes:
-                raise Error(f"class '{actor_in_trial.actor_class}' of actor '{actor_in_trial.name}' can not be found.")
+                raise CogmentError(f"class [{actor_in_trial.actor_class}] of actor [{actor_in_trial.name}]"
+                                   " cannot be found.")
             actor_class = self.cog_settings.actor_classes[actor_in_trial.actor_class]
             actor = self.Component(name=actor_in_trial.name, actor_class=actor_class)
             self.actors.append(actor)

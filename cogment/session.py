@@ -15,8 +15,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import logging
-import traceback
 import asyncio
+from cogment.errors import CogmentError
 
 
 class ActorInfo:
@@ -76,7 +76,7 @@ class RecvReward:
 
     def all_sources(self):
         if not self._sources:
-            raise RuntimeError("Unexpected reward with no source")
+            raise CogmentError("Unexpected reward with no source")
         for src in self._sources:
             yield RecvRewardSource(src)
 
@@ -136,20 +136,18 @@ class Session(ABC):
         self._last_event_delivered = False
         self._last_event_received = False
         self._task = None  # Task used to call _run()
+        self._ending = False
 
         # Pre-compute since it will be used regularly
         self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
 
     def _start(self):
         if self._event_queue is not None:
-            logging.warning(f"Cannot start [{self.name}] more than once. Data dropped.")
-            return False
+            raise CogmentError(f"Cannot start [{self.name}] more than once.")
         if self._trial.over:
-            logging.error(f"Cannot start [{self.name}] because the trial has ended.")
-            return False
+            raise CogmentError(f"Cannot start [{self.name}] because the trial has ended.")
 
         self._event_queue = asyncio.Queue()
-        return True
 
     async def _run(self):
         try:
@@ -161,7 +159,7 @@ class Session(ABC):
             return False
 
         except Exception:
-            logging.error(f"An exception occured in user implementation of [{self.name}]:\n{traceback.format_exc()}")
+            logging.exception(f"An exception occured in user implementation of [{self.name}]:")
             raise
 
     def _new_event(self, event):

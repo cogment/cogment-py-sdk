@@ -16,7 +16,7 @@ import pytest
 import unittest
 
 from cogment.api.common_pb2 import TrialActor
-from cogment.errors import Error
+from cogment.errors import CogmentError
 from cogment.trial import Trial
 
 @pytest.fixture(scope="function")
@@ -38,49 +38,11 @@ def trial(cog_settings):
 
 class TestTrial:
     def test_add_actor_with_unknown_class(self, cog_settings):
-        with pytest.raises(Error):
+        with pytest.raises(CogmentError):
             Trial("test_add_actor_with_unknown_class", [
                 TrialActor(actor_class="my_actor_class_1", name="agent_1"),
                 TrialActor(actor_class="my_unknown_actor_class", name="agent_2")
             ], cog_settings)
-
-    def test_get_actors_all(self, trial):
-        actors = trial.get_actors(["*"])
-        assert len(actors) == 4
-        assert actors[0].name == "agent_1"
-        assert actors[1].name == "agent_2"
-        assert actors[2].name == "agent_3"
-        assert actors[3].name == "agent_4"
-
-    def test_get_actors_one(self, trial):
-        actors = trial.get_actors(["agent_2"])
-        assert len(actors) == 1
-        assert actors[0].name == "agent_2"
-
-    def test_get_actors_many(self, trial):
-        actors = trial.get_actors(["agent_3", "agent_2"])
-        assert len(actors) == 2
-        assert actors[0].name == "agent_2"
-        assert actors[1].name == "agent_3"
-
-    def test_get_actors_by_class(self, trial):
-        actors = trial.get_actors(["my_actor_class_1.*"])
-        assert len(actors) == 2
-        assert actors[0].name == "agent_1"
-        assert actors[1].name == "agent_3"
-
-    def test_get_actors_by_class_and_by_name1(self, trial):
-        actors = trial.get_actors(["my_actor_class_1.*", "agent_1"])
-        assert len(actors) == 2
-        assert actors[0].name == "agent_1"
-        assert actors[1].name == "agent_3"
-
-    def test_get_actors_by_class_and_by_name2(self, trial):
-        actors = trial.get_actors(["my_actor_class_1.*", "agent_2"])
-        assert len(actors) == 3
-        assert actors[0].name == "agent_1"
-        assert actors[1].name == "agent_2"
-        assert actors[2].name == "agent_3"
 
     def test_send_messages(self, trial, unittest_case, data_pb2):
         trial.send_message(data_pb2.MyMessageUserData(a_string="foo", an_int=42), to=["agent_3", "agent_2"])

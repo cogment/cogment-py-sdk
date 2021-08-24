@@ -28,6 +28,7 @@ from cogment.environment import EnvironmentSession
 from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
 from cogment.control import Controller
+from cogment.errors import CogmentError
 
 # Controller
 import cogment.api.orchestrator_pb2_grpc as grpc_api
@@ -155,7 +156,7 @@ class Context:
             except RuntimeError:
                 pass
             if self.asyncio_loop is None:
-                raise RuntimeError("The Cogment SDK requires running in a Python.asyncio Task")
+                raise CogmentError("The Cogment SDK requires running in a Python.asyncio Task")
         else:
             self.asyncio_loop = asyncio_loop
 
@@ -164,9 +165,9 @@ class Context:
                        impl_name: str,
                        actor_classes: List[str] = []):
         if self._grpc_server is not None:
-            raise RuntimeError("Cannot register an actor after the server is started")
+            raise CogmentError("Cannot register an actor after the server is started")
         if impl_name in self.__actor_impls:
-            raise RuntimeError(f"The actor implementation name must be unique: [{impl_name}]")
+            raise CogmentError(f"The actor implementation name must be unique: [{impl_name}]")
 
         self.__actor_impls[impl_name] = SimpleNamespace(impl=impl, actor_classes=actor_classes)
 
@@ -174,25 +175,25 @@ class Context:
                              impl: Callable[[EnvironmentSession], Awaitable[None]],
                              impl_name: str = "default"):
         if self._grpc_server is not None:
-            raise RuntimeError("Cannot register an environment after the server is started")
+            raise CogmentError("Cannot register an environment after the server is started")
         if impl_name in self.__env_impls:
-            raise RuntimeError(f"The environment implementation name must be unique: [{impl_name}]")
+            raise CogmentError(f"The environment implementation name must be unique: [{impl_name}]")
 
         self.__env_impls[impl_name] = SimpleNamespace(impl=impl)
 
     def register_pre_trial_hook(self,
                                 impl: Callable[[PrehookSession], Awaitable[None]]):
         if self._grpc_server is not None:
-            raise RuntimeError("Cannot register a pre-trial hook after the server is started")
+            raise CogmentError("Cannot register a pre-trial hook after the server is started")
 
         self.__prehook_impls.append(impl)
 
     def register_datalog(self,
                          impl: Callable[[DatalogSession], Awaitable[None]]):
         if self._grpc_server is not None:
-            raise RuntimeError("Cannot register a datalog after the server is started")
+            raise CogmentError("Cannot register a datalog after the server is started")
         if self.__datalog_impl is not None:
-            raise RuntimeError("Only one datalog service can be registered")
+            raise CogmentError("Only one datalog service can be registered")
 
         self.__datalog_impl = impl
 
@@ -202,9 +203,9 @@ class Context:
                 len(self.__env_impls) == 0 and
                 len(self.__prehook_impls) == 0 and
                 self.__datalog_impl is None):
-            raise RuntimeError("Nothing registered to serve!")
+            raise CogmentError("Nothing registered to serve!")
         if self._grpc_server is not None:
-            raise RuntimeError("Cannot serve the same components twice")
+            raise CogmentError("Cannot serve the same components twice")
 
         self._grpc_server = grpc.aio.server()
 
@@ -295,7 +296,7 @@ class Context:
     async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
         actor_impl = self.__actor_impls.get(impl_name)
         if actor_impl is None:
-            raise Exception(f"Unknown actor impl [{impl_name}].  Was it registered?")
+            raise CogmentError(f"Unknown actor impl [{impl_name}].  Was it registered?")
 
         servicer = ClientServicer(self.__cog_settings, endpoint)
         await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)

@@ -21,6 +21,7 @@ import cogment.api.environment_pb2 as env_api
 import cogment.api.common_pb2 as common_api
 from cogment.utils import list_versions
 from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType
+from cogment.errors import CogmentError
 
 from types import SimpleNamespace, ModuleType
 import grpc.aio  # type: ignore
@@ -33,7 +34,6 @@ from prometheus_client import Summary, Counter
 
 import atexit
 import logging
-import traceback
 import typing
 import asyncio
 from time import time
@@ -66,7 +66,7 @@ def pack_observations(env_session, observations, reply, tick_id=-1):
 
     for actor_index, actor in enumerate(env_session._trial.actors):
         if not new_obs[actor_index]:
-            raise Exception(f"Actor [{actor.name}] is missing an observation")
+            raise CogmentError(f"Actor [{actor.name}] is missing an observation")
         snapshots[actor_index] = isinstance(new_obs[actor_index], actor.actor_class.observation_space)
 
     # dupping time
@@ -119,7 +119,7 @@ async def write_observations(context, env_session):
         logging.debug(f"Environment 'write_observations' coroutine cancelled: [{exc}]")
 
     except Exception:
-        logging.error(f"{traceback.format_exc()}")
+        logging.exception("write_observations")
         raise
 
 
@@ -130,7 +130,7 @@ def _process_actions(request, env_session):
     len_actors = len(env_session._trial.actors)
 
     if len_actions != len_actors:
-        raise Exception(f"Received {len_actions} actions but have {len_actors} actors")
+        raise CogmentError(f"Received {len_actions} actions but have {len_actors} actors")
 
     recv_event = RecvEvent(EventType.ACTIVE)
     for i, actor in enumerate(env_session._trial.actors):
@@ -156,7 +156,7 @@ async def read_actions(context, env_session):
         logging.debug(f"Environment 'read_actions' coroutine cancelled: [{exc}]")
 
     except Exception:
-        logging.error(f"{traceback.format_exc()}")
+        logging.exception("read_actions")
         raise
 
 
@@ -230,7 +230,8 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
             config = None
             if request.HasField("config"):
                 if self.__cog_settings.environment.config_type is None:
-                    raise Exception("Environment received config data of unknown type (was it defined in cogment.yaml)")
+                    raise CogmentError(
+                        "Environment received config data of unknown type (was it defined in cogment.yaml)")
                 config = self.__cog_settings.environment.config_type()
                 config.ParseFromString(request.config.content)
 
@@ -250,7 +251,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
             return reply
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnStart")
             raise
 
     async def OnAction(self, request_iterator, context):
@@ -292,7 +293,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
             raise
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnAction")
             raise
 
         finally:
@@ -324,7 +325,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
             return env_api.EnvMessageReply()
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnMessage")
             raise
 
     async def OnEnd(self, request, context):
@@ -357,7 +358,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
             return reply
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("OnEnd")
             raise
 
     def __cleanup(self):

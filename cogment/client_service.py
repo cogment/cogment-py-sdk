@@ -17,6 +17,7 @@ import grpc.aio  # type: ignore
 
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.actor import _ClientActorSession
+from cogment.errors import CogmentError
 from cogment.session import RecvEvent, EventType
 import cogment.api.orchestrator_pb2_grpc as grpc_api
 from cogment.delta_encoding import DecodeObservationData
@@ -27,7 +28,6 @@ from types import SimpleNamespace
 
 import asyncio
 import logging
-import traceback
 
 
 async def read_observations(client_session, reply_itor):
@@ -63,7 +63,7 @@ async def read_observations(client_session, reply_itor):
             raise
 
     except Exception:
-        logging.error(f"{traceback.format_exc()}")
+        logging.exception("read_observations")
         raise
 
 
@@ -92,7 +92,7 @@ class WriteActions:
             raise
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("WriteActions::anext")
             raise
 
         raise StopAsyncIteration
@@ -150,7 +150,7 @@ class ClientServicer:
         config = None
         if reply.HasField("config"):
             if actor_class.config_type is None:
-                raise Exception(
+                raise CogmentError(
                     f"Actor [{self_info.name}] received config data of unknown type (was it defined in cogment.yaml)")
             config = actor_class.config_type()
             config.ParseFromString(reply.config.content)
@@ -182,7 +182,7 @@ class ClientServicer:
             raise
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("ClientServicer::run")
             raise
 
         finally:

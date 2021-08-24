@@ -14,7 +14,6 @@
 
 import asyncio
 import logging
-import traceback
 from abc import ABC, abstractmethod
 
 
@@ -69,7 +68,7 @@ class DatalogSession(ABC):
             return False
 
         except Exception:
-            logging.error(f"An exception occured in user datalog implementation:\n{traceback.format_exc()}")
+            logging.exception(f"An exception occured in user datalog implementation:")
             raise
 
     def __str__(self):

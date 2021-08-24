@@ -15,13 +15,13 @@
 import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.session import ActorInfo
+from cogment.errors import CogmentError
 
 import asyncio
 import grpc
 import grpc.aio  # type: ignore
 from enum import Enum
 import logging
-import traceback
 
 
 class TrialState(Enum):
@@ -57,7 +57,7 @@ class Controller:
         metadata = [("trial-id", trial_id)]
         rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
         if len(rep.trial) != 1:
-            raise RuntimeError(f"Unexpected response from orchestraotr [{len(rep.trial)}]")
+            raise CogmentError(f"Unexpected response from orchestrator [{rep}] for [{trial_id}]")
 
         result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
         return result
@@ -115,7 +115,7 @@ class Controller:
 
         reply_itor = self._lifecycle_stub.WatchTrials(request=request)
         if not reply_itor:
-            raise Exception(f"'watch_trials' failed to connect")
+            raise CogmentError(f"'watch_trials' failed to connect")
 
         try:
             async for reply in reply_itor:
@@ -130,7 +130,7 @@ class Controller:
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
                 logging.error(f"Orchestrator communication lost: [{exc.details()}]")
             else:
-                logging.error(f"{traceback.format_exc()}")
+                logging.exception("watch_trials -- Unexpected aio error")
                 raise
 
         except GeneratorExit:
@@ -140,7 +140,7 @@ class Controller:
             logging.debug(f"watch_trial coroutine cancelled while waiting for trial info: [{exc}]")
 
         except Exception:
-            logging.error(f"{traceback.format_exc()}")
+            logging.exception("watch_trials")
             raise
 
     def __str__(self):
