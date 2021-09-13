@@ -59,10 +59,10 @@ This is the easiest way to run the tests.
 ./scripts/run_integration_test.sh
 ```
 
-By default it will use the latest public version of `cogment/cli` and `cogment/orchestrator` released on [DockerHub](https://hub.docker.com/u/cogment). To use specific versions define `COGMENT_CLI_IMAGE` and/or `COGMENT_ORCHESTRATOR_IMAGE`.
+By default it will use the latest public version `cogment/orchestrator` released on [DockerHub](https://hub.docker.com/u/cogment). To use specific versions define `COGMENT_ORCHESTRATOR_IMAGE`.
 
 ```
-COGMENT_CLI_IMAGE=<COGMENT_CLI_IMAGE_NAME_AND_TAG> COGMENT_CLI_IMAGE=<COGMENT_ORCHESTRATOR_IMAGE_NAME_AND_TAG> ./scripts/run_integration_test.sh
+./scripts/run_integration_test.sh
 ```
 
 ##### Run locally
@@ -72,7 +72,6 @@ poetry run task test --launch-orchestrator
 ```
 
 You'll need to define:
-- Either `COGMENT_CLI_IMAGE` (as above) or `COGMENT_CLI` as the path to a locally built Cogment cli executable.
 - Either `COGMENT_ORCHESTRATOR_IMAGE` (as above) or `COGMENT_ORCHESTRATOR` as the path to a locally built Cogment orchestrator executable.
 
 ### Lint
@@ -106,7 +105,7 @@ People having mainteners rights of the repository can follow these steps to rele
 1. Run `./scripts/create_release_branch.sh MAJOR.MINOR.PATCH` to create the release branch and update the version of the package,
 2. On the release branch, check and update the changelog if needed,
 3. Update `./.cogment-api.yaml` to use the public release of the API,
-4. Update `./.gitlab-ci.yml`, `integration_test`, `COGMENT_ORCHESTRATOR_IMAGE` and `COGMENT_CLI_IMAGE` to match the latest public releases of the orchestrator and cli
+4. Update `./.gitlab-ci.yml`, `integration_test`, and `COGMENT_ORCHESTRATOR_IMAGE` to match the latest public releases of the orchestrator and cli
 5. Make sure everything's fine on CI,
 6. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
 

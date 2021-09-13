@@ -3,13 +3,6 @@
 
 set -e
 
-if [ -z "${COGMENT_CLI_IMAGE}" ]; then
-  COGMENT_CLI_IMAGE="cogment/cli:latest"
-fi
-
-echo "** Pulling ${COGMENT_CLI_IMAGE}..."
-docker pull "${COGMENT_CLI_IMAGE}" || echo "   Unable to pull ${COGMENT_CLI_IMAGE}, maybe it is a locally built image."
-
 if [ -z "${COGMENT_ORCHESTRATOR_IMAGE}" ]; then
   COGMENT_ORCHESTRATOR_IMAGE="cogment/orchestrator:latest"
 fi
@@ -26,7 +19,6 @@ fi
 echo "** Building the docker image..."
 docker build \
   -t local/cogment-py-sdk-integration-test:"${TEST_IMAGE_TAG}" \
-  --build-arg COGMENT_CLI_IMAGE="${COGMENT_CLI_IMAGE}" \
   --build-arg COGMENT_ORCHESTRATOR_IMAGE="${COGMENT_ORCHESTRATOR_IMAGE}" \
   -f integration_test.dockerfile .
 

@@ -13,28 +13,6 @@
 # limitations under the License.
 
 import subprocess
-import os
 
-COGMENT_CLI_IMAGE = os.environ.get("COGMENT_CLI_IMAGE")
-COGMENT_CLI = os.environ.get("COGMENT_CLI")
-
-def cogment_generate(
-    app_directory,
-    docker_image=COGMENT_CLI_IMAGE,
-    binary=COGMENT_CLI
-):
-    if docker_image:
-        assert subprocess.run(["docker", "pull",  docker_image]).returncode == 0
-        assert subprocess.run(["docker", "run",
-                               "--volume", "/var/run/docker.sock:/var/run/docker.sock",
-                               "--volume", f"{app_directory}:/cogment",
-                               docker_image,
-                               "generate",
-                               "--python_dir=."
-                               ])
-    else:
-        assert binary
-        assert subprocess.run([binary,
-                               "generate",
-                               "--python_dir=."
-                               ], cwd=app_directory)
+def cogment_generate(app_directory):
+    assert subprocess.run(["python", "-m", "cogment.generate"], cwd=app_directory).returncode == 0

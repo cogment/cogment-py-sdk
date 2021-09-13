@@ -4,6 +4,7 @@ __pycache__
 sdist/
 eggs/
 .eggs/
+.vscode/
 build/
 dist
 .mypy_cache

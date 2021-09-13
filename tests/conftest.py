@@ -18,7 +18,10 @@ import os
 
 from helpers.cogment_generate import cogment_generate
 
-TEST_COGMENT_APP_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'test_cogment_app')
+TEST_COGMENT_APP_DIR = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "test_cogment_app"
+)
+
 
 @pytest.fixture(scope="session")
 def test_cogment_app_dir():
@@ -30,27 +33,40 @@ def test_cogment_app_dir():
 def cog_settings(test_cogment_app_dir):
     sys.path.append(test_cogment_app_dir)
     import cog_settings
+
     return cog_settings
+
 
 @pytest.fixture(scope="session")
 def data_pb2(test_cogment_app_dir):
     sys.path.append(test_cogment_app_dir)
     import data_pb2
+
     return data_pb2
+
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--launch-orchestrator", action="store_true", default=False, help="launch a live orchestrator run slow tests"
+        "--launch-orchestrator",
+        action="store_true",
+        default=False,
+        help="launch a live orchestrator run slow tests",
     )
 
+
 def pytest_configure(config):
-    config.addinivalue_line("markers", "use_orchestrator: mark test as requiring a live orchestrator to run")
+    config.addinivalue_line(
+        "markers", "use_orchestrator: mark test as requiring a live orchestrator to run"
+    )
+
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--launch-orchestrator"):
         # --launch-orchestrator given in cli: launch the orchestrator
         return
-    skip_requiring_orchestrator = pytest.mark.skip(reason="needs --launch-orchestrator option to run")
+    skip_requiring_orchestrator = pytest.mark.skip(
+        reason="needs --launch-orchestrator option to run"
+    )
     for item in items:
         if "use_orchestrator" in item.keywords:
             item.add_marker(skip_requiring_orchestrator)

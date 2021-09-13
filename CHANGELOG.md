@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Add `python -m cogment.generate` to compile the protobuf files and generate `cog_settings.py` for a cogment project.
+  This is designed as a replacement for the `cogment generate` command for python cogment components.
+
 ## Changed
 
 - Update grpc version used to 1.38.1
@@ -179,7 +184,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v1.0.0-alpha2 - 2020-12-09
 
-### Fixed 
+### Fixed
 
 - Add missing cogment protobuf api files to the generated package.
 
