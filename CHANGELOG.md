@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.3.0 - 2021-09-23
+
 ### Added
 
 - Add `python -m cogment.generate` to compile the protobuf files and generate `cog_settings.py` for a cogment project.
