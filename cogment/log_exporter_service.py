@@ -59,6 +59,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
         self.__cog_settings = cog_settings
         logging.info("Log Exporter Service started")
 
+    # Override
     async def OnLogSample(self, request_iterator, context):
         try:
             metadata = dict(context.invocation_metadata())
@@ -100,6 +101,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             if reader_task is not None:
                 reader_task.cancel()
 
+    # Override
     async def Version(self, request, context):
         try:
             return list_versions()

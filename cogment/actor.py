@@ -21,7 +21,6 @@ from cogment.session import Session, EventType
 from cogment.environment import ENVIRONMENT_ACTOR_NAME
 from cogment.errors import CogmentError
 
-import cogment.api.orchestrator_pb2 as orchestrator_api
 import cogment.api.common_pb2 as common_api
 import cogment.api.agent_pb2 as agent_api
 
@@ -186,68 +185,3 @@ class _ServedActorSession(ActorSession):
                 message.payload.Pack(payload)
 
             self._data_queue.put_nowait(message)
-
-
-class _ClientActorSession(ActorSession):
-    def __init__(self, impl, actor_class, trial, name, impl_name, config, actor_stub):
-        super().__init__(impl, actor_class, trial, name, impl_name, config)
-        self._actor_sub = actor_stub
-        self._action_queue = asyncio.Queue()
-
-    def ack_ending(self):
-        raise CogmentError("No ack ending for client actors")
-
-    async def _retrieve_action(self):
-        try:
-            action = await self._action_queue.get()
-            self._action_queue.task_done()
-            return action
-
-        except RuntimeError as exc:
-            # Unfortunatelty asyncio returns a standard RuntimeError in this case
-            if exc.args[0] != "Event loop is closed":
-                raise
-            else:
-                logging.debug(f"Normal exception on retrieving action at close: [{exc}]")
-
-        return None
-
-    def do_action(self, action):
-        if self._event_queue is None:
-            logging.warning(f"Cannot send action until actor [{self.name}] is started.")
-            return
-        self._action_queue.put_nowait(action)
-
-    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
-        request = orchestrator_api.TrialRewardRequest()
-
-        for dest_actor in self._trial.get_actors(pattern_list=to):
-            reward = common_api.Reward(receiver_name=dest_actor.name, tick_id=-1, value=value)
-            reward_source = common_api.RewardSource(sender_name=self.name, value=value, confidence=confidence)
-            if user_data is not None:
-                reward_source.user_data.Pack(user_data)
-            reward.sources.append(reward_source)
-            request.rewards.append(reward)
-
-        if request.rewards:
-            metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
-            self._actor_sub.SendReward(request=request, metadata=metadata)
-
-    def send_message(self, payload, to, to_environment=False):
-        message_req = orchestrator_api.TrialMessageRequest()
-
-        for dest_actor in self._trial.get_actors(pattern_list=to):
-            message = common_api.Message(tick_id=-1, receiver_name=dest_actor.name)
-            if payload is not None:
-                message.payload.Pack(payload)
-            message_req.messages.append(message)
-
-        if to_environment:
-            message = common_api.Message(tick_id=-1, receiver_name=ENVIRONMENT_ACTOR_NAME)
-            if payload is not None:
-                message.payload.Pack(payload)
-            message_req.messages.append(message)
-
-        if message_req.messages:
-            metadata = (("trial-id", self.get_trial_id()), ("actor-name", self.name))
-            self._actor_sub.SendMessage(request=message_req, metadata=metadata)

@@ -32,6 +32,7 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
 
         logging.info("Prehook Service started")
 
+    # Override
     async def OnPreTrial(self, request, context):
         try:
             metadata = dict(context.invocation_metadata())

@@ -293,14 +293,64 @@ class Context:
         stub = self._get_control_stub(endpoint)
         return Controller(stub, self._user_id)
 
-    async def join_trial(self, trial_id, endpoint: Endpoint, impl_name, actor_name=None):
-        actor_impl = self.__actor_impls.get(impl_name)
-        if actor_impl is None:
-            raise CogmentError(f"Unknown actor impl [{impl_name}].  Was it registered?")
+    async def join_trial(self, trial_id, endpoint: Endpoint, impl_name=None, actor_name=None, actor_class=None):
+        requested_class = None
+        requested_name = None
+        if impl_name is not None:
+            # For backward compatibility
+            logging.warning(f"`join_trial` parameter `impl_name` is deprecated")
+            if actor_name is None:
+                actor_impl = self.__actor_impls[impl_name]
+                if len(actor_impl.actor_classes) == 0:
+                    raise CogmentError(f"Unable to determine possible actor to join: "
+                                    f"[{impl_name}] does not have any registered actor class")
+                requested_class = actor_impl.actor_classes[0]
+            else:
+                requested_name = actor_name
+
+        elif actor_name is not None:
+            requested_name = actor_name
+            if actor_class is not None:
+                logging.warning(f"`actor_class` will be ignored because `actor_name` is provided in `join_trial")
+
+        elif actor_class is not None:
+            requested_class = actor_class
+
+        else:
+            raise CogmentError(f"Actor name or actor class must be specified to join a trial")
 
         servicer = ClientServicer(self.__cog_settings, endpoint)
-        await servicer.run(trial_id, actor_impl.impl, impl_name, actor_impl.actor_classes, actor_name)
+        init_data = await servicer.join(trial_id, requested_name, requested_class)
+
+        if requested_name is not None and requested_name != init_data.actor_name:
+            raise CogmentError(f"Internal error: Actor name [{requested_name}] requested, received: {init_data}")
+        if requested_class is not None and requested_class != init_data.actor_class:
+            raise CogmentError(f"Internal error: Actor class [{requested_class}] requested, received: {init_data}")
+
+        if impl_name is not None:
+            if init_data.impl_name != impl_name:
+                raise CogmentError(f"Registered impl_name [{impl_name}] does not match "
+                                   f"trial [{trial_id}] parameters impl_name [{init_data.impl_name}]")
+
+        actor_impl = self.__actor_impls.get(init_data.impl_name)
+        if actor_impl is None:
+            # This can only happen if impl_name was not provided as an argument
+            raise CogmentError(f"Trial [{trial_id}] - Parametrized impl_name [{init_data.impl_name}] "
+                               f"is not registered as an actor in this context")
+
+        compatible = True
+        for class_name in actor_impl.actor_classes:
+            compatible = False
+            if class_name == init_data.actor_class:
+                compatible = True
+                break
+        if not compatible:
+            raise CogmentError(f"Joined actor class [{init_data.actor_class}] is not compatible "
+                               f" with registered actor [{init_data.impl_name}]")
+
+        await servicer.run_session(actor_impl.impl, init_data)
 
     def __str__(self):
+        # TODO: Finish this method
         result = f"Context:"
         return result

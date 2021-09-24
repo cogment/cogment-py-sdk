@@ -94,9 +94,8 @@ def process_normal_data(data, session):
                         f"received unexpected detail data [{data.details}]")
 
     else:
-        data_set = data.WhichOneof("data")
         logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                      f"received unexpected data [{data_set}]")
+                      f"received unexpected data [{data.WhichOneof('data')}]")
 
 
 async def process_incoming(context, session):
@@ -115,7 +114,7 @@ async def process_incoming(context, session):
                 process_normal_data(data, session)
 
             elif data.state == common_api.CommunicationState.HEARTBEAT:
-                reply = agent_api.ServiceActorRunOutput()
+                reply = common_api.ActorRunTrialOutput()
                 reply.state = data.state
                 await context.write(reply)
 
@@ -127,7 +126,7 @@ async def process_incoming(context, session):
             elif data.state == common_api.CommunicationState.LAST_ACK:
                 logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
                               f"received an unexpected 'LAST_ACK'")
-                continue  # TODO: Should we `return` or raise instead?
+                # TODO: Should we `return` or raise instead of continuing?
 
             elif data.state == common_api.CommunicationState.END:
                 if session._ending:
@@ -136,7 +135,7 @@ async def process_incoming(context, session):
                                      f"Trial ended with explanation [{data.details}]")
                     else:
                         logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                                      f"Trial ended with no explanation")
+                                      f"Trial ended")
                 else:
                     if data.HasField("details"):
                         details = data.details
@@ -156,7 +155,7 @@ async def process_incoming(context, session):
                               f"received an invalid state [{data.state}]")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Agent [{session.name}] 'read_observations' coroutine cancelled: [{exc}]")
+        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] coroutine cancelled: [{exc}]")
 
     except Exception:
         logging.exception("process_incoming")
@@ -172,7 +171,7 @@ async def send_data(context, session):
                               f"Data retrieved is `None`")
                 continue  # TODO: Determine if it would be better to `return` here
 
-            package = agent_api.ServiceActorRunOutput()
+            package = common_api.ActorRunTrialOutput()
             package.state = common_api.CommunicationState.NORMAL
 
             # Using strict comparison: there is no reason to receive derived classes here
@@ -233,7 +232,11 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
 
         logging.info("Agent Service started")
 
-    def _start_session(self, trial_id, actor_name, init_input, context):
+    def _start_session(self, trial_id, init_input):
+        actor_name = init_input.actor_name
+        if not actor_name:
+            raise CogmentError(f"Trial [{trial_id}] - Empty actor name for service actor")
+
         if init_input.impl_name:
             impl_name = init_input.impl_name
             impl = self.__impls.get(impl_name)
@@ -314,93 +317,95 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
             if process_task is not None:
                 process_task.cancel()
 
+    async def _get_init_data(self, context, trial_id):
+        logging.debug(f"Trial [{trial_id}] - Processing init for service actor")
+
+        last_received = False
+        while True:
+            # TODO: Limit the time to wait for init data
+            request = await context.read()
+            logging.debug(f"Trial [{trial_id}] - Read initial request: {request}")
+
+            if request == grpc.aio.EOF:
+                logging.info(f"Trial [{trial_id}] - Orchestrator disconnected service actor before start")
+                return None
+
+            if request.state == common_api.CommunicationState.NORMAL:
+                if last_received:
+                    error_str = (f"Trial [{trial_id}] - Received init data after 'LAST'")
+                    logging.error(error_str)
+                    await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+
+                if request.HasField("init_input"):
+                    return request.init_input
+                else:
+                    data_set = request.WhichOneof("data")
+                    error_str = (f"Trial [{trial_id}] - Received unexpected init data [{data_set}]")
+                    logging.error(error_str)
+                    await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+
+            elif request.state == common_api.CommunicationState.HEARTBEAT:
+                reply = common_api.ActorRunTrialOutput()
+                reply.state = request.state
+                await context.write(reply)
+
+            elif request.state == common_api.CommunicationState.LAST:
+                if last_received:
+                    error_str = (f"Trial [{trial_id}] - Before start, received unexpected 'LAST' "
+                                    f"when waiting for 'END'")
+                    logging.error(error_str)
+                    await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+
+                logging.debug(f"Trial [{trial_id}] - Ending before init data")
+                reply = common_api.ActorRunTrialOutput()
+                reply.state = common_api.CommunicationState.LAST_ACK
+                await context.write(reply)
+                last_received = True
+
+            elif request.state == common_api.CommunicationState.LAST_ACK:
+                error_str = (f"Trial [{trial_id}] - Before start, received an unexpected 'LAST_ACK'")
+                logging.error(error_str)
+                await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+
+            elif request.state == common_api.CommunicationState.END:
+                if request.HasField("details"):
+                    logging.info(f"Trial [{trial_id}] - Ended before start [{request.details}]")
+                else:
+                    logging.debug(f"Trial [{trial_id}] - Ended before start")
+                return None
+
+            else:
+                error_str = (f"Trial [{trial_id}] - Before start, received an invalid state "
+                                f"[{request.state}] [{request}]")
+                logging.error(error_str)
+                await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+
+    # Override
     async def RunTrial(self, request_iterator, context):
         if len(self.__impls) == 0:
             logging.warning("No implementation registered on trial run request")
             raise CogmentError("No implementation registered")
 
         metadata = dict(context.invocation_metadata())
-        actor_name = metadata["actor-name"]
         trial_id = metadata["trial-id"]
-        logging.debug(f"Trial [{trial_id}] - Processing init for service actor [{actor_name}]")
 
-        awaiting_end_after_last = False
         try:
-            while True:
-                # TODO: Should we have a max time to wait?
-                request = await context.read()
-                logging.debug(f"Trial [{trial_id}] - Actor [{actor_name}] read initial request: {request}")
+            init_data = await self._get_init_data(context, trial_id)
+            if init_data is None:
+                return
+            key = _trial_key(trial_id, init_data.actor_name)
 
-                if request == grpc.aio.EOF:
-                    logging.info(f"Trial [{trial_id}] - "
-                                 f"Orchestrator disconnected service actor [{actor_name}] before start")
+            session = self._start_session(trial_id, init_data)
 
-                if request.state == common_api.CommunicationState.NORMAL:
-                    if awaiting_end_after_last:
-                        # TODO: This state may be acceptable when managing reconnections
-                        error_str = (f"Trial [{trial_id}] - Actor [{actor_name}] "
-                                     f"received unexpected normal data after 'LAST' before start")
-                        logging.error(error_str)
-                        await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+            init_msg = common_api.ActorRunTrialOutput()
+            init_msg.state = common_api.CommunicationState.NORMAL
+            init_msg.init_output.SetInParent()
+            await context.write(init_msg)
 
-                    if not request.HasField("init_input"):
-                        data_set = request.WhichOneof("data")
-                        error_str = (f"Trial [{trial_id}] - Actor [{actor_name}] "
-                                     f"received unexpected first data [{data_set}]")
-                        logging.error(error_str)
-                        await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+            await self._run_session(context, session)  # Blocking
 
-                    # --------------------------  Normal run ------------------------------------
-                    session = self._start_session(trial_id, actor_name, request.init_input, context)
-
-                    package = agent_api.ServiceActorRunOutput()
-                    package.state = common_api.CommunicationState.NORMAL
-                    package.init_output.SetInParent()
-                    await context.write(package)
-
-                    await self._run_session(context, session)
-
-                    key = _trial_key(trial_id, actor_name)
-                    self._sessions.remove(key)
-                    return
-
-                elif request.state == common_api.CommunicationState.HEARTBEAT:
-                    reply = agent_api.ServiceActorRunOutput()
-                    reply.state = request.state
-                    await context.write(reply)
-
-                elif request.state == common_api.CommunicationState.LAST:
-                    if awaiting_end_after_last:
-                        error_str = (f"Trial [{trial_id}] - Actor [{actor_name}] "
-                                     f"received unexpected 'LAST' when waiting for 'END'")
-                        logging.error(error_str)
-                        await context.abort(grpc.StatusCode.UNKNOWN, error_str)
-
-                    logging.debug(f"Trial [{trial_id}] - Actor [{actor_name}]: Trial ending before start")
-                    reply = agent_api.ServiceActorRunOutput()
-                    reply.state = common_api.CommunicationState.LAST_ACK
-                    await context.write(reply)
-                    awaiting_end_after_last = True
-
-                elif request.state == common_api.CommunicationState.LAST_ACK:
-                    error_str = (f"Trial [{trial_id}] - Actor [{actor_name}]: "
-                                 f" received an unexpected 'LAST_ACK' before start")
-                    logging.error(error_str)
-                    await context.abort(grpc.StatusCode.UNKNOWN, error_str)
-
-                elif request.state == common_api.CommunicationState.END:
-                    if request.HasField("details"):
-                        logging.info(f"Trial [{trial_id}] - Actor [{actor_name}]: "
-                                     f"Trial ended before start [{request.details}]")
-                    else:
-                        logging.debug(f"Trial [{trial_id}] - Actor [{actor_name}]: Trial ended before start")
-                    return
-
-                else:
-                    error_str = (f"Trial [{trial_id}] - "
-                                 f"Actor [{actor_name}] received an invalid state [{request.state}] [{request}]")
-                    logging.error(error_str)
-                    await context.abort(grpc.StatusCode.UNKNOWN, error_str)
+            self._sessions.remove(key)
+            return
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
             raise
@@ -409,6 +414,7 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
             logging.exception("RunTrial")
             raise
 
+    # Override
     async def Version(self, request, context):
         try:
             return list_versions()
