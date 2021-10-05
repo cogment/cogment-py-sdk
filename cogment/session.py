@@ -18,6 +18,18 @@ import logging
 import asyncio
 from cogment.errors import CogmentError
 
+import cogment.api.common_pb2 as common_api
+
+ENVIRONMENT_ACTOR_NAME = "env"
+
+
+class _Ending:
+    pass
+
+
+class _EndingAck:
+    pass
+
 
 class ActorInfo:
     def __init__(self, name, class_name):
@@ -42,12 +54,13 @@ class RecvObservation:
 
 
 class RecvAction:
-    def __init__(self, actor_index, action):
+    def __init__(self, actor_index, action, tick_id):
+        self.tick_id = tick_id
         self.actor_index = actor_index
         self.action = action
 
     def __str__(self):
-        result = f"RecvAction: actor index = {self.actor_index}"
+        result = f"RecvAction: tick_id = {self.tick_id}, actor index = {self.actor_index}"
         result += f", action = {self.action}"
         return result
 
@@ -132,22 +145,34 @@ class Session(ABC):
         self.name = name
         self.impl_name = impl_name
         self._impl = impl
-        self._event_queue = None  # Also used to know if we started
+        self._event_queue = asyncio.Queue()
+        self._started = False
         self._last_event_delivered = False
-        self._last_event_received = False
-        self._task = None  # Task used to call _run()
-        self._ending = False
+        self._user_task = None  # Task used to call _run()
+        self._data_queue = asyncio.Queue()
+        self._auto_ack = True
 
         # Pre-compute since it will be used regularly
         self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
 
-    def _start(self):
-        if self._event_queue is not None:
+    def __str__(self):
+        result = f"Session: name = {self.name}, impl_name = {self.impl_name}"
+        return result
+
+    # TODO: Should we tie the start with the init reply to the Orchestrator?
+    def _start(self, auto_done_sending):
+        if self._started:
             raise CogmentError(f"Cannot start [{self.name}] more than once.")
-        if self._trial.over:
+        if self._trial.ended:
             raise CogmentError(f"Cannot start [{self.name}] because the trial has ended.")
 
-        self._event_queue = asyncio.Queue()
+        self._auto_ack = auto_done_sending
+        self._started = True
+
+    def _exit_queues(self):
+        self._event_queue.put_nowait(None)
+        self._data_queue.put_nowait(None)
+        # TODO: Should be do a 'self._user_task.cancel()' after a delay? Or is it not our reponsibility!
 
     async def _run(self):
         try:
@@ -162,24 +187,85 @@ class Session(ABC):
             logging.exception(f"An exception occured in user implementation of [{self.name}]:")
             raise
 
+    def _start_user_task(self):
+        self._user_task = asyncio.create_task(self._run())
+        return self._user_task
+
     def _new_event(self, event):
-        if self._event_queue is None:
+        if not self._started:
             logging.warning(f"[{self.name}] received an event before session was started.")
             return
-        if self._last_event_received:
-            logging.debug(f"Event received after final event: [{event}]")
+        if self._trial.ended:
+            logging.debug(f"Event received after trial is over: [{event}]")
             return
-
-        if event is not None and event.type == EventType.FINAL:
-            self._last_event_received = True
+        if event is None:
+            logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: New event is `None`")
 
         self._event_queue.put_nowait(event)
 
+    def _post_data(self, data):
+        if not self._started:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send until session is started.")
+            return
+        if self._trial.ending_ack:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send after acknowledging ending")
+            return
+
+        if data is None:
+            raise CogmentError(f"Trial [{self._trial.id}] - Session for [{self.name}]: Data posted is `None`")
+
+        if type(data) == _Ending:
+            self._trial.ending = True
+        elif type(data) == _EndingAck:
+            self._trial.ending_ack = True
+
+        self._data_queue.put_nowait(data)
+
+    async def _retrieve_data(self):
+        try:
+            while True:
+                data = await self._data_queue.get()
+                if data is None:
+                    logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                                  f"Forcefull data loop exit")
+                    break
+                yield data
+                self._data_queue.task_done()
+
+        except RuntimeError as exc:
+            # Unfortunatelty asyncio returns a standard RuntimeError in this case
+            if exc.args[0] != "Event loop is closed":
+                raise
+            else:
+                logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                              f"Normal exception on retrieving data at close: [{exc}]")
+
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                        f"data retrieval coroutine cancelled: [{exc}]")
+
+        logging.debug(f"Exiting [{self.name}] _retrieve_data loop generator")
+
+    def sending_done(self):
+        if self._auto_ack:
+            raise CogmentError("Cannot manually end sending as it is set to automatic")
+        elif not self._trial.ending:
+            raise CogmentError("Cannot stop sending before trial is ready to end")
+        elif self._trial.ended:
+            logging.warning(f"Trial [{self._trial.id}] - Session [{self.name}] "
+                            f"end sending ignored because the trial has already ended.")
+        elif self._trial.ending_ack:
+            logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}] cannot end sending more than once")
+        else:
+            self._post_data(_EndingAck())
+
     async def event_loop(self):
-        if self._event_queue is None:
+        if not self._started:
             logging.warning(f"Event loop is not enabled until the [{self.name}] is started.")
             return
-        if self._trial.over:
+        if self._trial.ended:
             logging.info(f"No more events for [{self.name}] because the trial has ended.")
             return
 
@@ -187,6 +273,11 @@ class Session(ABC):
         while loop_active:
             try:
                 event = await self._event_queue.get()
+                if event is None:
+                    logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
+                                  f"Forcefull event loop exit")
+                    self._last_event_delivered = True
+                    break
 
             except asyncio.CancelledError as exc:
                 logging.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
@@ -211,19 +302,50 @@ class Session(ABC):
         return self._trial.tick_id
 
     def is_trial_over(self):
-        return self._trial.over
+        return self._trial.ended
 
     def get_active_actors(self):
         return self._active_actors
 
-    @abstractmethod
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
-        pass
+        if not self._started:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send reward until session is started.")
+            return
+        if self._trial.ending_ack:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send reward after acknowledging ending.")
+            return
 
-    @abstractmethod
+        for dest in to:
+            reward = common_api.Reward(receiver_name=dest, tick_id=-1, value=value)
+            reward_source = common_api.RewardSource(sender_name=self.name, value=value, confidence=confidence)
+            if user_data is not None:
+                reward_source.user_data.Pack(user_data)
+            reward.sources.append(reward_source)
+
+            self._post_data(reward)
+
     def send_message(self, payload, to, to_environment=False):
-        pass
+        if not self._started:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send message until session is started.")
+            return
+        if self._trial.ending_ack:
+            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                            f"Cannot send message after acknowledging ending.")
+            return
 
-    def __str__(self):
-        result = f"Session: name = {self.name}, impl_name = {self.impl_name}"
-        return result
+        if to_environment:
+            message = common_api.Message(tick_id=-1, receiver_name=ENVIRONMENT_ACTOR_NAME)
+            if payload is not None:
+                message.payload.Pack(payload)
+
+            self._post_data(message)
+
+        for dest in to:
+            message = common_api.Message(tick_id=-1, receiver_name=dest)
+            if payload is not None:
+                message.payload.Pack(payload)
+
+            self._post_data(message)

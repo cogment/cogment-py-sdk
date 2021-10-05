@@ -13,84 +13,112 @@
 # limitations under the License.
 
 import asyncio
-import importlib
+import time
 import logging
-from cogment.session import Session, EventType
-from abc import ABC
+from cogment.session import Session, _Ending, _EndingAck
+from cogment.errors import CogmentError
 
-ENVIRONMENT_ACTOR_NAME = "env"
+import cogment.api.environment_pb2 as env_api
+import cogment.api.common_pb2 as common_api
 
 
 class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 
-    def __init__(self, impl, trial, impl_name, config):
-        super().__init__(trial, ENVIRONMENT_ACTOR_NAME, impl, impl_name)
+    def __init__(self, impl, trial, name, impl_name, config):
+        super().__init__(trial, name, impl, impl_name)
         self.config = config
-        self._obs_queue = asyncio.Queue()
-        self.__final_obs_future = None
-
-    def start(self, observations):
-        self._start()
-        self._obs_queue.put_nowait((observations, False))
-
-    def produce_observations(self, observations):
-        if self._event_queue is None:
-            logging.warning("Cannot send observations until the environment is started.")
-            return
-
-        if self.__final_obs_future is not None:
-            self.__final_obs_future.set_result(observations)
-        elif not self.is_trial_over():
-            self._obs_queue.put_nowait((observations, False))
-        else:
-            logging.warning("Cannot send observation because the trial has ended.")
-
-    def end(self, observations):
-        if self.__final_obs_future is not None:
-            self.__final_obs_future.set_result(observations)
-        elif not self.is_trial_over():
-            self._obs_queue.put_nowait((observations, True))
-        else:
-            logging.warning("Cannot end the environment because the trial has already ended.")
-
-    async def _retrieve_obs(self):
-        obs = await self._obs_queue.get()
-        self._obs_queue.task_done()
-        return obs
-
-    async def _end_request(self, event):
-        logging.debug("Environment received an end request")
-
-        if self.is_trial_over():
-            return None
-        if self._event_queue is None:
-            logging.warning("The environment received an end request before it was started.")
-            return None
-
-        self.__final_obs_future = asyncio.get_running_loop().create_future()
-
-        await self._event_queue.put(event)
-
-        result = await self.__final_obs_future
-        self.__final_obs_future = None
-
-        return result
 
     def __str__(self):
         result = super().__str__()
         result += f" --- EnvironmentSession: config = {self.config}"
         return result
 
+    def start(self, observations, auto_done_sending=True):
+        self._start(auto_done_sending)
+        packed_obs = self._pack_observations(observations)
+        self._post_data(packed_obs)
 
-class _ServedEnvironmentSession(EnvironmentSession):
-    """An environment session that is served from an environment service."""
+    def produce_observations(self, observations):
+        if not self._trial.ended:
+            packed_obs = self._pack_observations(observations)
+            self._post_data(packed_obs)
+            if self._trial.ending and self._auto_ack:
+                self._post_data(_EndingAck())
+        else:
+            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
+                            f"Cannot send observation because the trial has ended.")
 
-    def __init__(self, impl, trial, impl_name, config):
-        super().__init__(impl, trial, impl_name, config)
+    def end(self, final_observations):
+        if self._trial.ended:
+            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
+                            f"end request ignored because the trial has already ended.")
+        elif self._trial.ending_ack:
+            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] cannot end more than once")
+        else:
+            if not self._trial.ending:
+                self._post_data(_Ending())
+            packed_obs = self._pack_observations(final_observations)
+            self._post_data(packed_obs)
+            if self._auto_ack:
+                self._post_data(_EndingAck())
 
-    def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
-        self._trial.add_reward(value, confidence, to, tick_id, user_data)
+    def _pack_observations(self, observations, tick_id=-1):
+        timestamp = int(time.time() * 1000000000)
 
-    def send_message(self, payload, to, to_environment=False):
-        self._trial.send_message(payload, to, to_environment)
+        new_obs = [None] * len(self._trial.actors)
+
+        for target, obs in observations:
+            if not isinstance(target, str):
+                raise CogmentError(f"Target actor name [{target}] must be a string")
+
+            if target == "*" or target == "*.*":
+                new_obs = [obs] * len(self._trial.actors)
+                if len(observations) > 1:
+                    raise CogmentError(f"Duplicate actors in observations list when using a wildcard")
+                break
+            else:
+                for actor_index, actor in enumerate(self._trial.actors):
+                    if "." not in target:
+                        if actor.name == target:
+                            if new_obs[actor_index] is not None:
+                                raise CogmentError(f"Duplicate actor [{actor.name}] in observations list")
+                            new_obs[actor_index] = obs
+                            break  # Names are unique in trial
+                    else:
+                        class_name, actor_name = target.split(".")
+                        if class_name == actor.actor_class.name:
+                            if actor_name == actor.name or actor_name == "*":
+                                if new_obs[actor_index] is not None:
+                                    raise CogmentError(f"Duplicate actor [{class_name}.{actor.name}] in observations list")
+                                new_obs[actor_index] = obs
+
+        snapshots = [True] * len(self._trial.actors)
+
+        for actor_index, actor in enumerate(self._trial.actors):
+            if new_obs[actor_index] is None:
+                raise CogmentError(f"Actor [{actor.name}] is missing an observation")
+            snapshots[actor_index] = isinstance(new_obs[actor_index], actor.actor_class.observation_space)
+
+        pack = env_api.ObservationSet()
+        pack.tick_id = tick_id
+        pack.timestamp = timestamp
+
+        # dupping time
+        seen_observations = {}
+        for actor_index, actor in enumerate(self._trial.actors):
+            actor_obs = new_obs[actor_index]
+            obs_id = id(actor_obs)
+            obs_key = seen_observations.get(obs_id)
+            if obs_key is None:
+                obs_key = len(pack.observations)
+
+                obs_content = actor_obs.SerializeToString()
+                observation_data = common_api.ObservationData(content=obs_content, snapshot=snapshots[actor_index])
+                pack.observations.append(observation_data)
+
+                seen_observations[obs_id] = obs_key
+
+            pack.actors_map.append(obs_key)
+
+        return pack

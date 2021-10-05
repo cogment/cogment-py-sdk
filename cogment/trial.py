@@ -17,7 +17,7 @@ from collections import deque
 from typing import List, Any
 
 import cogment.api.common_pb2 as common_api
-from cogment.environment import ENVIRONMENT_ACTOR_NAME
+from cogment.session import ENVIRONMENT_ACTOR_NAME
 from cogment.errors import CogmentError
 
 
@@ -69,12 +69,12 @@ class Trial:
 
     def __init__(self, id, actors_in_trial, cog_settings):
         self.id = id
-        self.over = False
+        self.ended = False
+        self.ending = False
+        self.ending_ack = False
         self.cog_settings = cog_settings
         self.tick_id = -1
         self.environment = self.MinimalComponent(ENVIRONMENT_ACTOR_NAME)
-
-        self.__actor_by_name = {}
 
         self.actors = []
         self.actor_counts = []

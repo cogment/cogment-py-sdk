@@ -18,9 +18,10 @@ import grpc.aio  # type: ignore
 import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2_grpc as grpc_api
 
-from cogment.actor import _ServedActorSession, _EndingAck
+from cogment.actor import ActorSession
+from cogment.utils import TRACE
 from cogment.errors import CogmentError
-from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _EndingAck
 from cogment.delta_encoding import DecodeObservationData
 from cogment.trial import Trial
 
@@ -32,15 +33,17 @@ class _EndQueue:
     pass
 
 
-def process_normal_data(data, session):
-    if session._ending:
+def _process_normal_data(data, session):
+    if session._trial.ending:
         recv_event = RecvEvent(EventType.ENDING)
     else:
         recv_event = RecvEvent(EventType.ACTIVE)
 
     if data.HasField("observation"):
-        if session._ending and session._auto_ack:
-            session._data_queue.put_nowait(_EndingAck())
+        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received an observation")
+
+        if session._trial.ending and session._auto_ack:
+            session._post_data(_EndingAck())
 
         session._trial.tick_id = data.observation.tick_id
 
@@ -55,10 +58,14 @@ def process_normal_data(data, session):
         session._new_event(recv_event)
 
     elif data.HasField("reward"):
+        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
+
         recv_event.rewards = [RecvReward(data.reward)]
         session._new_event(recv_event)
 
     elif data.HasField("message"):
+        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
+
         recv_event.messages = [RecvMessage(data.message)]
         session._new_event(recv_event)
 
@@ -71,28 +78,29 @@ def process_normal_data(data, session):
                       f"received unexpected data [{data.WhichOneof('data')}]")
 
 
-async def process_incoming(reply_itor, req_queue, session):
+async def _process_incoming(reply_itor, req_queue, session):
     try:
         async for data in reply_itor:
-            logging.debug(f"Received a reply [{data.state}] [{data.WhichOneof('data')}]")
-
             if data == grpc.aio.EOF:
                 logging.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
                              f"The orchestrator disconnected the actor")
                 break
+            logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                               f"Received data [{data.state}] [{data.WhichOneof('data')}]")
 
             if data.state == common_api.CommunicationState.NORMAL:
-                process_normal_data(data, session)
+                _process_normal_data(data, session)
 
             elif data.state == common_api.CommunicationState.HEARTBEAT:
+                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                                   f"received 'HEARTBEAT' and responding in kind")
                 reply = common_api.ActorRunTrialOutput()
                 reply.state = data.state
                 await req_queue.put(reply)
 
             elif data.state == common_api.CommunicationState.LAST:
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                              f"received 'LAST' state")
-                session._ending = True
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] received 'LAST' state")
+                session._trial.ending = True
 
             elif data.state == common_api.CommunicationState.LAST_ACK:
                 logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
@@ -100,13 +108,13 @@ async def process_incoming(reply_itor, req_queue, session):
                 # TODO: Should we `return` or raise instead of continuing?
 
             elif data.state == common_api.CommunicationState.END:
-                if session._ending:
+                if session._trial.ending:
                     if data.HasField("details"):
                         logging.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
                                      f"Trial ended with explanation [{data.details}]")
                     else:
-                        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                                      f"Trial ended")
+                        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
+                    session._new_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
@@ -115,8 +123,8 @@ async def process_incoming(reply_itor, req_queue, session):
                     logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
                                     f"Trial ended forcefully [{details}]")
 
-                session._trial.over = True
-                session._new_event(RecvEvent(EventType.FINAL))
+                session._trial.ended = True
+                session._exit_queues()
                 break
 
             else:
@@ -130,41 +138,42 @@ async def process_incoming(reply_itor, req_queue, session):
         logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
         if exc.code() == grpc.StatusCode.UNAVAILABLE:
             logging.error(f"Orchestrator communication lost: [{exc.details()}]")
-            session._task.cancel()
+            session._exit_queues()
         else:
-            logging.exception("process_incoming -- Unexpected aio error")
+            logging.exception("_process_incoming -- Unexpected aio error")
             raise
 
     except Exception:
-        logging.exception("process_incoming")
+        logging.exception("_process_incoming")
         raise
 
 
-async def send_data(data_queue, session):
+async def _process_outgoing(data_queue, session):
     try:
-        while True:
-            data = await session._retrieve_data()
-            if data is None:
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                              f"Data retrieved is `None`")
-                continue  # TODO: Determine if it would be better to `return` here
-
+        async for data in session._retrieve_data():
             package = common_api.ActorRunTrialOutput()
             package.state = common_api.CommunicationState.NORMAL
 
             # Using strict comparison: there is no reason to receive derived classes here
             if type(data) == common_api.Action:
+                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending action")
                 package.action.CopyFrom(data)
+
             elif type(data) == common_api.Reward:
+                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending reward")
                 package.reward.CopyFrom(data)
+
             elif type(data) == common_api.Message:
+                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending message")
                 package.message.CopyFrom(data)
+
             elif type(data) == _EndingAck:
                 package.state = common_api.CommunicationState.LAST_ACK
                 logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
                               f"Sending 'LAST_ACK'")
                 await data_queue.put(package)
                 break
+
             else:
                 logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
                               f"Unknown data type to send [{type(data)}]")
@@ -172,12 +181,8 @@ async def send_data(data_queue, session):
 
             await data_queue.put(package)
 
-    except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                      f"'send_data' coroutine cancelled: [{exc}]")
-
     except Exception:
-        logging.exception("send_data")
+        logging.exception("_process_outgoing")
         raise
 
 
@@ -262,6 +267,7 @@ class ClientServicer:
         if not self._reply_itor:
             raise CogmentError(f"Failed to connect to join trial")
 
+        # TODO: Move out into its own `get_init_data` function
         try:
             async for reply in self._reply_itor:
                 logging.debug(f"Trial [{trial_id}] - Received a reply while joining "
@@ -340,21 +346,20 @@ class ClientServicer:
             config = actor_class.config_type()
             config.ParseFromString(init_data.config.content)
 
-        session = _ServedActorSession(
-            impl, actor_class, trial, init_data.actor_name, init_data.impl_name, config)
+        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name, config)
         logging.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] "
                       f"for client actor [{init_data.actor_name}] started")
 
         try:
-            send_task = asyncio.create_task(send_data(self._request_queue, session))
-            process_task = asyncio.create_task(process_incoming(self._reply_itor, self._request_queue, session))
-            session._task = asyncio.create_task(session._run())
+            send_task = asyncio.create_task(_process_outgoing(self._request_queue, session))
+            process_task = asyncio.create_task(_process_incoming(self._reply_itor, self._request_queue, session))
+            user_task = session._start_user_task()
 
             logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] session started")
-            normal_return = await session._task
+            normal_return = await user_task
 
             if normal_return:
-                if not session._last_event_received:
+                if not session._last_event_delivered:
                     logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
                                     f"user implementation returned before required")
                 else:
@@ -367,7 +372,6 @@ class ClientServicer:
         except asyncio.CancelledError as exc:
             logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
                           f"user implementation was cancelled")
-            raise
 
         except Exception:
             logging.exception("run_session")

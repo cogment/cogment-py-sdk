@@ -25,7 +25,7 @@ class DatalogSession(ABC):
         self.trial_params = trial_params
         self.raw_trial_params = raw_trial_params
 
-        self._task = None
+        self._user_task = None
         self._impl = impl
         self.__queue = None
 
@@ -70,6 +70,10 @@ class DatalogSession(ABC):
         except Exception:
             logging.exception(f"An exception occured in user datalog implementation:")
             raise
+
+    def _start_user_task(self):
+        self._user_task = asyncio.create_task(self._run())
+        return self._user_task
 
     def __str__(self):
         result = f"DatalogSession: trial_id = {self.trial_id}, trial_params = {self.trial_params}"

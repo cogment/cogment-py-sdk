@@ -74,7 +74,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             raw_trial_params = request.trial_params
 
             session = _ServedDatalogSession(self._impl, trial_id, trial_params, raw_trial_params)
-            session._task = asyncio.create_task(session._run())
+            user_task = session._start_user_task()
 
             reader_task = asyncio.create_task(read_sample(context, session))
 
@@ -82,7 +82,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             reply = datalog_api.LogExporterSampleReply()
             await context.write(reply)
 
-            normal_return = await session._task
+            normal_return = await user_task
 
             if normal_return:
                 logging.debug(f"User datalog implementation returned")

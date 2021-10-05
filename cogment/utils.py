@@ -21,6 +21,9 @@ import logging
 import importlib
 import grpc
 
+# logging level for "trace" (repeated output in critical path)
+# Use: logging.log(TRACE, f"This is a trace message for {my_pgm}")
+TRACE = 5
 
 def list_versions():
     reply = common_api.VersionInfo()
