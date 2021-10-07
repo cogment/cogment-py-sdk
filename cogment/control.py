@@ -74,12 +74,12 @@ class Controller:
 
         return rep.trial_id
 
-    async def terminate_trial(self, trial_id):
+    async def terminate_trial(self, trial_id, hard=False):
         req = orchestrator_api.TerminateTrialRequest()
+        req.hard_termination = hard
         metadata = [("trial-id", trial_id)]
-        logging.debug(f"Requesting end of trial [{trial_id}] ...")
+        logging.debug(f"Requesting end of trial [{trial_id}] (hard termination: [{hard}])")
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
-        logging.debug(f"End of trial request accepted for {trial_id}")
 
     async def get_remote_versions(self):
         req = common_api.VersionRequest()
