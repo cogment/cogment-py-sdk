@@ -31,4 +31,3 @@ from cogment.control import TrialState
 
 # Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList
-import cogment.delta_encoding

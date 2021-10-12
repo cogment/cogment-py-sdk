@@ -14,7 +14,6 @@
 
 import cogment.api.common_pb2 as common_api
 from cogment.version import __version__
-from cogment.delta_encoding import DecodeObservationData
 from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward
 
 import logging
@@ -24,6 +23,7 @@ import grpc
 # logging level for "trace" (repeated output in critical path)
 # Use: logging.log(TRACE, f"This is a trace message for {my_pgm}")
 TRACE = 5
+
 
 def list_versions():
     reply = common_api.VersionInfo()
@@ -101,88 +101,3 @@ def user_params_to_raw_params(params, settings):
             actor_pb.config.content = actor_data["config"].SerializeToString()
 
     return result
-
-
-def decode_period_data(session, data, event_type):
-    events = {}
-    for obs_request in data.observations:
-        snapshot = DecodeObservationData(
-            session._actor_class,
-            obs_request.data,
-            session._latest_observation)
-        session._latest_observation = snapshot
-
-        evt = events.setdefault(obs_request.tick_id, RecvEvent(event_type))
-        if evt.observation:
-            logging.warning(f"Agent received two observations with the same tick_id: {obs_request.tick_id}")
-        else:
-            evt.observation = RecvObservation(obs_request, snapshot)
-
-    for rew in data.rewards:
-        evt = events.setdefault(rew.tick_id, RecvEvent(event_type))
-        evt.rewards.append(RecvReward(rew))
-
-    for msg in data.messages:
-        evt = events.setdefault(msg.tick_id, RecvEvent(event_type))
-        evt.messages.append(RecvMessage(msg))
-
-    return events
-
-
-class DecodeData():
-
-    def __init__(self, trial_params, cog_settings):
-        self.__cog_settings = cog_settings
-        self.last_obs = []
-
-        actor_classes_list = [
-            actor.name for actor in self.__cog_settings.actor_classes]
-        trial_actor_list = [actor.actor_class for actor in trial_params.actors]
-        self.actor_counts = [0] * len(actor_classes_list)
-        for index, actor_class in enumerate(actor_classes_list):
-            self.actor_counts[index] += trial_actor_list.count(actor_class)
-
-        for ac_index, actor_class in enumerate(self.__cog_settings.actor_classes):
-            count = self.actor_counts[ac_index]
-            self.last_obs.extend([None] * count)
-
-    def decode_datasample(self, sample):
-
-        actor_index = 0
-        for ac_index, actor_class in enumerate(self.__cog_settings.actor_classes):
-            count = self.actor_counts[ac_index]
-            for _ in range(count):
-                obs_id = sample.observations.actors_map[actor_index]
-                obs_data = sample.observations.observations[obs_id]
-
-                obs = DecodeObservationData(
-                    actor_class, obs_data, self.last_obs[actor_index])
-                self.last_obs[actor_index] = obs
-
-                actor_index += 1
-
-        action_list = []
-        for act_data in sample.actions:
-            action = self.__cog_settings.data_pb.Action()
-            action.ParseFromString(act_data.content)
-            action_list.append(action)
-
-        reward_list = []
-        for rwd in sample.rewards:
-            reward_list.append((rwd.value, rwd.confidence))
-
-        message_list = []
-        for messages in sample.messages:
-            sub_msg_list = []
-            for message in messages.messages:
-
-                class_type = message.payload.type_url.split('.')
-                user_data = getattr(importlib.import_module(
-                    self.__cog_settings.protolib), class_type[-1])()
-                message.payload.Unpack(user_data)
-
-                sub_msg_list.append((message.sender_name, user_data))
-
-            message_list.append(sub_msg_list)
-
-        return self.last_obs, action_list, reward_list, message_list

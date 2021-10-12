@@ -69,6 +69,7 @@ class _PrometheusData:
 
         pass
 
+
 def _trial_key(trial_id, actor_name):
     return f"{trial_id}_{actor_name}"
 
@@ -349,7 +350,6 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
                 normal_return = await user_task
 
             self._prometheus_data.update_count_per_trial.labels(session.impl_name).observe(session._trial.tick_id)
-
 
             if normal_return:
                 if not session._last_event_delivered:

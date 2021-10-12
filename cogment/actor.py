@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
-import importlib
-import logging
+import time
 from abc import abstractmethod
 from typing import Any
 from cogment.session import Session
@@ -30,20 +28,15 @@ class ActorClass:
         config_type,
         action_space,
         observation_space,
-        observation_delta,
-        observation_delta_apply_fn,
     ):
         self.name = name
         self.config_type = config_type
         self.action_space = action_space
         self.observation_space = observation_space
-        self.observation_delta = observation_delta
-        self.observation_delta_apply_fn = observation_delta_apply_fn
 
     def __str__(self):
         result = f"ActorClass: name = {self.name}, config_type = {type(self.config_type)}"
         result += f", action_space = {type(self.action_space)}, observation_space = {type(self.observation_space)}"
-        result += f", observation_delta = {type(self.observation_delta)}"
         return result
 
 
@@ -82,7 +75,6 @@ class ActorSession(Session):
         self.config = config
 
         self._actor_class = actor_class
-        self._latest_observation = None
 
     def __str__(self):
         result = super().__str__()
@@ -94,9 +86,9 @@ class ActorSession(Session):
 
     def do_action(self, action):
         action_req = common_api.Action()
+        action_req.timestamp = int(time.time() * 1000000000)
         action_req.tick_id = -1
         if action is not None:
             action_req.content = action.SerializeToString()
 
         self._post_data(action_req)
-

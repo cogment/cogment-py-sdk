@@ -42,14 +42,16 @@ class ActorInfo:
 
 
 class RecvObservation:
-    def __init__(self, obs, snapshot):
+    def __init__(self, obs, obs_space):
         self.tick_id = obs.tick_id
         self.timestamp = obs.timestamp
-        self.snapshot = snapshot
+        self.observation = obs_space
+
+        self.snapshot = obs_space  # Deprecated, from v1.0
 
     def __str__(self):
         result = f"RecvObservation: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
-        result += f", snapshot = {self.snapshot}"
+        result += f", observation = {self.observation}"
         return result
 
 

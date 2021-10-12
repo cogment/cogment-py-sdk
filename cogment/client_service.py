@@ -22,7 +22,6 @@ from cogment.actor import ActorSession
 from cogment.utils import TRACE
 from cogment.errors import CogmentError
 from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _EndingAck
-from cogment.delta_encoding import DecodeObservationData
 from cogment.trial import Trial
 
 import asyncio
@@ -47,14 +46,10 @@ def _process_normal_data(data, session):
 
         session._trial.tick_id = data.observation.tick_id
 
-        snapshot = DecodeObservationData(
-            session._actor_class,
-            data.observation.data,
-            session._latest_observation,
-        )
-        session._latest_observation = snapshot
+        obs_space = session._actor_class.observation_space()
+        obs_space.ParseFromString(data.observation.content)
 
-        recv_event.observation = RecvObservation(data.observation, snapshot)
+        recv_event.observation = RecvObservation(data.observation, obs_space)
         session._new_event(recv_event)
 
     elif data.HasField("reward"):

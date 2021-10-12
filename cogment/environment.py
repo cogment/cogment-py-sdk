@@ -73,9 +73,9 @@ class EnvironmentSession(Session):
                 raise CogmentError(f"Target actor name [{target}] must be a string")
 
             if target == "*" or target == "*.*":
-                new_obs = [obs] * len(self._trial.actors)
                 if len(observations) > 1:
                     raise CogmentError(f"Duplicate actors in observations list when using a wildcard")
+                new_obs = [obs] * len(self._trial.actors)
                 break
             else:
                 for actor_index, actor in enumerate(self._trial.actors):
@@ -90,15 +90,13 @@ class EnvironmentSession(Session):
                         if class_name == actor.actor_class.name:
                             if actor_name == actor.name or actor_name == "*":
                                 if new_obs[actor_index] is not None:
-                                    raise CogmentError(f"Duplicate actor [{class_name}.{actor.name}] in observations list")
+                                    raise CogmentError(f"Duplicate actor [{class_name}.{actor.name}] "
+                                                       f"in observations list")
                                 new_obs[actor_index] = obs
-
-        snapshots = [True] * len(self._trial.actors)
 
         for actor_index, actor in enumerate(self._trial.actors):
             if new_obs[actor_index] is None:
                 raise CogmentError(f"Actor [{actor.name}] is missing an observation")
-            snapshots[actor_index] = isinstance(new_obs[actor_index], actor.actor_class.observation_space)
 
         pack = env_api.ObservationSet()
         pack.tick_id = tick_id
@@ -113,9 +111,7 @@ class EnvironmentSession(Session):
             if obs_key is None:
                 obs_key = len(pack.observations)
 
-                obs_content = actor_obs.SerializeToString()
-                observation_data = common_api.ObservationData(content=obs_content, snapshot=snapshots[actor_index])
-                pack.observations.append(observation_data)
+                pack.observations.append(actor_obs.SerializeToString())
 
                 seen_observations[obs_id] = obs_key
 
