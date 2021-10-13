@@ -16,7 +16,7 @@ import cogment.api.common_pb2 as common_api
 import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
 from cogment.trial import Trial
-from cogment.datalog import _ServedDatalogSession
+from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
 from cogment.utils import raw_params_to_user_params, list_versions
 import logging
@@ -35,7 +35,7 @@ async def read_sample(context, session):
                 break
 
             elif request.HasField("sample"):
-                trial_ended = (request.sample.trial_data.state == common_api.TrialState.ENDED)
+                trial_ended = (request.sample.info.state == common_api.TrialState.ENDED)
                 session._new_sample(request.sample)
                 if trial_ended:
                     break
@@ -64,6 +64,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
         try:
             metadata = dict(context.invocation_metadata())
             trial_id = metadata["trial-id"]
+            user_id = metadata["user-id"]
 
             request = await context.read()
 
@@ -73,7 +74,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
             raw_trial_params = request.trial_params
 
-            session = _ServedDatalogSession(self._impl, trial_id, trial_params, raw_trial_params)
+            session = DatalogSession(self._impl, trial_id, user_id, trial_params, raw_trial_params)
             user_task = session._start_user_task()
 
             reader_task = asyncio.create_task(read_sample(context, session))

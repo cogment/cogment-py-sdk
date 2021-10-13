@@ -14,14 +14,15 @@
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 
 
 class DatalogSession(ABC):
     """This represents a datalogger working locally."""
 
-    def __init__(self, impl, trial_id, trial_params, raw_trial_params):
+    def __init__(self, impl, trial_id, user_id, trial_params, raw_trial_params):
         self.trial_id = trial_id
+        self.user_id = user_id
         self.trial_params = trial_params
         self.raw_trial_params = raw_trial_params
 
@@ -79,8 +80,3 @@ class DatalogSession(ABC):
         result = f"DatalogSession: trial_id = {self.trial_id}, trial_params = {self.trial_params}"
         result += f", raw_trial_params = {self.raw_trial_params}"
         return result
-
-
-class _ServedDatalogSession(DatalogSession):
-    def __init__(self, impl, trial_id, trial_params, raw_trial_params):
-        super().__init__(impl, trial_id, trial_params, raw_trial_params)
