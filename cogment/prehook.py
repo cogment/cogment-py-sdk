@@ -19,9 +19,10 @@ from cogment.errors import InvalidParamsError
 class PrehookSession(ABC):
     """This represents the session for a prehook for a trial"""
 
-    def __init__(self, params, trial):
+    def __init__(self, params, trial, user_id):
         self._params = params
         self._trial = trial
+        self._user_id = user_id
 
         self.trial_config = params["trial_config"]
         self.trial_max_steps = params["max_steps"]
@@ -33,48 +34,11 @@ class PrehookSession(ABC):
 
         self.actors = params["actors"]
 
-    @abstractmethod
-    def _recode(self):
-        pass
-
     def get_trial_id(self):
         return self._trial.id
 
-    def validate(self):
-        unknowns = []
-        for name in dir(self):
-            if name and name[0] != "_":
-                if (
-                    name != "trial_config" and
-                    name != "trial_max_steps" and
-                    name != "trial_max_inactivity" and
-                    name != "environment_config" and
-                    name != "environment_endpoint" and
-                    name != "environment_implementation" and
-                    name != "actors" and
-                    name != "get_trial_id" and
-                    name != "validate"
-                ):
-                    unknowns.append(name)
-        if unknowns:
-            raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
-
-        self._recode()
-
-    def __str__(self):
-        result = f"PreHookSession: trial_config = {self.trial_config}"
-        result += f", trial_max_steps = {self.trial_max_steps}"
-        result += f", trial_max_inactivity = {self.trial_max_inactivity}"
-        result += f", environment_config = {self.environment_config}"
-        result += f", environment_endpoint = {self.environment_endpoint}"
-        result += f", environment_implementation = {self.environment_implementation}"
-        result += f", actors = {self.actors}"
-        return result
-
-
-class _ServedPrehookSession(PrehookSession):
-    def __init__(self, params, trial):
-        super().__init__(params, trial)
+    def get_user_id(self):
+        return self._user_id
 
     def _recode(self):
         for act in self.actors:
@@ -93,4 +57,27 @@ class _ServedPrehookSession(PrehookSession):
 
         self._params["environment"]["config"] = self.environment_config
         self._params["environment"]["endpoint"] = self.environment_endpoint
-        self._params["environment"]["implementation"] = self.environment_implementation
+
+    def validate(self):
+        unknowns = []
+        for name in dir(self):
+            if name and name[0] != "_":
+                if (name != "trial_config" and name != "trial_max_steps" and name != "trial_max_inactivity" and
+                        name != "environment_config" and name != "environment_endpoint" and name != "actors" and
+                        name != "get_trial_id" and name != "get_user_id" and name != "validate"):
+                    unknowns.append(name)
+        if unknowns:
+            raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
+
+        self._recode()
+
+    def __str__(self):
+        result = f"PreHookSession: trial_config = {self.trial_config}"
+        result += f", trial_max_steps = {self.trial_max_steps}"
+        result += f", trial_max_inactivity = {self.trial_max_inactivity}"
+        result += f", environment_config = {self.environment_config}"
+        result += f", environment_endpoint = {self.environment_endpoint}"
+        result += f", environment_implementation = {self.environment_implementation}"
+        result += f", actors = {self.actors}"
+        return result
+

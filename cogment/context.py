@@ -71,8 +71,8 @@ def _add_env_service(grpc_server, impls, cog_settings, prometheus_registry):
     add_EnvironmentSPServicer_to_server(servicer, grpc_server)
 
 
-def _add_prehook_service(grpc_server, impls, cog_settings, prometheus_registry):
-    servicer = PrehookServicer(impls, cog_settings, prometheus_registry)
+def _add_prehook_service(grpc_server, impl, cog_settings, prometheus_registry):
+    servicer = PrehookServicer(impl, cog_settings, prometheus_registry)
     add_TrialHooksSPServicer_to_server(servicer, grpc_server)
 
 
@@ -142,7 +142,7 @@ class Context:
         self._user_id = user_id
         self.__actor_impls: Dict[str, SimpleNamespace] = {}
         self.__env_impls: Dict[str, SimpleNamespace] = {}
-        self.__prehook_impls: List[Callable[[PrehookSession], Awaitable[None]]] = []
+        self.__prehook_impl: Callable[[PrehookSession], Awaitable[None]] = None
         self.__datalog_impl: Callable[[DatalogSession], Awaitable[None]] = None
         self._grpc_server = None  # type: Any
         self._prometheus_registry = prometheus_registry
@@ -185,8 +185,10 @@ class Context:
                                 impl: Callable[[PrehookSession], Awaitable[None]]):
         if self._grpc_server is not None:
             raise CogmentError("Cannot register a pre-trial hook after the server is started")
+        if self.__prehook_impl is not None:
+            raise CogmentError("Only one prehook service can be registered")
 
-        self.__prehook_impls.append(impl)
+        self.__prehook_impl = impl
 
     def register_datalog(self,
                          impl: Callable[[DatalogSession], Awaitable[None]]):
@@ -201,7 +203,7 @@ class Context:
                                    prometheus_port=DEFAULT_PROMETHEUS_PORT):
         if (len(self.__actor_impls) == 0 and
                 len(self.__env_impls) == 0 and
-                len(self.__prehook_impls) == 0 and
+                self.__prehook_impl is None and
                 self.__datalog_impl is None):
             raise CogmentError("Nothing registered to serve!")
         if self._grpc_server is not None:
@@ -227,10 +229,10 @@ class Context:
                 self._prometheus_registry
             )
 
-        if self.__prehook_impls:
+        if self.__prehook_impl is not None:
             _add_prehook_service(
                 self._grpc_server,
-                self.__prehook_impls,
+                self.__prehook_impl,
                 self.__cog_settings,
                 self._prometheus_registry
             )

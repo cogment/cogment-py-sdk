@@ -18,42 +18,52 @@ import cogment.api.hooks_pb2_grpc as grpc_api
 import cogment.api.hooks_pb2 as hooks_api
 import cogment.utils as utils
 from cogment.trial import Trial
-from cogment.prehook import _ServedPrehookSession
+from cogment.prehook import PrehookSession
+from cogment.errors import CogmentError
 
 import logging
+import asyncio
 
 
 class PrehookServicer(grpc_api.TrialHooksSPServicer):
 
-    def __init__(self, impls, cog_settings, prometheus_registry=None):
+    def __init__(self, impl, cog_settings, prometheus_registry=None):
 
-        self.__impls = impls
+        self.__impl = impl
         self.__cog_settings = cog_settings
 
         logging.info("Prehook Service started")
 
     # Override
     async def OnPreTrial(self, request, context):
+        if not self.__impl:
+            logging.warning("No implementation registered on prehook request")
+            raise CogmentError("No implementation registered")
+
         try:
             metadata = dict(context.invocation_metadata())
             logging.debug(f"Received metadata: [{metadata}]")
             trial_id = metadata["trial-id"]
+            user_id = metadata["user-id"]
 
             trial = Trial(trial_id, [], self.__cog_settings)
             user_params = utils.raw_params_to_user_params(request.params, self.__cog_settings)
 
-            prehook = _ServedPrehookSession(user_params, trial)
-            for impl in self.__impls:
-                try:
-                    await impl(prehook)
-                except Exception:
-                    logging.exception("An exception occured in user pre-trial hook implementation:")
-                    raise
+            prehook = PrehookSession(user_params, trial, user_id)
+            try:
+                await self.__impl(prehook)
 
-                prehook._recode()
+            except asyncio.CancelledError as exc:
+                logging.debug(f"Prehook implementation coroutine cancelled: [{exc}]")
+                return False
 
-            reply = hooks_api.PreTrialContext()
-            reply.CopyFrom(request)
+            except Exception:
+                logging.exception(f"An exception occured in user prehook implementation:")
+                raise
+
+            prehook._recode()
+
+            reply = hooks_api.PreTrialParams()
             reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
             return reply
 
