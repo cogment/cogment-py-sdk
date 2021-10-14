@@ -305,7 +305,7 @@ class Context:
                 actor_impl = self.__actor_impls[impl_name]
                 if len(actor_impl.actor_classes) == 0:
                     raise CogmentError(f"Unable to determine possible actor to join: "
-                                    f"[{impl_name}] does not have any registered actor class")
+                                       f"impl_name [{impl_name}] does not have any registered actor class")
                 requested_class = actor_impl.actor_classes[0]
             else:
                 requested_name = actor_name
