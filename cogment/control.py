@@ -62,14 +62,21 @@ class Controller:
         result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
         return result
 
-    async def start_trial(self, trial_config=None):
+    async def start_trial(self, trial_config=None, trial_id_requested=None):
         req = orchestrator_api.TrialStartRequest()
         req.user_id = self._user_id
         if trial_config is not None:
             req.config.content = trial_config.SerializeToString()
+        if trial_id_requested is not None:
+            req.trial_id_requested = trial_id_requested
 
         logging.debug(f"Requesting start of a trial with [{req}] ...")
         rep = await self._lifecycle_stub.StartTrial(req)
+
+        # For compatibility with v1, we can't return an empty string.
+        if not rep.trial_id:
+            raise CogmentError(f"Requested trial id [{trial_id_requested}] could not be used")
+
         logging.debug(f"Trial [{rep.trial_id}] started")
 
         return rep.trial_id
