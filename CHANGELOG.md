@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
-- Relax dependency to `grpcio-tools` from `==1.38.0` to `^1.38.0`.
+- Added expanation for strict 1.38 requirement on grpcio-tools.
 
 ## v1.3.0 - 2021-09-23
 
