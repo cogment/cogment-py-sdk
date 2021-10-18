@@ -52,6 +52,7 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             prehook = PrehookSession(user_params, trial, user_id)
             try:
                 await self.__impl(prehook)
+                prehook.validate()
 
             except asyncio.CancelledError as exc:
                 logging.debug(f"Prehook implementation coroutine cancelled: [{exc}]")

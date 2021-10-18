@@ -20,8 +20,6 @@ from cogment.errors import CogmentError
 
 import cogment.api.common_pb2 as common_api
 
-ENVIRONMENT_ACTOR_NAME = "env"
-
 
 class _Ending:
     pass
@@ -306,9 +304,6 @@ class Session(ABC):
     def is_trial_over(self):
         return self._trial.ended
 
-    def get_active_actors(self):
-        return self._active_actors
-
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         if not self._started:
             logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
@@ -328,7 +323,7 @@ class Session(ABC):
 
             self._post_data(reward)
 
-    def send_message(self, payload, to, to_environment=False):
+    def send_message(self, payload, to):
         if not self._started:
             logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                             f"Cannot send message until session is started.")
@@ -337,13 +332,6 @@ class Session(ABC):
             logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                             f"Cannot send message after acknowledging ending.")
             return
-
-        if to_environment:
-            message = common_api.Message(tick_id=-1, receiver_name=ENVIRONMENT_ACTOR_NAME)
-            if payload is not None:
-                message.payload.Pack(payload)
-
-            self._post_data(message)
 
         for dest in to:
             message = common_api.Message(tick_id=-1, receiver_name=dest)

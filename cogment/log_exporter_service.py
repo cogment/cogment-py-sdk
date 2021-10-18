@@ -15,7 +15,6 @@
 import cogment.api.common_pb2 as common_api
 import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
-from cogment.trial import Trial
 from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
 from cogment.utils import raw_params_to_user_params, list_versions

@@ -23,32 +23,20 @@ class PrehookSession(ABC):
         self._params = params
         self._trial = trial
         self._user_id = user_id
+        self._decode()
 
-        self.trial_config = params["trial_config"]
-        self.trial_max_steps = params["max_steps"]
-        self.trial_max_inactivity = params["max_inactivity"]
+    def _decode(self):
+        self.trial_config = self._params["trial_config"]
+        self.trial_max_steps = self._params["max_steps"]
+        self.trial_max_inactivity = self._params["max_inactivity"]
 
-        self.environment_config = params["environment"]["config"]
-        self.environment_endpoint = params["environment"]["endpoint"]
-        self.environment_implementation = params["environment"]["implementation"]
+        self.environment_config = self._params["environment"]["config"]
+        self.environment_endpoint = self._params["environment"]["endpoint"]
+        self.environment_name = self._params["environment"]["name"]
 
-        self.actors = params["actors"]
-
-    def get_trial_id(self):
-        return self._trial.id
-
-    def get_user_id(self):
-        return self._user_id
+        self.actors = self._params["actors"]
 
     def _recode(self):
-        for act in self.actors:
-            if "name" not in act or \
-               "actor_class" not in act or \
-               "endpoint" not in act or \
-               "implementation" not in act or \
-               "config" not in act:
-                raise InvalidParamsError(f"incomplete actor: {act}")
-
         self._params["actors"] = self.actors
 
         self._params["trial_config"] = self.trial_config
@@ -57,19 +45,33 @@ class PrehookSession(ABC):
 
         self._params["environment"]["config"] = self.environment_config
         self._params["environment"]["endpoint"] = self.environment_endpoint
+        self._params["environment"]["name"] = self.environment_name
+
+    def get_trial_id(self):
+        return self._trial.id
+
+    def get_user_id(self):
+        return self._user_id
 
     def validate(self):
         unknowns = []
         for name in dir(self):
             if name and name[0] != "_":
                 if (name != "trial_config" and name != "trial_max_steps" and name != "trial_max_inactivity" and
-                        name != "environment_config" and name != "environment_endpoint" and name != "actors" and
+                        name != "environment_config" and name != "environment_endpoint" and 
+                        name != "environment_name" and name != "actors" and
                         name != "get_trial_id" and name != "get_user_id" and name != "validate"):
                     unknowns.append(name)
         if unknowns:
             raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
 
-        self._recode()
+        for act in self.actors:
+            if "name" not in act or \
+               "actor_class" not in act or \
+               "endpoint" not in act or \
+               "implementation" not in act or \
+               "config" not in act:
+                raise InvalidParamsError(f"incomplete actor: {act}")
 
     def __str__(self):
         result = f"PreHookSession: trial_config = {self.trial_config}"
@@ -77,7 +79,7 @@ class PrehookSession(ABC):
         result += f", trial_max_inactivity = {self.trial_max_inactivity}"
         result += f", environment_config = {self.environment_config}"
         result += f", environment_endpoint = {self.environment_endpoint}"
-        result += f", environment_implementation = {self.environment_implementation}"
+        result += f", environment_name = {self.environment_name}"
         result += f", actors = {self.actors}"
         return result
 

@@ -34,6 +34,9 @@ class EnvironmentSession(Session):
         result += f" --- EnvironmentSession: config = {self.config}"
         return result
 
+    def get_active_actors(self):
+        return self._active_actors
+
     def start(self, observations, auto_done_sending=True):
         self._start(auto_done_sending)
         packed_obs = self._pack_observations(observations)

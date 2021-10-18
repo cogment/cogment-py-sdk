@@ -81,6 +81,11 @@ class ActorSession(Session):
         result += f" --- ActorSession: class_name = {self.class_name}, config = {self.config}"
         return result
 
+    def get_active_actors(self):
+        # Controller.get_actors can be used.
+        # Or provide actors details in the config, or the observations.
+        raise CogmentError(f"This function is deprecated for actors")
+
     def start(self, auto_done_sending=True):
         self._start(auto_done_sending)
 
