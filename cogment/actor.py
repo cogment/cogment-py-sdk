@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import time
 from abc import abstractmethod
 from typing import Any
@@ -69,11 +70,10 @@ class ActorClassList:
 class ActorSession(Session):
     """This represents an actor being performed locally."""
 
-    def __init__(self, impl, actor_class, trial, name, impl_name, config):
-        super().__init__(trial, name, impl, impl_name)
+    def __init__(self, impl, actor_class, trial, name, impl_name, env_name, config):
+        super().__init__(trial, name, impl, impl_name, config)
         self.class_name = actor_class.name
-        self.config = config
-
+        self.env_name = env_name
         self._actor_class = actor_class
 
     def __str__(self):
@@ -97,3 +97,12 @@ class ActorSession(Session):
             action_req.content = action.SerializeToString()
 
         self._post_data(action_req)
+
+    def send_message(self, payload, to, to_environment=None):
+        if to_environment is not None:
+            logging.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                            "Use 'self.env_name' as environment name in the 'to' parameter.")
+            if to_environment:
+                self._send_message(payload, to + [self.env_name])
+                return
+        self._send_message(payload, to)

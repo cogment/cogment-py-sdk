@@ -34,14 +34,15 @@ class TrialState(Enum):
 
 
 class TrialInfo:
-    def __init__(self, trial_id):
+    def __init__(self, trial_id, api_state):
         self.trial_id = trial_id
-        self.state = TrialState.UNKNOWN
+        self.state = TrialState(api_state)
+        self.env_name = None
         self.tick_id = None
         self.duration = None
 
     def __str__(self):
-        result = f"TrialInfo: trial_id = {self.trial_id}, state = {self.state}"
+        result = f"TrialInfo: trial_id = {self.trial_id}, env_name = {self.env_name}, state = {self.state}"
         result += f", tick_id = {self.tick_id}, duration = {self.duration}"
         return result
 
@@ -106,8 +107,8 @@ class Controller:
 
         result = []
         for reply in rep.trial:
-            info_ex = TrialInfo(reply.trial_id)
-            info_ex.state = TrialState(reply.state)
+            info_ex = TrialInfo(reply.trial_id, reply.state)
+            info_ex.env_name = reply.env_name
             info_ex.tick_id = reply.tick_id
             info_ex.duration = reply.trial_duration
 
@@ -126,8 +127,7 @@ class Controller:
 
         try:
             async for reply in reply_itor:
-                info = TrialInfo(reply.trial_id)
-                info.state = TrialState(reply.state)
+                info = TrialInfo(reply.trial_id, reply.state)
                 keep_looping = yield info
                 if keep_looping is not None and not bool(keep_looping):
                     break

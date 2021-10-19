@@ -343,7 +343,8 @@ class ClientServicer:
             config = actor_class.config_type()
             config.ParseFromString(init_data.config.content)
 
-        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name, config)
+        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name, 
+                               init_data.env_name, config)
         logging.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] "
                       f"for client actor [{init_data.actor_name}] started")
 

@@ -271,7 +271,7 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
             config.ParseFromString(init_input.config.content)
 
         trial = Trial(trial_id, [], self.__cog_settings)
-        new_session = ActorSession(impl.impl, actor_class, trial, actor_name, impl_name, config)
+        new_session = ActorSession(impl.impl, actor_class, trial, actor_name, impl_name, init_input.env_name, config)
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)
 

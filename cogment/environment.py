@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import time
 import logging
 from cogment.session import Session, _Ending, _EndingAck
@@ -26,8 +25,7 @@ class EnvironmentSession(Session):
     """This represents the environment being performed locally."""
 
     def __init__(self, impl, trial, name, impl_name, config):
-        super().__init__(trial, name, impl, impl_name)
-        self.config = config
+        super().__init__(trial, name, impl, impl_name, config)
 
     def __str__(self):
         result = super().__str__()
@@ -36,6 +34,12 @@ class EnvironmentSession(Session):
 
     def get_active_actors(self):
         return self._active_actors
+
+    def send_message(self, payload, to, to_environment=None):
+        if to_environment is not None:
+            logging.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                            "No message will be sent back to the environment!")
+        self._send_message(payload, to)
 
     def start(self, observations, auto_done_sending=True):
         self._start(auto_done_sending)

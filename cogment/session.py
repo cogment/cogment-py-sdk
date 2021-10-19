@@ -140,10 +140,11 @@ class RecvEvent:
 
 
 class Session(ABC):
-    def __init__(self, trial, name, impl, impl_name):
+    def __init__(self, trial, name, impl, impl_name, config):
         self._trial = trial
         self.name = name
         self.impl_name = impl_name
+        self.config = config
         self._impl = impl
         self._event_queue = asyncio.Queue()
         self._started = False
@@ -323,7 +324,7 @@ class Session(ABC):
 
             self._post_data(reward)
 
-    def send_message(self, payload, to):
+    def _send_message(self, payload, to):
         if not self._started:
             logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                             f"Cannot send message until session is started.")
