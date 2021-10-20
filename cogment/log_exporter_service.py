@@ -17,11 +17,62 @@ import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
 from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
-from cogment.utils import raw_params_to_user_params, list_versions
+from cogment.utils import list_versions
 import logging
 import asyncio
 
 import grpc.aio  # type: ignore
+
+
+def raw_params_to_logger_params(params, settings):
+    trial_config = None
+    if params.HasField("trial_config"):
+        trial_config = settings.trial.config_type()
+        trial_config.ParseFromString(params.trial_config.content)
+
+    env_config = None
+    if(params.environment.HasField("config")):
+        env_config = settings.environment.config_type()
+        env_config.ParseFromString(params.environment.config.content)
+
+    datalog = {
+        "endpoint": params.datalog.endpoint,
+        "type": params.datalog.type,
+        "exclude": params.datalog.exclude_fields
+    }
+
+    environment = {
+        "endpoint": params.environment.endpoint,
+        "name": params.environment.name,
+        "config": env_config
+    }
+
+    actors = []
+    for actor in params.actors:
+        actor_config = None
+
+        if actor.HasField("config"):
+            a_c = settings.actor_classes.__getattribute__(actor.actor_class)
+            actor_config = a_c.config_type()
+            actor_config.ParseFromString(actor.config.content)
+
+        actor_data = {
+            "name": actor.name,
+            "actor_class": actor.actor_class,
+            "endpoint": actor.endpoint,
+            "implementation": actor.implementation,
+            "config": actor_config
+        }
+        actors.append(actor_data)
+
+    return {
+        "trial_config": trial_config,
+        "datalog": datalog,
+        "environment": environment,
+        "actors": actors,
+        "max_steps": params.max_steps,
+        "max_inactivity": params.max_inactivity
+    }
 
 
 async def read_sample(context, session):
@@ -60,6 +111,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
 
     # Override
     async def OnLogSample(self, request_iterator, context):
+        reader_task = None
         try:
             metadata = dict(context.invocation_metadata())
             trial_id = metadata["trial-id"]
@@ -70,7 +122,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             if not request.HasField("trial_params"):
                 raise CogmentError(f"Initial logging request for [{trial_id}] does not contain parameters.")
 
-            trial_params = raw_params_to_user_params(request.trial_params, self.__cog_settings)
+            trial_params = raw_params_to_logger_params(request.trial_params, self.__cog_settings)
             raw_trial_params = request.trial_params
 
             session = DatalogSession(self._impl, trial_id, user_id, trial_params, raw_trial_params)

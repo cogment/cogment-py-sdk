@@ -19,33 +19,9 @@ from cogment.errors import InvalidParamsError
 class PrehookSession(ABC):
     """This represents the session for a prehook for a trial"""
 
-    def __init__(self, params, trial, user_id):
-        self._params = params
+    def __init__(self, trial, user_id):
         self._trial = trial
         self._user_id = user_id
-        self._decode()
-
-    def _decode(self):
-        self.trial_config = self._params["trial_config"]
-        self.trial_max_steps = self._params["max_steps"]
-        self.trial_max_inactivity = self._params["max_inactivity"]
-
-        self.environment_config = self._params["environment"]["config"]
-        self.environment_endpoint = self._params["environment"]["endpoint"]
-        self.environment_name = self._params["environment"]["name"]
-
-        self.actors = self._params["actors"]
-
-    def _recode(self):
-        self._params["actors"] = self.actors
-
-        self._params["trial_config"] = self.trial_config
-        self._params["max_steps"] = self.trial_max_steps
-        self._params["max_inactivity"] = self.trial_max_inactivity
-
-        self._params["environment"]["config"] = self.environment_config
-        self._params["environment"]["endpoint"] = self.environment_endpoint
-        self._params["environment"]["name"] = self.environment_name
 
     def get_trial_id(self):
         return self._trial.id
@@ -54,24 +30,25 @@ class PrehookSession(ABC):
         return self._user_id
 
     def validate(self):
-        unknowns = []
-        for name in dir(self):
-            if name and name[0] != "_":
-                if (name != "trial_config" and name != "trial_max_steps" and name != "trial_max_inactivity" and
-                        name != "environment_config" and name != "environment_endpoint" and 
-                        name != "environment_name" and name != "actors" and
-                        name != "get_trial_id" and name != "get_user_id" and name != "validate"):
-                    unknowns.append(name)
-        if unknowns:
-            raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
+        attributes = {"trial_config", "trial_max_steps", "trial_max_inactivity", 
+                      "environment_config", "environment_endpoint", "environment_name",
+                      "actors", "get_trial_id", "get_user_id", "validate", "datalog_endpoint",
+                      "datalog_type", "datalog_exclude"}
+        for att in dir(self):
+            if att and att[0] != "_" and att not in attributes:
+                raise InvalidParamsError(f"Unknown attribute [{att}] for parameters")
+        for att in attributes:
+            if att not in dir(self):
+                raise InvalidParamsError(f"Missing attribute [{att}] for parameters")
 
-        for act in self.actors:
-            if "name" not in act or \
-               "actor_class" not in act or \
-               "endpoint" not in act or \
-               "implementation" not in act or \
-               "config" not in act:
-                raise InvalidParamsError(f"incomplete actor: {act}")
+        actor_attributes = {"name", "actor_class", "endpoint", "implementation", "config"}
+        for actor in self.actors:
+            for att in actor_attributes:
+                if att not in actor:
+                    raise InvalidParamsError(f"Incomplete actor for parameters. Missing attribute [{att}]")
+            for att in actor:
+                if att not in actor_attributes:
+                    raise InvalidParamsError(f"Unknown actor attribute [{att}] for parameters")
 
     def __str__(self):
         result = f"PreHookSession: trial_config = {self.trial_config}"

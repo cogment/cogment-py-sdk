@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from types import SimpleNamespace
-
+import cogment.api.common_pb2 as common_api
 import cogment.api.hooks_pb2_grpc as grpc_api
 import cogment.api.hooks_pb2 as hooks_api
-import cogment.utils as utils
 from cogment.trial import Trial
 from cogment.prehook import PrehookSession
 from cogment.errors import CogmentError
@@ -28,11 +26,80 @@ import asyncio
 class PrehookServicer(grpc_api.TrialHooksSPServicer):
 
     def __init__(self, impl, cog_settings, prometheus_registry=None):
-
         self.__impl = impl
         self.__cog_settings = cog_settings
 
         logging.info("Prehook Service started")
+
+    # TODO: Check every field's presence and set the resulting session value to None if not present
+    def _decode(self, session, proto_params):
+        if proto_params.HasField("trial_config"):
+            session.trial_config = self.__cog_settings.trial.config_type()
+            session.trial_config.ParseFromString(proto_params.trial_config.content)
+        else:
+            session.trial_config = None
+
+        session.trial_max_steps = proto_params.max_steps
+        session.trial_max_inactivity = proto_params.max_inactivity
+
+        session.datalog_endpoint = proto_params.datalog.endpoint
+        session.datalog_type = proto_params.datalog.type
+        session.datalog_exclude = [field for field in proto_params.datalog.exclude_fields]
+
+        if proto_params.environment.HasField("config"):
+            session.environment_config = self.__cog_settings.environment.config_type()
+            session.environment_config.ParseFromString(proto_params.environment.config.content)
+        else:
+            session.environment_config = None
+        session.environment_endpoint = proto_params.environment.endpoint
+        session.environment_name = proto_params.environment.name
+
+        session.actors = []
+        for actor in proto_params.actors:
+            if actor.HasField("config"):
+                a_c = self.__cog_settings.actor_classes.__getattribute__(actor.actor_class)
+                actor_config = a_c.config_type()
+                actor_config.ParseFromString(actor.config.content)
+            else:
+                actor_config = None
+
+            actor_data = {
+                "name": actor.name,
+                "actor_class": actor.actor_class,
+                "endpoint": actor.endpoint,
+                "implementation": actor.implementation,
+                "config": actor_config
+            }
+            session.actors.append(actor_data)
+
+    # TODO: Take into account if any of the session value is None
+    def _recode(self, session):
+        proto_params = common_api.TrialParams()
+
+        if session.trial_config is not None:
+            proto_params.trial_config.content = session.trial_config.SerializeToString()
+        proto_params.max_steps = session.trial_max_steps
+        proto_params.max_inactivity = session.trial_max_inactivity
+
+        proto_params.datalog.endpoint = session.datalog_endpoint
+        proto_params.datalog.type = session.datalog_type
+        proto_params.datalog.exclude_fields.extend(session.datalog_exclude)
+
+        if session.environment_config is not None:
+            proto_params.environment.config.content = session.environment_config.SerializeToString()
+        proto_params.environment.endpoint = session.environment_endpoint
+        proto_params.environment.name = session.environment_name
+
+        for actor_data in session.actors:
+            actor_pb = proto_params.actors.add()
+            actor_pb.name = actor_data["name"]
+            actor_pb.actor_class = actor_data["actor_class"]
+            actor_pb.endpoint = actor_data["endpoint"]
+            actor_pb.implementation = actor_data["implementation"]
+            if actor_data["config"] is not None:
+                actor_pb.config.content = actor_data["config"].SerializeToString()
+
+        return proto_params
 
     # Override
     async def OnPreTrial(self, request, context):
@@ -47,9 +114,9 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             user_id = metadata["user-id"]
 
             trial = Trial(trial_id, [], self.__cog_settings)
-            user_params = utils.raw_params_to_user_params(request.params, self.__cog_settings)
 
-            prehook = PrehookSession(user_params, trial, user_id)
+            prehook = PrehookSession(trial, user_id)
+            self._decode(prehook, request.params)
             try:
                 await self.__impl(prehook)
                 prehook.validate()
@@ -62,10 +129,9 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
                 logging.exception(f"An exception occured in user prehook implementation:")
                 raise
 
-            prehook._recode()
-
             reply = hooks_api.PreTrialParams()
-            reply.params.CopyFrom(utils.user_params_to_raw_params(prehook._params, self.__cog_settings))
+            reply.params.CopyFrom(self._recode(prehook))
+
             return reply
 
         except Exception:
