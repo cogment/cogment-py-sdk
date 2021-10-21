@@ -30,7 +30,7 @@ class PrehookSession(ABC):
         return self._user_id
 
     def validate(self):
-        attributes = {"trial_config", "trial_max_steps", "trial_max_inactivity", 
+        attributes = {"trial_config", "trial_max_steps", "trial_max_inactivity",
                       "environment_config", "environment_endpoint", "environment_name",
                       "actors", "get_trial_id", "get_user_id", "validate", "datalog_endpoint",
                       "datalog_type", "datalog_exclude"}

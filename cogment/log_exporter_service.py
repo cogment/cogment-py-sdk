@@ -94,6 +94,7 @@ async def read_sample(context, session):
 
     except asyncio.CancelledError as exc:
         logging.debug(f"LogExporterService 'read_sample' coroutine cancelled: [{exc}]")
+        raise
 
     except Exception:
         logging.exception("read_sample")
@@ -143,7 +144,6 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
 
         except asyncio.CancelledError as exc:
             logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
-            raise
 
         except Exception:
             logging.exception("OnLogSample")

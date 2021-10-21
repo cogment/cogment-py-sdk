@@ -218,6 +218,11 @@ async def _process_outgoing(context, session):
 
             await context.write(package)
 
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                      f"process outgoing cancelled: [{exc}]")
+        raise
+
     except Exception:
         logging.exception("_process_outgoing")
         raise
@@ -367,7 +372,6 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
         except asyncio.CancelledError as exc:
             logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
                           f"user implementation was cancelled with exception")
-            raise
 
         except Exception:
             logging.exception("run_session")

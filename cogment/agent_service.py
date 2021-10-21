@@ -181,6 +181,7 @@ async def _process_incoming(context, session):
 
     except asyncio.CancelledError as exc:
         logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] coroutine cancelled: [{exc}]")
+        raise
 
     except Exception:
         logging.exception("_process_incoming")
@@ -218,6 +219,10 @@ async def _process_outgoing(context, session):
                 continue
 
             await context.write(package)
+
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] process outgoing cancelled: [{exc}]")
+        raise
 
     except Exception:
         logging.exception("_process_outgoing")

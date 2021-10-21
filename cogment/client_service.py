@@ -128,6 +128,7 @@ async def _process_incoming(reply_itor, req_queue, session):
 
     except asyncio.CancelledError as exc:
         logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] coroutine cancelled: [{exc}]")
+        raise
 
     except grpc.aio.AioRpcError as exc:
         logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
@@ -176,6 +177,10 @@ async def _process_outgoing(data_queue, session):
                 continue
 
             await data_queue.put(package)
+
+    except asyncio.CancelledError as exc:
+        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] process outgoing cancelled: [{exc}]")
+        raise
 
     except Exception:
         logging.exception("_process_outgoing")
@@ -343,7 +348,7 @@ class ClientServicer:
             config = actor_class.config_type()
             config.ParseFromString(init_data.config.content)
 
-        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name, 
+        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name,
                                init_data.env_name, config)
         logging.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] "
                       f"for client actor [{init_data.actor_name}] started")

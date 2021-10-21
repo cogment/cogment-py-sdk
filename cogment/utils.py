@@ -28,4 +28,3 @@ def list_versions():
     reply.versions.add(name='grpc', version=grpc.__version__)
 
     return reply
-
