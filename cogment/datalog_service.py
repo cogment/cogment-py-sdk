@@ -93,7 +93,7 @@ async def read_sample(context, session):
                 logging.warning(f"Invalid request received from the orchestrator : {request}")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"LogExporterService 'read_sample' coroutine cancelled: [{exc}]")
+        logging.debug(f"DatalogServicer 'read_sample' coroutine cancelled: [{exc}]")
         raise
 
     except Exception:
@@ -104,14 +104,14 @@ async def read_sample(context, session):
     session._new_sample(None)
 
 
-class LogExporterService(grpc_api.LogExporterSPServicer):
+class DatalogServicer(grpc_api.DatalogSPServicer):
     def __init__(self, impl, cog_settings):
         self._impl = impl
         self.__cog_settings = cog_settings
-        logging.info("Log Exporter Service started")
+        logging.info("Datalog Service started")
 
     # Override
-    async def OnLogSample(self, request_iterator, context):
+    async def RunTrialDatalog(self, request_iterator, context):
         reader_task = None
         try:
             metadata = dict(context.invocation_metadata())
@@ -132,7 +132,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             reader_task = asyncio.create_task(read_sample(context, session))
 
             # TODO: Investigate probable bug in easy_grpc that expects a stream to be "used"
-            reply = datalog_api.LogExporterSampleReply()
+            reply = datalog_api.RunTrialDatalogOutput()
             await context.write(reply)
 
             normal_return = await user_task
@@ -146,7 +146,7 @@ class LogExporterService(grpc_api.LogExporterSPServicer):
             logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
 
         except Exception:
-            logging.exception("OnLogSample")
+            logging.exception("RunTrialDatalog")
             raise
 
         finally:

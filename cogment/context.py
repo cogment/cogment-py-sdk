@@ -49,9 +49,9 @@ from cogment.api.environment_pb2_grpc import add_EnvironmentSPServicer_to_server
 from cogment.hooks_service import PrehookServicer
 from cogment.api.hooks_pb2_grpc import add_TrialHooksSPServicer_to_server
 
-# Log Exporter
-from cogment.log_exporter_service import LogExporterService
-from cogment.api.datalog_pb2_grpc import add_LogExporterSPServicer_to_server
+# Datalog
+from cogment.datalog_service import DatalogServicer
+from cogment.api.datalog_pb2_grpc import add_DatalogSPServicer_to_server
 
 
 DEFAULT_MAX_WORKERS = 1
@@ -77,8 +77,8 @@ def _add_prehook_service(grpc_server, impl, cog_settings, prometheus_registry):
 
 
 def _add_datalog_service(grpc_server, impl, cog_settings):
-    servicer = LogExporterService(impl, cog_settings)
-    add_LogExporterSPServicer_to_server(servicer, grpc_server)
+    servicer = DatalogServicer(impl, cog_settings)
+    add_DatalogSPServicer_to_server(servicer, grpc_server)
 
 
 class Endpoint:
