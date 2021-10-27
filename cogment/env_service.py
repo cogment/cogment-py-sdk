@@ -89,13 +89,12 @@ def _process_normal_data(data, session):
         if len_actions != len_actors:
             raise CogmentError(f"Received {len_actions} actions but have {len_actors} actors")
 
-        tick_id = data.action_set.tick_id
-        session._trial.tick_id = tick_id
+        session._trial.tick_id = data.action_set.tick_id
 
         for i, actor in enumerate(session._trial.actors):
             action = actor.actor_class.action_space()
             action.ParseFromString(data.action_set.actions[i])
-            recv_event.actions.append(RecvAction(i, action, tick_id))
+            recv_event.actions.append(RecvAction(i, data.action_set, action))
 
         session._new_event(recv_event)
 

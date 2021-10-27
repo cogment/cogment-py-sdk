@@ -15,44 +15,109 @@
 import cogment.api.common_pb2 as common_api
 import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
+from cogment.control import TrialState
 from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
 from cogment.utils import list_versions
+from cogment.session import RecvObservation, RecvAction, RecvMessage, RecvReward
 import logging
 import asyncio
 
 import grpc.aio  # type: ignore
 
 
-def raw_params_to_logger_params(params, settings):
-    trial_config = None
-    if params.HasField("trial_config"):
-        trial_config = settings.trial.config_type()
-        trial_config.ParseFromString(params.trial_config.content)
+class LogParams:
+    def __init__(self, cog_settings):
+        self.max_steps = None
+        self.max_inactivity = None
+        self.datalog = None
+        self.environment = None
+        self.nb_actors = None
 
-    env_config = None
-    if(params.environment.HasField("config")):
-        env_config = settings.environment.config_type()
-        env_config.ParseFromString(params.environment.config.content)
+        self._actor_indexes = None
+        self._raw_params = None
+        self._settings = cog_settings
 
-    datalog = {
-        "endpoint": params.datalog.endpoint,
-        "type": params.datalog.type,
-        "exclude": params.datalog.exclude_fields
-    }
+    # Type of serialized data being produced and consumed by this class.
+    # This is dependent on all the underlying protobuf messages used to
+    # serialize/deserialize, and should be incremented if any of them changes in
+    # a backward or forward incompatible way. V1 could be considered a type 0 or 1.
+    # Current dependencies: TrialParams, DatalogParams, EnvironmentParams, ActorParams,
+    #                       TrialConfig, EnvironmentConfig, ActorConfig 
+    def get_serial_type(self):
+        return 2
 
-    environment = {
-        "endpoint": params.environment.endpoint,
-        "name": params.environment.name,
-        "config": env_config
-    }
+    def _set(self, raw_params):
+        self._set_from_params(raw_params)
 
-    actors = []
-    for actor in params.actors:
+    def serialize(self):
+        if self._raw_params is None:
+            raise CogmentError("Not set, cannot serialize")
+        return self._raw_params.SerializeToString()
+
+    def deserialize(self, raw_string):
+        params = common_api.TrialParams()
+        params.ParseFromString(raw_string)
+        self._set_from_params(params)
+
+    def _set_from_params(self, raw_params):
+        if type(raw_params) != common_api.TrialParams:
+            raise CogmentError(f"Wrong type of parameters provided [{type(raw_params)}]")
+
+        self.max_steps = raw_params.max_steps
+        self.max_inactivity = raw_params.max_inactivity
+
+        self.datalog = {
+            "type": raw_params.datalog.type,
+            "endpoint": raw_params.datalog.endpoint,
+            "exclude": raw_params.datalog.exclude_fields,
+        }
+
+        self.environment = {
+            "name": raw_params.environment.name,
+            "endpoint": raw_params.environment.endpoint,
+            "implementation": raw_params.environment.implementation,
+        }
+
+        self.nb_actors = len(raw_params.actors)
+        self._actor_indexes = None
+        self._raw_params = raw_params
+
+    def get_trial_config(self):
+        config = None
+        if self._raw_params.HasField("trial_config"):
+            config = self._settings.trial.config_type()
+            config.ParseFromString(self._raw_params.trial_config.content)
+        
+        return config
+
+    def get_environment_config(self):
+        config = None
+        if(self._raw_params.environment.HasField("config")):
+            config = self._settings.environment.config_type()
+            config.ParseFromString(self._raw_params.environment.config.content)
+
+        return config
+
+    def get_actor_index(self, actor_name):
+        if self._actor_indexes is not None:
+            return self._actor_indexes.get(actor_name)
+        else:
+            indexes = {}
+            for index, actor in enumerate(self._raw_params.actors):
+                indexes[actor.name] = index
+            self._actor_indexes = indexes
+            return indexes.get(actor_name)
+
+    def get_actor_name(self, actor_index):
+        return self._raw_params.actors[actor_index].name
+
+    def get_actor(self, actor_index):
+        actor = self._raw_params.actors[actor_index]
+
         actor_config = None
-
+        a_c = self._settings.actor_classes.__getattribute__(actor.actor_class)
         if actor.HasField("config"):
-            a_c = settings.actor_classes.__getattribute__(actor.actor_class)
             actor_config = a_c.config_type()
             actor_config.ParseFromString(actor.config.content)
 
@@ -61,21 +126,122 @@ def raw_params_to_logger_params(params, settings):
             "actor_class": actor.actor_class,
             "endpoint": actor.endpoint,
             "implementation": actor.implementation,
-            "config": actor_config
+            "config": actor_config,
+            "action_space": a_c.action_space,
+            "observation_space": a_c.observation_space,
         }
-        actors.append(actor_data)
 
-    return {
-        "trial_config": trial_config,
-        "datalog": datalog,
-        "environment": environment,
-        "actors": actors,
-        "max_steps": params.max_steps,
-        "max_inactivity": params.max_inactivity
-    }
+        return actor_data
+
+    def __str__(self):
+        result = f"LogParams: {self._raw_params}"
+        return result
 
 
-async def read_sample(context, session):
+class LogSample:
+    def __init__(self, params):
+        self.tick_id = None
+        self.timestamp = None
+        self.state = None
+        self.events = None
+
+        self._raw_sample = None
+        self._params = params
+
+    # Type of serialized data being produced and consumed by this class.
+    # This is dependent on all the underlying protobuf messages used to
+    # serialize/deserialize, and should be incremented if any of them changes in
+    # a backward or forward incompatible way. V1 could be considered a type 0 or 1.
+    # Current dependencies: DatalogSample, SampleInfo, TrialState, ObservationSet,
+    #                       Action, Reward, RewardSource, Message
+    def get_serial_type(self):
+        return 2
+
+    def _set(self, raw_sample):
+        self._set_from_sample(raw_sample)
+
+    def serialize(self):
+        if self._raw_sample is None:
+            raise CogmentError("Not set, nothing to serialize")
+        return self._raw_sample.SerializeToString()
+
+    def deserialize(self, raw_string):
+        sample = datalog_api.DatalogSample()
+        sample.ParseFromString(raw_string)
+        self._set_from_sample(sample)
+
+    def _set_from_sample(self, sample):
+        if type(sample) != datalog_api.DatalogSample:
+            raise CogmentError(f"Wrong type of sample provided [{type(sample)}]")
+        if sample.HasField("info"):
+            self.state = TrialState(sample.info.state)
+            self.tick_id = sample.info.tick_id
+            self.timestamp = sample.info.timestamp
+            self.events = sample.info.special_events
+        else:
+            self.state = None
+            self.tick_id = None
+            self.timestamp = None
+            self.events = None
+
+        self._raw_sample = sample
+
+    def all_actor_names(self):
+        for index in range(self._params.nb_actors):
+            yield self._params.get_actor_name(index)
+
+    def get_action(self, actor):
+        if isinstance(actor, int):
+            actor_index = actor
+        elif isinstance(actor, str):
+            actor_index = self._params.get_actor_index(actor)
+        else:
+            raise CogmentError(f"Wrong type of parameter [{type(actor)}]")
+        if actor_index is None or actor_index < 0 or actor_index >= self._params.nb_actors:
+            raise CogmentError(f"Invalid actor [{actor}] [{actor_index}]")
+
+        if len(self._raw_sample.actions) > 0:
+            data = self._raw_sample.actions[actor_index]
+            action = self._params.get_actor(actor_index)["action_space"]()
+            action.ParseFromString(data.content)
+            return RecvAction(actor_index, data, action)
+        else:
+            return None
+
+    def get_observation(self, actor):
+        if isinstance(actor, int):
+            actor_index = actor
+        elif isinstance(actor, str):
+            actor_index = self._params.get_actor_index(actor)
+        else:
+            raise CogmentError(f"Wrong type of parameter [{type(actor)}]")
+        if actor_index is None or actor_index < 0 or actor_index >= self._params.nb_actors:
+            raise CogmentError(f"Invalid actor [{actor}] [{actor_index}]")
+
+        if self._raw_sample.HasField("observations"):
+            data = self._raw_sample.observations
+            obs_index = data.actors_map[actor_index]
+            obs_content = data.observations[obs_index]
+            obs = self._params.get_actor(actor_index)["observation_space"]()
+            obs.ParseFromString(obs_content)
+            return RecvObservation(data, obs)
+        else:
+            return None
+
+    def all_rewards(self):
+        for rew in self._raw_sample.rewards:
+            yield RecvReward(rew)
+
+    def all_messages(self):
+        for msg in self._raw_sample.messages:
+            yield RecvMessage(msg)
+
+    def __str__(self):
+        result = f"LogSample: {self._raw_sample}"
+        return result
+
+
+async def read_sample(context, session, settings):
     try:
         while True:
             request = await context.read()
@@ -86,7 +252,9 @@ async def read_sample(context, session):
 
             elif request.HasField("sample"):
                 trial_ended = (request.sample.info.state == common_api.TrialState.ENDED)
-                session._new_sample(request.sample)
+                sample = LogSample(session.trial_params)
+                sample._set(request.sample)
+                session._new_sample(sample)
                 if trial_ended:
                     break
             else:
@@ -123,13 +291,13 @@ class DatalogServicer(grpc_api.DatalogSPServicer):
             if not request.HasField("trial_params"):
                 raise CogmentError(f"Initial logging request for [{trial_id}] does not contain parameters.")
 
-            trial_params = raw_params_to_logger_params(request.trial_params, self.__cog_settings)
-            raw_trial_params = request.trial_params
+            trial_params = LogParams(self.__cog_settings)
+            trial_params._set(request.trial_params)
 
-            session = DatalogSession(self._impl, trial_id, user_id, trial_params, raw_trial_params)
+            session = DatalogSession(self._impl, trial_id, user_id, trial_params)
             user_task = session._start_user_task()
 
-            reader_task = asyncio.create_task(read_sample(context, session))
+            reader_task = asyncio.create_task(read_sample(context, session, self.__cog_settings))
 
             # TODO: Investigate probable bug in easy_grpc that expects a stream to be "used"
             reply = datalog_api.RunTrialDatalogOutput()

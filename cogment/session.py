@@ -54,14 +54,15 @@ class RecvObservation:
 
 
 class RecvAction:
-    def __init__(self, actor_index, action, tick_id):
-        self.tick_id = tick_id
+    def __init__(self, actor_index, action, action_space):
+        self.tick_id = action.tick_id
+        self.timestamp = action.timestamp
         self.actor_index = actor_index
-        self.action = action
+        self.action = action_space
 
     def __str__(self):
-        result = f"RecvAction: tick_id = {self.tick_id}, actor index = {self.actor_index}"
-        result += f", action = {self.action}"
+        result = f"RecvAction: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
+        result += f", actor index = {self.actor_index}, action = {self.action}"
         return result
 
 
@@ -80,6 +81,7 @@ class RecvRewardSource:
 
 class RecvReward:
     def __init__(self, reward):
+        self.receiver_name = reward.receiver_name
         self.tick_id = reward.tick_id
         self.value = reward.value
         self._sources = reward.sources
@@ -94,20 +96,21 @@ class RecvReward:
             yield RecvRewardSource(src)
 
     def __str__(self):
-        result = f"RecvReward: tick_id = {self.tick_id}, value = {self.value}"
-        result += f", sources = {self._sources}"
+        result = f"RecvReward: tick_id = {self.tick_id}, receiver name = {self.receiver_name}"
+        result += f", value = {self.value}, sources = {self._sources}"
         return result
 
 
 class RecvMessage:
     def __init__(self, message):
+        self.receiver_name = message.receiver_name
         self.tick_id = message.tick_id
         self.sender_name = message.sender_name
         self.payload = message.payload
 
     def __str__(self):
-        result = f"RecvMessage: tick_id = {self.tick_id}, sender_name = {self.sender_name}"
-        result += f", payload = {self.payload}"
+        result = f"RecvMessage: tick_id = {self.tick_id}, receiver name = {self.receiver_name}"
+        result += f", sender_name = {self.sender_name}, payload = {self.payload}"
         return result
 
 
