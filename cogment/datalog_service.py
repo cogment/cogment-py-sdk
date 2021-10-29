@@ -43,7 +43,7 @@ class LogParams:
     # serialize/deserialize, and should be incremented if any of them changes in
     # a backward or forward incompatible way. V1 could be considered a type 0 or 1.
     # Current dependencies: TrialParams, DatalogParams, EnvironmentParams, ActorParams,
-    #                       TrialConfig, EnvironmentConfig, ActorConfig 
+    #                       TrialConfig, EnvironmentConfig, ActorConfig
     def get_serial_type(self):
         return 2
 
@@ -88,7 +88,7 @@ class LogParams:
         if self._raw_params.HasField("trial_config"):
             config = self._settings.trial.config_type()
             config.ParseFromString(self._raw_params.trial_config.content)
-        
+
         return config
 
     def get_environment_config(self):

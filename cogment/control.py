@@ -82,11 +82,18 @@ class Controller:
 
         return rep.trial_id
 
-    async def terminate_trial(self, trial_id, hard=False):
+    async def terminate_trial(self, trial_ids, hard=False):
         req = orchestrator_api.TerminateTrialRequest()
         req.hard_termination = hard
-        metadata = [("trial-id", trial_id)]
-        logging.debug(f"Requesting end of trial [{trial_id}] (hard termination: [{hard}])")
+        if type(trial_ids) == str:
+            logging.warning("Using Controller.TerminateTrial() with a string trial ID is deprecated.  Use a list.")
+            metadata = [("trial-id", trial_ids)]
+        else:
+            metadata = []
+            for id in trial_ids:
+                metadata.append(("trial-id", id))
+
+        logging.debug(f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])")
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
 
     async def get_remote_versions(self):
@@ -97,13 +104,19 @@ class Controller:
             result[ver.name] = ver.version
         return result
 
-    async def get_trial_info(self, trial_id):
+    async def get_trial_info(self, trial_ids):
         req = orchestrator_api.TrialInfoRequest()
-        if trial_id is not None:
-            metadata = [("trial-id", trial_id)]
-            rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+        if trial_ids is None:
+            logging.warning("Using Controller.GetTrialInfo() with a null trial ID is deprecated.  Use a list.")
+            metadata = []
+        elif type(trial_ids) == str:
+            logging.warning("Using Controller.GetTrialInfo() with a string trial ID is deprecated.  Use a list.")
+            metadata = [("trial-id", trial_ids)]
         else:
-            rep = await self._lifecycle_stub.GetTrialInfo(request=req)
+            metadata = []
+            for id in trial_ids:
+                metadata.append(("trial-id", id))
+        rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
 
         result = []
         for reply in rep.trial:
