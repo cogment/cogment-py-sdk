@@ -43,7 +43,6 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
         session.trial_max_inactivity = proto_params.max_inactivity
 
         session.datalog_endpoint = proto_params.datalog.endpoint
-        session.datalog_type = proto_params.datalog.type
         session.datalog_exclude = [field for field in proto_params.datalog.exclude_fields]
 
         if proto_params.environment.HasField("config"):
@@ -72,32 +71,42 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             }
             session.actors.append(actor_data)
 
-    # TODO: Take into account if any of the session value is None
+    # TODO: Take into account if any of the session value is None?
     def _recode(self, session):
         proto_params = common_api.TrialParams()
 
-        if session.trial_config is not None:
+        if hasattr(session, "trial_config") and session.trial_config is not None:
             proto_params.trial_config.content = session.trial_config.SerializeToString()
-        proto_params.max_steps = session.trial_max_steps
-        proto_params.max_inactivity = session.trial_max_inactivity
+        if hasattr(session, "trial_max_steps") and session.trial_max_steps is not None:
+            proto_params.max_steps = session.trial_max_steps
+        if hasattr(session, "trial_max_inactivity") and session.trial_max_inactivity is not None:
+            proto_params.max_inactivity = session.trial_max_inactivity
 
-        proto_params.datalog.endpoint = session.datalog_endpoint
-        proto_params.datalog.type = session.datalog_type
-        proto_params.datalog.exclude_fields.extend(session.datalog_exclude)
+        if hasattr(session, "datalog_endpoint") and session.datalog_endpoint is not None:
+            proto_params.datalog.endpoint = session.datalog_endpoint
+        if hasattr(session, "datalog_exclude") and session.datalog_exclude is not None:
+            proto_params.datalog.exclude_fields.extend(session.datalog_exclude)
 
-        if session.environment_config is not None:
+        if hasattr(session, "environment_config") and session.environment_config is not None:
             proto_params.environment.config.content = session.environment_config.SerializeToString()
-        proto_params.environment.endpoint = session.environment_endpoint
-        proto_params.environment.name = session.environment_name
+        if hasattr(session, "environment_endpoint") and session.environment_endpoint is not None:
+            proto_params.environment.endpoint = session.environment_endpoint
+        if hasattr(session, "environment_name") and session.environment_name is not None:
+            proto_params.environment.name = session.environment_name
 
-        for actor_data in session.actors:
-            actor_pb = proto_params.actors.add()
-            actor_pb.name = actor_data["name"]
-            actor_pb.actor_class = actor_data["actor_class"]
-            actor_pb.endpoint = actor_data["endpoint"]
-            actor_pb.implementation = actor_data["implementation"]
-            if actor_data["config"] is not None:
-                actor_pb.config.content = actor_data["config"].SerializeToString()
+        if hasattr(session, "actors") and session.actors is not None:
+            for actor_data in session.actors:
+                actor_pb = proto_params.actors.add()
+                if "name" in actor_data:
+                    actor_pb.name = actor_data["name"]
+                if "actor_class" in actor_data:
+                    actor_pb.actor_class = actor_data["actor_class"]
+                if "endpoint" in actor_data:
+                    actor_pb.endpoint = actor_data["endpoint"]
+                if "implementation" in actor_data:
+                    actor_pb.implementation = actor_data["implementation"]
+                if "config" in actor_data and actor_data["config"] is not None:
+                    actor_pb.config.content = actor_data["config"].SerializeToString()
 
         return proto_params
 

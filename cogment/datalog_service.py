@@ -68,7 +68,6 @@ class LogParams:
         self.max_inactivity = raw_params.max_inactivity
 
         self.datalog = {
-            "type": raw_params.datalog.type,
             "endpoint": raw_params.datalog.endpoint,
             "exclude": raw_params.datalog.exclude_fields,
         }
