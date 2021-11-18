@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Changed
 
 - Restrict the SDK to python >= 3.7 and <3.10 to maintain compatiblity with tensorflow ^2.7.0.
+- Update the cogment api to v1.0.0 to v1.2.1
 
 ### Fixed
 
