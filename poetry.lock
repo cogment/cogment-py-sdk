@@ -361,7 +361,7 @@ generate = ["PyYAML", "grpcio-tools"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7, <3.10"
-content-hash = "52188ac9dcb489962ae709234467f94daa0a4ce1f23f568cbe667b377a8366f0"
+content-hash = "5d787630a530bc631a250750f361820d23c1ae5d2ee224ac225a39dd0ab30a68"
 
 [metadata.files]
 atomicwrites = [
