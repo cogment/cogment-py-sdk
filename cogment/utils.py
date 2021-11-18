@@ -43,6 +43,7 @@ def raw_params_to_user_params(params, settings):
 
     environment = {
         "endpoint": params.environment.endpoint,
+        "implementation": params.environment.implementation,
         "config": env_config
     }
 
@@ -83,6 +84,7 @@ def user_params_to_raw_params(params, settings):
         result.trial_config.content = params["trial_config"].SerializeToString()
 
     result.environment.endpoint = params["environment"]["endpoint"]
+    result.environment.implementation = params["environment"]["implementation"]
     if params["environment"]["config"] is not None:
         result.environment.config.content = params["environment"]["config"].SerializeToString()
 

@@ -29,6 +29,7 @@ class PrehookSession(ABC):
 
         self.environment_config = params["environment"]["config"]
         self.environment_endpoint = params["environment"]["endpoint"]
+        self.environment_implementation = params["environment"]["implementation"]
 
         self.actors = params["actors"]
 
@@ -43,9 +44,17 @@ class PrehookSession(ABC):
         unknowns = []
         for name in dir(self):
             if name and name[0] != "_":
-                if (name != "trial_config" and name != "trial_max_steps" and name != "trial_max_inactivity" and
-                        name != "environment_config" and name != "environment_endpoint" and name != "actors" and
-                        name != "get_trial_id" and name != "validate"):
+                if (
+                    name != "trial_config" and
+                    name != "trial_max_steps" and
+                    name != "trial_max_inactivity" and
+                    name != "environment_config" and
+                    name != "environment_endpoint" and
+                    name != "environment_implementation" and
+                    name != "actors" and
+                    name != "get_trial_id" and
+                    name != "validate"
+                ):
                     unknowns.append(name)
         if unknowns:
             raise InvalidParamsError(f"Unknown attributes for parameters: {unknowns}")
@@ -58,6 +67,7 @@ class PrehookSession(ABC):
         result += f", trial_max_inactivity = {self.trial_max_inactivity}"
         result += f", environment_config = {self.environment_config}"
         result += f", environment_endpoint = {self.environment_endpoint}"
+        result += f", environment_implementation = {self.environment_implementation}"
         result += f", actors = {self.actors}"
         return result
 
@@ -83,3 +93,4 @@ class _ServedPrehookSession(PrehookSession):
 
         self._params["environment"]["config"] = self.environment_config
         self._params["environment"]["endpoint"] = self.environment_endpoint
+        self._params["environment"]["implementation"] = self.environment_implementation

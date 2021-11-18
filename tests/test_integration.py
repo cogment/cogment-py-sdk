@@ -52,8 +52,11 @@ def cogment_test_setup(test_cogment_app_dir):
 
 
 # Base implementations
-async def default_pre_trial_hook(session):
-    session.validate()
+def create_pre_trial_hook(environment_implementation):
+    async def _pre_trial_hook(session):
+        session.environment_implementation = environment_implementation
+        session.validate()
+    return _pre_trial_hook
 
 
 class TestIntegration:
@@ -506,9 +509,9 @@ class TestIntegration:
             prometheus_registry=None,
         )
 
-        pre_trial_hook = mock.AsyncMock(wraps=default_pre_trial_hook)
+        pre_trial_hook = mock.AsyncMock(wraps=create_pre_trial_hook(environment_implementation="test_environment"))
         context.register_pre_trial_hook(pre_trial_hook)
-        context.register_environment(impl=environment)
+        context.register_environment(impl_name="test_environment", impl=environment)
         context.register_actor(impl_name="test", impl=agent)
 
         prometheus_port = find_free_port()

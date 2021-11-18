@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - Added expanation for strict 1.38 requirement on grpcio-tools.
+- Enable pre-trial hooks to set a trial's environment's implementation in `prehook_session.environment_implementation`.
 
 ## v1.3.0 - 2021-09-23
 
