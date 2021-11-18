@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v1.3.1 - 2021-11-18
+
 ## Changed
 
 - Restrict the SDK to python >= 3.7 and <3.10 to maintain compatiblity with tensorflow ^2.7.0.
