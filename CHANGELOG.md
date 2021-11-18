@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Changed
+
+- Restrict the SDK to python >= 3.7 and <3.10 to maintain compatiblity with tensorflow ^2.7.0.
+
 ### Fixed
 
 - Added expanation for strict 1.38 requirement on grpcio-tools.
