@@ -146,11 +146,11 @@ class Controller:
                     break
 
         except grpc.aio.AioRpcError as exc:
-            logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
+            logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
                 logging.error(f"Watch_trials Orchestrator communication lost: [{exc.details()}]")
             else:
-                logging.exception("watch_trials -- Unexpected aio error")
+                logging.exception("watch_trials -- Unexpected aio failure")
                 raise
 
         except GeneratorExit:

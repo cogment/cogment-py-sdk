@@ -52,6 +52,7 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             session.environment_config = None
         session.environment_endpoint = proto_params.environment.endpoint
         session.environment_name = proto_params.environment.name
+        session.environment_implementation = proto_params.environment.implementation
 
         session.actors = []
         for actor in proto_params.actors:
@@ -93,6 +94,8 @@ class PrehookServicer(grpc_api.TrialHooksSPServicer):
             proto_params.environment.endpoint = session.environment_endpoint
         if hasattr(session, "environment_name") and session.environment_name is not None:
             proto_params.environment.name = session.environment_name
+        if hasattr(session, "environment_implementation") and session.environment_implementation is not None:
+            proto_params.environment.implementation = session.environment_implementation
 
         if hasattr(session, "actors") and session.actors is not None:
             for actor_data in session.actors:

@@ -23,8 +23,8 @@ class PrehookSession(ABC):
         self._trial = trial
         self._user_id = user_id
         self._data_attributes = {"trial_config", "trial_max_steps", "trial_max_inactivity",
-                      "datalog_endpoint", "datalog_exclude", "environment_config",
-                      "environment_endpoint", "environment_name", "actors"}
+                      "datalog_endpoint", "datalog_exclude", "environment_implementation",
+                      "environment_endpoint", "environment_name", "environment_config", "actors"}
         self._attributes = self._data_attributes.union({"get_trial_id", "get_user_id", "validate"})
         self._actor_attributes = {"name", "actor_class", "endpoint", "implementation", "config"}
 

@@ -131,13 +131,13 @@ async def _process_incoming(reply_itor, req_queue, session):
         raise
 
     except grpc.aio.AioRpcError as exc:
-        logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
+        logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
         if exc.code() == grpc.StatusCode.UNAVAILABLE:
             logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
                           f"Orchestrator communication lost [{exc.details()}]")
             session._exit_queues()
         else:
-            logging.exception("_process_incoming -- Unexpected aio error")
+            logging.exception("_process_incoming -- Unexpected aio failure")
             raise
 
     except Exception:
@@ -316,12 +316,12 @@ class ClientServicer:
             logging.debug(f"Trial [{trial_id}] - Join coroutine cancelled: [{exc}]")
 
         except grpc.aio.AioRpcError as exc:
-            logging.debug(f"gRPC Error details: [{exc.debug_error_string()}]")
+            logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
                 logging.error(f"Trial [{trial_id}] - Actor [{actor_name}] "
                               f"Orchestrator communication lost in init [{exc.details()}]")
             else:
-                logging.exception("join -- Unexpected aio error")
+                logging.exception("join -- Unexpected aio failure")
                 raise
 
         except Exception:

@@ -325,9 +325,9 @@ class Context:
         init_data = await servicer.join(trial_id, requested_name, requested_class)
 
         if requested_name is not None and requested_name != init_data.actor_name:
-            raise CogmentError(f"Internal error: Actor name [{requested_name}] requested, received: {init_data}")
+            raise CogmentError(f"Internal failure: Actor name [{requested_name}] requested, received: {init_data}")
         if requested_class is not None and requested_class != init_data.actor_class:
-            raise CogmentError(f"Internal error: Actor class [{requested_class}] requested, received: {init_data}")
+            raise CogmentError(f"Internal failure: Actor class [{requested_class}] requested, received: {init_data}")
 
         if impl_name is not None:
             if init_data.impl_name != impl_name:
