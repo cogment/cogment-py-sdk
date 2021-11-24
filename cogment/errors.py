@@ -13,19 +13,7 @@
 # limitations under the License.
 
 class CogmentError(Exception):
-
-    def __init__(self, msg):
-        super().__init__(msg)
-
-
-class InvalidRequestError(CogmentError):
-
-    def __init__(self, message, request):
-        self.request = request
-        super().__init__(message)
-
-
-class InvalidParamsError(CogmentError):
+    """Cogment specific exception class. All exceptions raised by Cogment are of this type."""
 
     def __init__(self, msg):
         super().__init__(msg)

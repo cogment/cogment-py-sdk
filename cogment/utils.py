@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
+
 import cogment.api.common_pb2 as common_api
+
 from cogment.version import __version__
 
-import grpc
 
 # logging level for "trace" (i.e. repeated output in critical path) since Python logging does not have a TRACE level
 # Use: logging.log(TRACE, f"This is a trace message for {my_pgm}")
 TRACE = 5
+
+# Timeout (in seconds) for the init data to come from the Orchestrator before we consider a failure.
+INIT_TIMEOUT = 30
 
 
 def list_versions():

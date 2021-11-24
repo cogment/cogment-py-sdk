@@ -12,21 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc.aio  # type: ignore
+
+import cogment.api.datalog_pb2_grpc as datalog_grpc_api
 import cogment.api.common_pb2 as common_api
-import cogment.api.datalog_pb2_grpc as grpc_api
 import cogment.api.datalog_pb2 as datalog_api
+
 from cogment.control import TrialState
 from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
 from cogment.utils import list_versions
 from cogment.session import RecvObservation, RecvAction, RecvMessage, RecvReward
+
 import logging
 import asyncio
 
-import grpc.aio  # type: ignore
-
 
 class LogParams:
+    """Class representing the parameters of a trial for the datalog service."""
+
     def __init__(self, cog_settings):
         self.max_steps = None
         self.max_inactivity = None
@@ -38,10 +42,14 @@ class LogParams:
         self._raw_params = None
         self._settings = cog_settings
 
+    def __str__(self):
+        result = f"LogParams: {self._raw_params}"
+        return result
+
     # Type of serialized data being produced and consumed by this class.
     # This is dependent on all the underlying protobuf messages used to
     # serialize/deserialize, and should be incremented if any of them changes in
-    # a backward or forward incompatible way. V1 could be considered a type 0 or 1.
+    # a backward or forward incompatible way. API 1.0 could be considered a type 0 or 1.
     # Current dependencies: TrialParams, DatalogParams, EnvironmentParams, ActorParams,
     #                       TrialConfig, EnvironmentConfig, ActorConfig
     def get_serial_type(self):
@@ -132,12 +140,10 @@ class LogParams:
 
         return actor_data
 
-    def __str__(self):
-        result = f"LogParams: {self._raw_params}"
-        return result
-
 
 class LogSample:
+    """Class representing a trial sample for the datalog service."""
+
     def __init__(self, params):
         self.tick_id = None
         self.timestamp = None
@@ -145,12 +151,19 @@ class LogSample:
         self.events = None
 
         self._raw_sample = None
+
+        if type(params) != LogParams:
+            raise CogmentError(f"Wrong type of params provided [{type(params)}]")
         self._params = params
+
+    def __str__(self):
+        result = f"LogSample: {self._raw_sample}"
+        return result
 
     # Type of serialized data being produced and consumed by this class.
     # This is dependent on all the underlying protobuf messages used to
     # serialize/deserialize, and should be incremented if any of them changes in
-    # a backward or forward incompatible way. V1 could be considered a type 0 or 1.
+    # a backward or forward incompatible way. API 1.0 could be considered a type 0 or 1.
     # Current dependencies: DatalogSample, SampleInfo, TrialState, ObservationSet,
     #                       Action, Reward, RewardSource, Message
     def get_serial_type(self):
@@ -195,7 +208,7 @@ class LogSample:
         elif isinstance(actor, str):
             actor_index = self._params.get_actor_index(actor)
         else:
-            raise CogmentError(f"Wrong type of parameter [{type(actor)}]")
+            raise CogmentError(f"Wrong type of actor parameter [{type(actor)}]: must be int or str")
         if actor_index is None or actor_index < 0 or actor_index >= self._params.nb_actors:
             raise CogmentError(f"Invalid actor [{actor}] [{actor_index}]")
 
@@ -213,7 +226,7 @@ class LogSample:
         elif isinstance(actor, str):
             actor_index = self._params.get_actor_index(actor)
         else:
-            raise CogmentError(f"Wrong type of parameter [{type(actor)}]")
+            raise CogmentError(f"Wrong type of actor parameter [{type(actor)}]: must be int or str")
         if actor_index is None or actor_index < 0 or actor_index >= self._params.nb_actors:
             raise CogmentError(f"Invalid actor [{actor}] [{actor_index}]")
 
@@ -235,12 +248,8 @@ class LogSample:
         for msg in self._raw_sample.messages:
             yield RecvMessage(msg)
 
-    def __str__(self):
-        result = f"LogSample: {self._raw_sample}"
-        return result
 
-
-async def read_sample(context, session, settings):
+async def _read_sample(context, session, settings):
     try:
         while True:
             request = await context.read()
@@ -255,23 +264,26 @@ async def read_sample(context, session, settings):
                 sample._set(request.sample)
                 session._new_sample(sample)
                 if trial_ended:
+                    logging.debug("Last log sample received for trial")
                     break
             else:
                 logging.warning(f"Invalid request received from the orchestrator : {request}")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"DatalogServicer 'read_sample' coroutine cancelled: [{exc}]")
+        logging.debug(f"DatalogServicer '_read_sample' coroutine cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("read_sample")
+        logging.exception("_read_sample")
         raise
 
     # Exit the loop
     session._new_sample(None)
 
 
-class DatalogServicer(grpc_api.DatalogSPServicer):
+class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
+    """Internal datalog servicer class."""
+
     def __init__(self, impl, cog_settings):
         self._impl = impl
         self.__cog_settings = cog_settings
@@ -296,11 +308,7 @@ class DatalogServicer(grpc_api.DatalogSPServicer):
             session = DatalogSession(self._impl, trial_id, user_id, trial_params)
             user_task = session._start_user_task()
 
-            reader_task = asyncio.create_task(read_sample(context, session, self.__cog_settings))
-
-            # TODO: Investigate probable bug in easy_grpc that expects a stream to be "used"
-            reply = datalog_api.RunTrialDatalogOutput()
-            await context.write(reply)
+            reader_task = asyncio.create_task(_read_sample(context, session, self.__cog_settings))
 
             normal_return = await user_task
 

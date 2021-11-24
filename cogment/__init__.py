@@ -29,6 +29,7 @@ from cogment.context import Context, Endpoint, ServedEndpoint
 from cogment.session import EventType
 from cogment.control import TrialState
 from cogment.datalog_service import LogParams, LogSample
+from cogment.errors import CogmentError
 
 # Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList

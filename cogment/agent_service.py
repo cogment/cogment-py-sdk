@@ -12,28 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cogment.api.agent_pb2_grpc as grpc_api
-import cogment.api.agent_pb2 as agent_api
-import cogment.api.common_pb2 as common_api
-
-from cogment.utils import list_versions, TRACE
-from cogment.trial import Trial
-
-from cogment.actor import ActorSession
-from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _EndingAck
-from cogment.errors import CogmentError
-
-from prometheus_client import Summary, Counter, Gauge
-
-from types import SimpleNamespace
-import atexit
-import logging
-import asyncio
 import grpc  # type: ignore
 import grpc.aio  # type: ignore
+from prometheus_client import Summary, Counter, Gauge
+
+import cogment.api.agent_pb2_grpc as agent_grpc_api
+import cogment.api.common_pb2 as common_api
+
+from cogment.utils import list_versions, TRACE, INIT_TIMEOUT
+from cogment.trial import Trial
+from cogment.actor import ActorSession
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _InitAck, _EndingAck
+from cogment.errors import CogmentError
+
+import logging
+import asyncio
 
 
 class _PrometheusData:
+    """Internal class holding the details of Prometheus report values for a service actor."""
+
     def __init__(self, prometheus_registry):
         self.decide_request_time = Summary(
             "actor_decide_processing_seconds",
@@ -81,7 +79,7 @@ def _process_normal_data(data, session):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received an observation")
 
         if session._trial.ending and session._auto_ack:
-            session._post_data(_EndingAck())
+            session._post_outgoing_data(_EndingAck())
 
         session._trial.tick_id = data.observation.tick_id
 
@@ -89,13 +87,13 @@ def _process_normal_data(data, session):
         obs_space.ParseFromString(data.observation.content)
 
         recv_event.observation = RecvObservation(data.observation, obs_space)
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
     elif data.HasField("reward"):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
 
         recv_event.rewards = [RecvReward(data.reward)]
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
         value = recv_event.rewards[0].value
         session._prometheus_data.rewards_counter.labels(session.name, session.impl_name).inc()
@@ -108,7 +106,7 @@ def _process_normal_data(data, session):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
         session._prometheus_data.messages_received.labels(session.name, session.impl_name).inc()
 
@@ -123,8 +121,6 @@ def _process_normal_data(data, session):
 
 async def _process_incoming(context, session):
     try:
-        session._prometheus_data.actors_started.labels(session.impl_name).inc()
-
         while True:
             data = await context.read()
             if data == grpc.aio.EOF:
@@ -160,7 +156,7 @@ async def _process_incoming(context, session):
                                      f"Trial ended with explanation [{data.details}]")
                     else:
                         logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
-                    session._new_event(RecvEvent(EventType.FINAL))
+                    session._post_incoming_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
@@ -171,8 +167,6 @@ async def _process_incoming(context, session):
 
                 session._trial.ended = True
                 session._exit_queues()
-
-                session._prometheus_data.actors_ended.labels(session.impl_name).inc()
                 break
 
             else:
@@ -190,7 +184,7 @@ async def _process_incoming(context, session):
 
 async def _process_outgoing(context, session):
     try:
-        async for data in session._retrieve_data():
+        async for data in session._retrieve_outgoing_data():
             package = common_api.ActorRunTrialOutput()
             package.state = common_api.CommunicationState.NORMAL
 
@@ -206,6 +200,10 @@ async def _process_outgoing(context, session):
             elif type(data) == common_api.Message:
                 logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending message")
                 package.message.CopyFrom(data)
+
+            elif type(data) == _InitAck:
+                package.init_output.SetInParent()
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending Init Data")
 
             elif type(data) == _EndingAck:
                 package.state = common_api.CommunicationState.LAST_ACK
@@ -229,105 +227,22 @@ async def _process_outgoing(context, session):
         raise
 
 
-class AgentServicer(grpc_api.ServiceActorSPServicer):
+class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
+    """Internal service actor servicer class."""
+
     def __init__(self, agent_impls, cog_settings, prometheus_registry=None):
-        self.__impls = agent_impls
+        self._impls = agent_impls
         self._sessions = set()
-        self.__cog_settings = cog_settings
+        self._cog_settings = cog_settings
         self._prometheus_data = _PrometheusData(prometheus_registry)
 
         logging.info("Agent Service started")
-
-    def _start_session(self, trial_id, init_input):
-        actor_name = init_input.actor_name
-        if not actor_name:
-            raise CogmentError(f"Trial [{trial_id}] - Empty actor name for service actor")
-
-        if init_input.impl_name:
-            impl_name = init_input.impl_name
-            impl = self.__impls.get(impl_name)
-            if impl is None:
-                raise CogmentError(f"Trial [{trial_id}] - "
-                                   f"Unknown impl [{impl_name}] for service actor [{actor_name}]")
-        else:
-            impl_name, impl = next(iter(self.__impls.items()))
-            logging.info(f"Trial [{trial_id}] - "
-                         f"impl [{impl_name}] arbitrarily chosen for service actor [{actor_name}]")
-
-        if init_input.actor_class not in self.__cog_settings.actor_classes:
-            raise CogmentError(f"Trial [{trial_id}] - "
-                               f"Unknown class [{init_input.actor_class}] for service actor [{actor_name}]")
-        actor_class = self.__cog_settings.actor_classes[init_input.actor_class]
-
-        if not _impl_can_serve_actor_class(impl, actor_class):
-            raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}]: "
-                               f"[{impl}] does not implement actor class [{init_input.actor_class}]")
-
-        key = _trial_key(trial_id, actor_name)
-        if key in self._sessions:
-            raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}] already exists")
-
-        config = None
-        if init_input.HasField("config"):
-            if actor_class.config_type is None:
-                raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}] "
-                                   f"received config data of unknown type (was it defined in cogment.yaml?)")
-            config = actor_class.config_type()
-            config.ParseFromString(init_input.config.content)
-
-        trial = Trial(trial_id, [], self.__cog_settings)
-        new_session = ActorSession(impl.impl, actor_class, trial, actor_name, impl_name, init_input.env_name, config)
-        new_session._prometheus_data = self._prometheus_data
-        self._sessions.add(key)
-
-        logging.debug(f"Trial [{trial_id}] - impl [{impl_name}] for service actor [{actor_name}] started")
-
-        return new_session
-
-    async def _run_session(self, context, session):
-        send_task = None
-        process_task = None
-
-        try:
-            with self._prometheus_data.decide_request_time.labels(session.name, session.impl_name).time():
-                send_task = asyncio.create_task(_process_outgoing(context, session))
-                process_task = asyncio.create_task(_process_incoming(context, session))
-                user_task = session._start_user_task()
-
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] session started")
-                normal_return = await user_task
-
-                if normal_return:
-                    if not session._last_event_delivered:
-                        logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                        f"user implementation returned before required")
-                    else:
-                        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                    f"user implementation returned")
-                else:
-                    logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                f"user implementation was cancelled")
-
-        except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                          f"user implementation was cancelled")
-
-        except Exception:
-            logging.exception("run_session")
-            raise
-
-        finally:
-            if send_task is not None:
-                send_task.cancel()
-            if process_task is not None:
-                process_task.cancel()
 
     async def _get_init_data(self, context, trial_id):
         logging.debug(f"Trial [{trial_id}] - Processing init for service actor")
 
         last_received = False
         while True:
-            # TODO: Limit the time to wait for init data
             request = await context.read()
             logging.debug(f"Trial [{trial_id}] - Read initial request: {request}")
 
@@ -343,6 +258,9 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
 
                 if request.HasField("init_input"):
                     return request.init_input
+                elif reply.HasField("details"):
+                    logging.warning(f"Trial [{trial_id}] - Received unexpected detail data "
+                                    f"[{reply.details}] before start")
                 else:
                     data_set = request.WhichOneof("data")
                     error_str = (f"Trial [{trial_id}] - Received unexpected init data [{data_set}]")
@@ -385,9 +303,97 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
                 logging.error(error_str)
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
+    def _start_session(self, trial_id, init_input):
+        actor_name = init_input.actor_name
+        if not actor_name:
+            raise CogmentError(f"Trial [{trial_id}] - Empty actor name for service actor")
+
+        if init_input.impl_name:
+            impl_name = init_input.impl_name
+            impl = self._impls.get(impl_name)
+            if impl is None:
+                raise CogmentError(f"Trial [{trial_id}] - "
+                                   f"Unknown impl [{impl_name}] for service actor [{actor_name}]")
+        else:
+            impl_name, impl = next(iter(self._impls.items()))  # "First" impl of the dict
+            logging.info(f"Trial [{trial_id}] - "
+                         f"impl [{impl_name}] arbitrarily chosen for service actor [{actor_name}]")
+
+        actor_class = self._cog_settings.actor_classes.get(init_input.actor_class)
+        if actor_class is None:
+            raise CogmentError(f"Trial [{trial_id}] - "
+                               f"Unknown class [{init_input.actor_class}] for service actor [{actor_name}]")
+
+        if not _impl_can_serve_actor_class(impl, actor_class):
+            raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}]: "
+                               f"[{impl}] does not implement actor class [{init_input.actor_class}]")
+
+        key = _trial_key(trial_id, actor_name)
+        if key in self._sessions:
+            raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}] already exists")
+
+        config = None
+        if init_input.HasField("config"):
+            if actor_class.config_type is None:
+                raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}] "
+                                   f"received config data of unknown type (was it defined in cogment.yaml?)")
+            config = actor_class.config_type()
+            config.ParseFromString(init_input.config.content)
+
+        self._prometheus_data.actors_started.labels(impl_name).inc()
+
+        trial = Trial(trial_id, [], self._cog_settings)
+        new_session = ActorSession(impl.impl, actor_class, trial, actor_name, impl_name, init_input.env_name, config)
+        new_session._prometheus_data = self._prometheus_data
+        self._sessions.add(key)
+
+        logging.debug(f"Trial [{trial_id}] - impl [{impl_name}] for service actor [{actor_name}] started")
+
+        return new_session
+
+    async def _run_session(self, context, session):
+        send_task = None
+        process_task = None
+
+        try:
+            send_task = asyncio.create_task(_process_outgoing(context, session))
+            process_task = asyncio.create_task(_process_incoming(context, session))
+            user_task = session._start_user_task()
+
+            with self._prometheus_data.decide_request_time.labels(session.name, session.impl_name).time():
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] session started")
+                normal_return = await user_task
+
+            if normal_return:
+                if not session._last_event_delivered:
+                    logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                                    f"user implementation returned before required")
+                else:
+                    logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                                f"user implementation returned")
+            else:
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                            f"user implementation was cancelled")
+
+            self._prometheus_data.actors_ended.labels(session.impl_name).inc()
+
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                          f"user implementation was cancelled")
+
+        except Exception:
+            logging.exception("run_session")
+            raise
+
+        finally:
+            if send_task is not None:
+                send_task.cancel()
+            if process_task is not None:
+                process_task.cancel()
+
     # Override
     async def RunTrial(self, request_iterator, context):
-        if len(self.__impls) == 0:
+        if len(self._impls) == 0:
             logging.warning("No implementation registered on trial run request")
             raise CogmentError("No implementation registered")
 
@@ -395,25 +401,22 @@ class AgentServicer(grpc_api.ServiceActorSPServicer):
         trial_id = metadata["trial-id"]
 
         try:
-            init_data = await self._get_init_data(context, trial_id)
+            init_data = await asyncio.wait_for(self._get_init_data(context, trial_id), INIT_TIMEOUT)
             if init_data is None:
                 return
             key = _trial_key(trial_id, init_data.actor_name)
 
             session = self._start_session(trial_id, init_data)
 
-            init_msg = common_api.ActorRunTrialOutput()
-            init_msg.state = common_api.CommunicationState.NORMAL
-            init_msg.init_output.SetInParent()
-            await context.write(init_msg)
-
             await self._run_session(context, session)  # Blocking
 
             self._sessions.remove(key)
-            return
+
+        except asyncio.TimeoutError:
+            logging.error("Failed to receive init data from Orchestrator")
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
-            raise
+            pass
 
         except Exception:
             logging.exception("RunTrial")

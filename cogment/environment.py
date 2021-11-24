@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import logging
+import cogment.api.environment_pb2 as env_api
+
 from cogment.session import Session, _Ending, _EndingAck
 from cogment.errors import CogmentError
 
-import cogment.api.environment_pb2 as env_api
-import cogment.api.common_pb2 as common_api
+import time
+import logging
 
 
 class EnvironmentSession(Session):
-    """This represents the environment being performed locally."""
+    """Derived class representing the session of an environment for a trial."""
 
     def __init__(self, impl, trial, name, impl_name, config):
         super().__init__(trial, name, impl, impl_name, config)
@@ -41,17 +41,19 @@ class EnvironmentSession(Session):
                             "No message will be sent back to the environment!")
         self._send_message(payload, to)
 
-    def start(self, observations, auto_done_sending=True):
+    def start(self, observations=None, auto_done_sending=True):
         self._start(auto_done_sending)
-        packed_obs = self._pack_observations(observations)
-        self._post_data(packed_obs)
+
+        if observations is not None:
+            packed_obs = self._pack_observations(observations)
+            self._post_outgoing_data(packed_obs)
 
     def produce_observations(self, observations):
         if not self._trial.ended:
             packed_obs = self._pack_observations(observations)
-            self._post_data(packed_obs)
+            self._post_outgoing_data(packed_obs)
             if self._trial.ending and self._auto_ack:
-                self._post_data(_EndingAck())
+                self._post_outgoing_data(_EndingAck())
         else:
             logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
                             f"Cannot send observation because the trial has ended.")
@@ -64,11 +66,11 @@ class EnvironmentSession(Session):
             logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] cannot end more than once")
         else:
             if not self._trial.ending:
-                self._post_data(_Ending())
+                self._post_outgoing_data(_Ending())
             packed_obs = self._pack_observations(final_observations)
-            self._post_data(packed_obs)
+            self._post_outgoing_data(packed_obs)
             if self._auto_ack:
-                self._post_data(_EndingAck())
+                self._post_outgoing_data(_EndingAck())
 
     def _pack_observations(self, observations, tick_id=-1):
         timestamp = int(time.time() * 1000000000)
@@ -105,23 +107,22 @@ class EnvironmentSession(Session):
             if new_obs[actor_index] is None:
                 raise CogmentError(f"Actor [{actor.name}] is missing an observation")
 
-        pack = env_api.ObservationSet()
-        pack.tick_id = tick_id
-        pack.timestamp = timestamp
+        package = env_api.ObservationSet()
+        package.tick_id = tick_id
+        package.timestamp = timestamp
 
-        # dupping time
         seen_observations = {}
         for actor_index, actor in enumerate(self._trial.actors):
             actor_obs = new_obs[actor_index]
             obs_id = id(actor_obs)
             obs_key = seen_observations.get(obs_id)
             if obs_key is None:
-                obs_key = len(pack.observations)
+                obs_key = len(package.observations)
 
-                pack.observations.append(actor_obs.SerializeToString())
+                package.observations.append(actor_obs.SerializeToString())
 
                 seen_observations[obs_id] = obs_key
 
-            pack.actors_map.append(obs_key)
+            package.actors_map.append(obs_key)
 
-        return pack
+        return package

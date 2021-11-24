@@ -17,7 +17,7 @@ import logging
 
 
 class DatalogSession():
-    """This represents a datalogger working locally."""
+    """Class representing the session of a datalog for a trial."""
 
     def __init__(self, impl, trial_id, user_id, trial_params):
         self.trial_id = trial_id
@@ -27,6 +27,10 @@ class DatalogSession():
         self._user_task = None
         self._impl = impl
         self.__queue = None
+
+    def __str__(self):
+        result = f"DatalogSession: trial_id = {self.trial_id}, trial_params = {self.trial_params}"
+        return result
 
     def start(self):
         self.__queue = asyncio.Queue()
@@ -39,10 +43,9 @@ class DatalogSession():
                     if sample is None:
                         break
                     keep_looping = yield sample
+                    self.__queue.task_done()
                     if keep_looping is not None and not bool(keep_looping):
                         break
-
-                    self.__queue.task_done()
 
                 except GeneratorExit:
                     raise
@@ -73,7 +76,3 @@ class DatalogSession():
     def _start_user_task(self):
         self._user_task = asyncio.create_task(self._run())
         return self._user_task
-
-    def __str__(self):
-        result = f"DatalogSession: trial_id = {self.trial_id}, trial_params = {self.trial_params}"
-        return result

@@ -12,24 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import time
-from abc import abstractmethod
-from typing import Any
+import cogment.api.common_pb2 as common_api
+
 from cogment.session import Session
 from cogment.errors import CogmentError
 
-import cogment.api.common_pb2 as common_api
+import logging
+import time
 
 
 class ActorClass:
-    def __init__(
-        self,
-        name,
-        config_type,
-        action_space,
-        observation_space,
-    ):
+    """Class containing the details of an actor class defined in a config file."""
+
+    def __init__(self, name, config_type, action_space, observation_space):
         self.name = name
         self.config_type = config_type
         self.action_space = action_space
@@ -42,6 +37,8 @@ class ActorClass:
 
 
 class ActorClassList:
+    """Class containing the list of actor classes defined in a config file."""
+
     def __init__(self, *args):
         self._actor_classes_list = list(args)
 
@@ -63,12 +60,15 @@ class ActorClassList:
     def __str__(self):
         result = f"ActorClassList:"
         for ac in self._actor_classes_list:
-            result += f" {ac.name} = {{{ac}}},"
+            result += f" {ac.name} = {ac},"
         return result
+
+    def get(self, key, default=None):  # Similar to dict.get()
+        return getattr(self, key, default)
 
 
 class ActorSession(Session):
-    """This represents an actor being performed locally."""
+    """Derived class representing the session of an actor for a trial."""
 
     def __init__(self, impl, actor_class, trial, name, impl_name, env_name, config):
         super().__init__(trial, name, impl, impl_name, config)
@@ -96,7 +96,7 @@ class ActorSession(Session):
         if action is not None:
             action_req.content = action.SerializeToString()
 
-        self._post_data(action_req)
+        self._post_outgoing_data(action_req)
 
     def send_message(self, payload, to, to_environment=None):
         if to_environment is not None:

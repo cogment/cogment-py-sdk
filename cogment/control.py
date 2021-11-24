@@ -12,19 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import grpc
+import grpc.aio  # type: ignore
+
 import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2 as orchestrator_api
+
 from cogment.session import ActorInfo
 from cogment.errors import CogmentError
 
 import asyncio
-import grpc
-import grpc.aio  # type: ignore
 from enum import Enum
 import logging
 
 
 class TrialState(Enum):
+    """Enum class for the different states of a trial."""
+
     UNKNOWN = common_api.TrialState.UNKNOWN
     INITIALIZING = common_api.TrialState.INITIALIZING
     PENDING = common_api.TrialState.PENDING
@@ -34,6 +38,8 @@ class TrialState(Enum):
 
 
 class TrialInfo:
+    """Class representing the details of a trial."""
+
     def __init__(self, trial_id, api_state):
         self.trial_id = trial_id
         self.state = TrialState(api_state)
@@ -48,16 +54,24 @@ class TrialInfo:
 
 
 class Controller:
+    """Class representing a Cogment controller associated with an Orchestrator."""
+
     def __init__(self, stub, user_id):
         self._lifecycle_stub = stub
         self._user_id = user_id
+
+    def __str__(self):
+        result = f"Controller: user id = {self._user_id}"
+        return result
 
     async def get_actors(self, trial_id):
         req = orchestrator_api.TrialInfoRequest()
         req.get_actor_list = True
         metadata = [("trial-id", trial_id)]
         rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
-        if len(rep.trial) != 1:
+        if len(rep.trial) == 0:
+            raise CogmentError(f"Unknown trial [{trial_id}]")
+        elif len(rep.trial) > 1:
             raise CogmentError(f"Unexpected response from orchestrator [{rep}] for [{trial_id}]")
 
         result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
@@ -74,7 +88,7 @@ class Controller:
         logging.debug(f"Requesting start of a trial with [{req}] ...")
         rep = await self._lifecycle_stub.StartTrial(req)
 
-        # For compatibility with v1, we can't return an empty string.
+        # For compatibility with Cogment 1.0, we can't return an empty string.
         if not rep.trial_id:
             raise CogmentError(f"Requested trial id [{trial_id_requested}] could not be used")
 
@@ -131,8 +145,10 @@ class Controller:
 
     async def watch_trials(self, trial_state_filters=[]):
         request = orchestrator_api.TrialListRequest()
-        for fil in trial_state_filters:
-            request.filter.append(fil.value)
+        for filter in trial_state_filters:
+            if type(filter) != TrialState:
+                raise CogmentError(f"Unknown filter type [{type(filter)}]: must of type 'cogment.TrialState'")
+            request.filter.append(filter.value)
 
         reply_itor = self._lifecycle_stub.WatchTrials(request=request)
         if not reply_itor:
@@ -162,7 +178,3 @@ class Controller:
         except Exception:
             logging.exception("watch_trials")
             raise
-
-    def __str__(self):
-        result = f"Controller:"
-        return result

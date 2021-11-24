@@ -12,29 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
-
-import cogment.api.environment_pb2_grpc as grpc_api
-
-import cogment.api.environment_pb2 as env_api
-import cogment.api.common_pb2 as common_api
-from cogment.utils import list_versions, TRACE
-from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType, _EndingAck, _Ending
-from cogment.errors import CogmentError
-
 import grpc.aio  # type: ignore
-
-from cogment.environment import EnvironmentSession
-
-from cogment.trial import Trial
-
 from prometheus_client import Summary, Counter
 
+import cogment.api.environment_pb2_grpc as env_grpc_api
+import cogment.api.environment_pb2 as env_api
+import cogment.api.common_pb2 as common_api
+
+from cogment.utils import list_versions, TRACE, INIT_TIMEOUT
+from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType, _InitAck, _EndingAck, _Ending
+from cogment.errors import CogmentError
+from cogment.environment import EnvironmentSession
+from cogment.trial import Trial
+
+from abc import ABC, abstractmethod
 import logging
 import asyncio
 
 
 class _PrometheusData:
+    """Internal class holding the details of Prometheus report values for an environment."""
+
     def __init__(self, prometheus_registry):
         self.update_count_per_trial = Summary(
             "environment_update_count_per_trial",
@@ -91,20 +89,20 @@ def _process_normal_data(data, session):
 
         session._trial.tick_id = data.action_set.tick_id
 
-        for i, actor in enumerate(session._trial.actors):
+        for index, actor in enumerate(session._trial.actors):
             action = actor.actor_class.action_space()
-            action.ParseFromString(data.action_set.actions[i])
-            recv_event.actions.append(RecvAction(i, data.action_set, action))
+            action.ParseFromString(data.action_set.actions[index])
+            recv_event.actions.append(RecvAction(index, data.action_set, action))
 
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
     elif data.HasField("message"):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}] received message")
 
-        session._prometheus_data.messages_received.labels(session.impl_name).inc()
-
         recv_event.messages = [RecvMessage(data.message)]
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
+
+        session._prometheus_data.messages_received.labels(session.impl_name).inc()
 
     elif data.HasField("details"):
         logging.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
@@ -153,7 +151,7 @@ async def _process_incoming(context, session):
                                      f"ended [{data.details}]")
                     else:
                         logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] ended")
-                    session._new_event(RecvEvent(EventType.FINAL))
+                    session._post_incoming_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
@@ -181,7 +179,7 @@ async def _process_incoming(context, session):
 
 async def _process_outgoing(context, session):
     try:
-        async for data in session._retrieve_data():
+        async for data in session._retrieve_outgoing_data():
             package = env_api.EnvRunTrialOutput()
             package.state = common_api.CommunicationState.NORMAL
 
@@ -199,6 +197,10 @@ async def _process_outgoing(context, session):
                 logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending message")
                 session._prometheus_data.messages_sent.labels(session.impl_name).inc()
                 package.message.CopyFrom(data)
+
+            elif type(data) == _InitAck:
+                package.init_output.SetInParent()
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending Init Data")
 
             elif type(data) == _Ending:
                 package.state = common_api.CommunicationState.LAST
@@ -227,11 +229,13 @@ async def _process_outgoing(context, session):
         raise
 
 
-class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
+class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
+    """Internal environment servicer class."""
+
     def __init__(self, env_impls, cog_settings, prometheus_registry=None):
-        self.__impls = env_impls
+        self._impls = env_impls
         self._sessions = set()
-        self.__cog_settings = cog_settings
+        self._cog_settings = cog_settings
         self._prometheus_data = _PrometheusData(prometheus_registry)
 
         logging.info("Environment Service started")
@@ -241,7 +245,6 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
         last_received = False
         while True:
-            # TODO: Limit the time to wait for init data
             request = await context.read()
             logging.debug(f"Trial [{trial_id}] - Read initial environment request: {request}")
 
@@ -257,6 +260,9 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
                 if request.HasField("init_input"):
                     return request.init_input
+                elif reply.HasField("details"):
+                    logging.warning(f"Trial [{trial_id}] - Received unexpected detail data "
+                                    f"[{reply.details}] before start")
                 else:
                     data_set = request.WhichOneof("data")
                     error_str = (f"Trial [{trial_id}] - Environment received unexpected init data [{data_set}]")
@@ -306,12 +312,12 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
         if init_input.impl_name:
             impl_name = init_input.impl_name
-            impl = self.__impls.get(impl_name)
+            impl = self._impls.get(impl_name)
             if impl is None:
                 raise CogmentError(f"Trial [{trial_id}] - "
                                    f"Unknown impl [{impl_name}] for environment [{name}]")
         else:
-            impl_name, impl = next(iter(self.__impls.items()))
+            impl_name, impl = next(iter(self._impls.items()))
             logging.info(f"Trial [{trial_id}] - "
                          f"impl [{impl_name}] arbitrarily chosen for environment [{name}]")
 
@@ -321,7 +327,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
         config = None
         if init_input.HasField("config"):
-            env_config_type = self.__cog_settings.environment.config_type
+            env_config_type = self._cog_settings.environment.config_type
             if env_config_type is None:
                 raise CogmentError(f"Trial [{trial_id}] - Environment [{name}] "
                                    f"received config data of unknown type (was it defined in cogment.yaml?)")
@@ -330,7 +336,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
         self._prometheus_data.trials_started.labels(impl_name).inc()
 
-        trial = Trial(trial_id, init_input.actors_in_trial, self.__cog_settings)
+        trial = Trial(trial_id, init_input.actors_in_trial, self._cog_settings)
         trial.tick_id = init_input.tick_id
         new_session = EnvironmentSession(impl.impl, trial, name, impl_name, config)
         new_session._prometheus_data = self._prometheus_data
@@ -384,7 +390,7 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
 
     # Override
     async def RunTrial(self, request_iterator, context):
-        if len(self.__impls) == 0:
+        if len(self._impls) == 0:
             logging.warning("No implementation registered on trial run request")
             raise CogmentError("No implementation registered")
 
@@ -392,22 +398,20 @@ class EnvironmentServicer(grpc_api.EnvironmentSPServicer):
         trial_id = metadata["trial-id"]
 
         try:
-            init_data = await self._get_init_data(context, trial_id)
+            init_data = await asyncio.wait_for(self._get_init_data(context, trial_id), INIT_TIMEOUT)
             if init_data is None:
                 return
             key = _trial_key(trial_id, init_data.name)
 
             session = self._start_session(trial_id, init_data)
 
-            init_msg = env_api.EnvRunTrialOutput()
-            init_msg.state = common_api.CommunicationState.NORMAL
-            init_msg.init_output.SetInParent()
-            await context.write(init_msg)
-
             await self._run_session(context, session)  # Blocking
 
             self._sessions.remove(key)
             return
+
+        except asyncio.TimeoutError:
+            logging.error("Failed to receive init data from Orchestrator")
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
             raise

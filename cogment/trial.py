@@ -16,7 +16,10 @@ from cogment.errors import CogmentError
 
 
 class Trial:
+    """Internal class maintaining the information of a trial."""
+
     class Actor:
+        """Internal class maintaining the information of an actor in a trial."""
         def __init__(self, name, actor_class):
             self.name = name
             self.actor_class = actor_class

@@ -16,12 +16,11 @@ import grpc
 import grpc.aio  # type: ignore
 
 import cogment.api.common_pb2 as common_api
-import cogment.api.orchestrator_pb2_grpc as grpc_api
 
 from cogment.actor import ActorSession
-from cogment.utils import TRACE
+from cogment.utils import TRACE, INIT_TIMEOUT
 from cogment.errors import CogmentError
-from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _EndingAck
+from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _InitAck, _EndingAck
 from cogment.trial import Trial
 
 import asyncio
@@ -29,7 +28,18 @@ import logging
 
 
 class _EndQueue:
+    """Internal class signaling the end of data queueing."""
     pass
+
+
+def _impl_can_serve_actor_class(impl, actor_class):
+    if impl.actor_classes:
+        for ac in impl.actor_classes:
+            if ac == actor_class.name:
+                return True
+        return False
+    else:
+        return True
 
 
 def _process_normal_data(data, session):
@@ -42,7 +52,7 @@ def _process_normal_data(data, session):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received an observation")
 
         if session._trial.ending and session._auto_ack:
-            session._post_data(_EndingAck())
+            session._post_outgoing_data(_EndingAck())
 
         session._trial.tick_id = data.observation.tick_id
 
@@ -50,19 +60,19 @@ def _process_normal_data(data, session):
         obs_space.ParseFromString(data.observation.content)
 
         recv_event.observation = RecvObservation(data.observation, obs_space)
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
     elif data.HasField("reward"):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
 
         recv_event.rewards = [RecvReward(data.reward)]
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
     elif data.HasField("message"):
         logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
-        session._new_event(recv_event)
+        session._post_incoming_event(recv_event)
 
     elif data.HasField("details"):
         logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
@@ -109,7 +119,7 @@ async def _process_incoming(reply_itor, req_queue, session):
                                      f"Trial ended with explanation [{data.details}]")
                     else:
                         logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
-                    session._new_event(RecvEvent(EventType.FINAL))
+                    session._post_incoming_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
@@ -147,7 +157,7 @@ async def _process_incoming(reply_itor, req_queue, session):
 
 async def _process_outgoing(data_queue, session):
     try:
-        async for data in session._retrieve_data():
+        async for data in session._retrieve_outgoing_data():
             package = common_api.ActorRunTrialOutput()
             package.state = common_api.CommunicationState.NORMAL
 
@@ -164,10 +174,13 @@ async def _process_outgoing(data_queue, session):
                 logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending message")
                 package.message.CopyFrom(data)
 
+            elif type(data) == _InitAck:
+                # The init output was done before we could get here
+                continue
+
             elif type(data) == _EndingAck:
                 package.state = common_api.CommunicationState.LAST_ACK
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                              f"Sending 'LAST_ACK'")
+                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending 'LAST_ACK'")
                 await data_queue.put(package)
                 break
 
@@ -187,7 +200,9 @@ async def _process_outgoing(data_queue, session):
         raise
 
 
-class GrpcWriter:
+class _GrpcWriter:
+    """Internal class encapsulating an async queue to serve as a grpc writing iterator."""
+
     def __init__(self, data_queue):
         self._queue = data_queue
 
@@ -202,133 +217,107 @@ class GrpcWriter:
                 return data
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Client 'GrpcWriter' coroutine cancelled: [{exc}]")
+            logging.debug(f"Client '_GrpcWriter' coroutine cancelled: [{exc}]")
 
         except GeneratorExit:
             raise
 
         except Exception:
-            logging.exception("GrpcWriter::anext")
+            logging.exception("_GrpcWriter::anext")
             raise
 
         raise StopAsyncIteration
 
 
 class ClientServicer:
-    def __init__(self, cog_settings, endpoint):
-        self.cog_settings = cog_settings
+    """Internal client actor servicer class."""
+
+    def __init__(self, cog_settings, stub):
         self.trial_id = None
+        self._cog_settings = cog_settings
         self._request_queue = None
         self._reply_itor = None
+        self._actor_stub = stub
 
-        if endpoint.private_key is None:
-            channel = grpc.aio.insecure_channel(endpoint.url)
-        else:
-            if endpoint.root_certificates:
-                root = bytes(endpoint.root_certificates, "utf-8")
-            else:
-                root = None
-            if endpoint.private_key:
-                key = bytes(endpoint.private_key, "utf-8")
-            else:
-                key = None
-            if endpoint.certificate_chain:
-                certs = bytes(endpoint.certificate_chain, "utf-8")
-            else:
-                certs = None
-            creds = grpc.ssl_channel_credentials(root, key, certs)
-            channel = grpc.aio.secure_channel(endpoint.url, creds)
+    async def _get_init_data(self):
+        logging.debug(f"Trial [{self.trial_id}] - Processing init for client actor")
 
-        self._actor_stub = grpc_api.ClientActorSPStub(channel)
+        last_received = False
+        async for reply in self._reply_itor:
+            logging.debug(f"Trial [{self.trial_id}] - Read initial reply: {reply}")
 
-    async def join(self, trial_id, actor_name, actor_class):
-        if self._request_queue is not None:
-            raise CogmentError(f"ClientServicer has already joined")
+            if reply == grpc.aio.EOF:
+                logging.info(f"Trial [{self.trial_id}] - Orchestrator disconnected client actor before start")
+                return None
 
-        req = common_api.ActorRunTrialOutput()
-        req.state = common_api.CommunicationState.NORMAL
+            if reply.state == common_api.CommunicationState.NORMAL:
+                if last_received:
+                    raise CogmentError(f"Trial [{self.trial_id}] - Received init data after 'LAST'")
 
-        init = common_api.ActorInitialOutput()
-        if actor_name is not None:
-            init.actor_name = actor_name
-        elif actor_class is not None:
-            init.actor_class = actor_class
-        else:
-            raise CogmentError(f"Only actor_name or actor_class must be specified, not both.")
-        req.init_output.CopyFrom(init)
-
-        self._request_queue = asyncio.Queue()
-        await self._request_queue.put(req)
-
-        self.trial_id = trial_id
-
-        req_itor = GrpcWriter(self._request_queue)
-        metadata = (("trial-id", trial_id),)
-        self._reply_itor = self._actor_stub.RunTrial(request_iterator=req_itor, metadata=metadata)
-        if not self._reply_itor:
-            raise CogmentError(f"Failed to connect to join trial")
-
-        # TODO: Move out into its own `get_init_data` function
-        try:
-            async for reply in self._reply_itor:
-                logging.debug(f"Trial [{trial_id}] - Received a reply while joining "
-                              f"[{reply.state}] [{reply.WhichOneof('data')}]")
-
-                if reply.state == common_api.CommunicationState.NORMAL:
-                    if reply.HasField("init_input"):
-                        return reply.init_input
-                    elif reply.HasField("details"):
-                        logging.warning(f"Trial [{trial_id}] - Received unexpected detail data "
-                                        f"[{reply.details}] while joining")
-                    else:
-                        raise CogmentError(f"Unexpected data [{reply.WhichOneof('data')}] while joining")
-
-                elif reply.state == common_api.CommunicationState.HEARTBEAT:
-                    reply = common_api.ActorRunTrialOutput()
-                    reply.state = reply.state
-                    await self._request_queue.put(reply)
-
-                elif reply.state == common_api.CommunicationState.LAST:
-                    logging.warning(f"Trial [{trial_id}] - Received 'LAST' state while joining")
-                    reply = common_api.ActorRunTrialOutput()
-                    reply.state == common_api.CommunicationState.LAST_ACK
-                    await self._request_queue.put(reply)
-                    break
-
-                elif reply.state == common_api.CommunicationState.LAST_ACK:
-                    raise CogmentError(f"Trial [{trial_id}] - Received an unexpected 'LAST_ACK' while joining")
-
-                elif reply.state == common_api.CommunicationState.END:
-                    if reply.HasField("details"):
-                        details = reply.details
-                    else:
-                        details = ""
-                    logging.warning(f"Trial [{trial_id}] - Ended forcefully [{details}] while joining")
-                    break
-
+                if reply.HasField("init_input"):
+                    return reply.init_input
+                elif reply.HasField("details"):
+                    logging.warning(f"Trial [{self.trial_id}] - Received unexpected detail data "
+                                    f"[{reply.details}] before start")
                 else:
-                    raise CogmentError(f"Received an invalid state [{reply.state}] while joining")
+                    data_set = reply.WhichOneof("data")
+                    raise CogmentError(f"Trial [{self.trial_id}] - Received unexpected init data [{data_set}]")
 
-        except CogmentError:
-            raise
+            elif reply.state == common_api.CommunicationState.HEARTBEAT:
+                req = common_api.ActorRunTrialOutput()
+                req.state = reply.state
+                await self._request_queue.put(req)
 
-        except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{trial_id}] - Join coroutine cancelled: [{exc}]")
+            elif reply.state == common_api.CommunicationState.LAST:
+                if last_received:
+                    raise CogmentError(f"Trial [{self.trial_id}] - Before start, received unexpected 'LAST' "
+                                       f"when waiting for 'END'")
 
-        except grpc.aio.AioRpcError as exc:
-            logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
-            if exc.code() == grpc.StatusCode.UNAVAILABLE:
-                logging.error(f"Trial [{trial_id}] - Actor [{actor_name}] "
-                              f"Orchestrator communication lost in init [{exc.details()}]")
+                logging.debug(f"Trial [{self.trial_id}] - Ending before init data")
+                req = common_api.ActorRunTrialOutput()
+                req.state = common_api.CommunicationState.LAST_ACK
+                await self._request_queue.put(req)
+                last_received = True
+
+            elif reply.state == common_api.CommunicationState.LAST_ACK:
+                raise CogmentError(f"Trial [{self.trial_id}] - Before start, received an unexpected 'LAST_ACK'")
+
+            elif reply.state == common_api.CommunicationState.END:
+                if reply.HasField("details"):
+                    logging.info(f"Trial [{self.trial_id}] - Ended before start [{reply.details}]")
+                else:
+                    logging.debug(f"Trial [{self.trial_id}] - Ended before start")
+                return None
+
             else:
-                logging.exception("join -- Unexpected aio failure")
-                raise
+                raise CogmentError(f"Trial [{self.trial_id}] - Before start, received an invalid state "
+                                   f"[{reply.state}] [{reply}]")
 
-        except Exception:
-            logging.exception("join")
-            raise
+    def _start_session(self, impl, init_data):
+        actor_name = init_data.actor_name
+        if not actor_name:
+            raise CogmentError(f"Trial [{self.trial_id}] - Empty actor name for client actor")
 
-        return None
+        actor_class = self._cog_settings.actor_classes.get(init_data.actor_class)
+        if actor_class is None:
+            raise CogmentError(f"Trial [{self.trial_id}] - "
+                               f"Unknown class [{init_data.actor_class}] for client actor [{actor_name}]")
+
+        config = None
+        if init_data.HasField("config"):
+            if actor_class.config_type is None:
+                raise CogmentError(f"Trial [{self.trial_id}] - Client actor [{actor_name}] "
+                                   f"received config data of unknown type (was it defined in cogment.yaml?)")
+            config = actor_class.config_type()
+            config.ParseFromString(init_data.config.content)
+
+        trial = Trial(self.trial_id, [], self._cog_settings)
+        new_session = ActorSession(impl, actor_class, trial, actor_name, init_data.impl_name,
+                                   init_data.env_name, config)
+
+        logging.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] for actor [{actor_name}] started")
+
+        return new_session
 
     async def run_session(self, impl, init_data):
         if self._request_queue is None:
@@ -337,21 +326,7 @@ class ClientServicer:
         send_task = None
         process_task = None
 
-        trial = Trial(self.trial_id, [], self.cog_settings)
-        actor_class = self.cog_settings.actor_classes[init_data.actor_class]
-
-        config = None
-        if init_data.HasField("config"):
-            if actor_class.config_type is None:
-                raise CogmentError(f"Actor [{init_data.actor_name}] received config data of unknown type "
-                                    "(was it defined in cogment.yaml)")
-            config = actor_class.config_type()
-            config.ParseFromString(init_data.config.content)
-
-        session = ActorSession(impl, actor_class, trial, init_data.actor_name, init_data.impl_name,
-                               init_data.env_name, config)
-        logging.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] "
-                      f"for client actor [{init_data.actor_name}] started")
+        session = self._start_session(impl, init_data)
 
         try:
             send_task = asyncio.create_task(_process_outgoing(self._request_queue, session))
@@ -387,3 +362,57 @@ class ClientServicer:
                 send_task.cancel()
             if process_task is not None:
                 process_task.cancel()
+
+    async def join_trial(self, trial_id, actor_name, actor_class):
+        if self._request_queue is not None:
+            raise CogmentError(f"ClientServicer has already joined")
+
+        req = common_api.ActorRunTrialOutput()
+        req.state = common_api.CommunicationState.NORMAL
+
+        init = common_api.ActorInitialOutput()
+        if actor_name is not None:
+            init.actor_name = actor_name
+        elif actor_class is not None:
+            init.actor_class = actor_class
+        else:
+            raise CogmentError(f"Only actor_name or actor_class must be specified, not both.")
+        req.init_output.CopyFrom(init)
+
+        self._request_queue = asyncio.Queue()
+        await self._request_queue.put(req)
+
+        self.trial_id = trial_id
+
+        req_itor = _GrpcWriter(self._request_queue)
+        metadata = (("trial-id", trial_id),)
+        self._reply_itor = self._actor_stub.RunTrial(request_iterator=req_itor, metadata=metadata)
+        if not self._reply_itor:
+            raise CogmentError(f"Failed to connect to join trial")
+
+        try:
+            return await asyncio.wait_for(self._get_init_data(), INIT_TIMEOUT)
+
+        except CogmentError:
+            raise
+
+        except asyncio.TimeoutError:
+            logging.error(f"Trial [{trial_id}] - Join failed to receive init data from Orchestrator")
+
+        except asyncio.CancelledError as exc:
+            logging.error(f"Trial [{trial_id}] - Join coroutine cancelled before start: [{exc}]")
+
+        except grpc.aio.AioRpcError as exc:
+            logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
+            if exc.code() == grpc.StatusCode.UNAVAILABLE:
+                logging.error(f"Trial [{trial_id}] - Actor [{actor_name}] "
+                              f"Orchestrator communication lost in init [{exc.details()}]")
+            else:
+                logging.exception("join_trial -- Unexpected aio failure")
+                raise
+
+        except Exception:
+            logging.exception("join_trial")
+            raise
+
+        return None

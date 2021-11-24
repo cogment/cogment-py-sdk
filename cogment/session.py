@@ -12,24 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
+import cogment.api.common_pb2 as common_api
+
+from cogment.errors import CogmentError
+
+from abc import ABC
 from enum import Enum
 import logging
 import asyncio
-from cogment.errors import CogmentError
 
-import cogment.api.common_pb2 as common_api
+
+# This class is not necessary, but simplifies the code as it is.
+# I.e. the actual init_output proto message could be sent instead.
+class _InitAck:
+    """Internal class to signal acknowledgement of the start."""
+    pass
 
 
 class _Ending:
+    """Internal class to signal the ending."""
     pass
 
 
 class _EndingAck:
+    """Internal class to signal acknowledgement of the ending."""
     pass
 
 
 class ActorInfo:
+    """Class representing the information of an actor."""
+
     def __init__(self, name, class_name):
         self.actor_name = name
         self.actor_class_name = class_name
@@ -40,6 +52,8 @@ class ActorInfo:
 
 
 class RecvObservation:
+    """Class representing a received observation in a trial."""
+
     def __init__(self, obs, obs_space):
         self.tick_id = obs.tick_id
         self.timestamp = obs.timestamp
@@ -54,11 +68,13 @@ class RecvObservation:
 
 
 class RecvAction:
-    def __init__(self, actor_index, action, action_space):
-        self.tick_id = action.tick_id
-        self.timestamp = action.timestamp
+    """Class representing a received action in a trial."""
+
+    def __init__(self, actor_index, action_data, action):
+        self.tick_id = action_data.tick_id
+        self.timestamp = action_data.timestamp
         self.actor_index = actor_index
-        self.action = action_space
+        self.action = action
 
     def __str__(self):
         result = f"RecvAction: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
@@ -67,6 +83,8 @@ class RecvAction:
 
 
 class RecvRewardSource:
+    """Class representing a received reward source in a trial."""
+
     def __init__(self, src):
         self.value = src.value
         self.confidence = src.confidence
@@ -80,6 +98,8 @@ class RecvRewardSource:
 
 
 class RecvReward:
+    """Class representing a received reward in a trial."""
+
     def __init__(self, reward):
         self.receiver_name = reward.receiver_name
         self.tick_id = reward.tick_id
@@ -102,6 +122,8 @@ class RecvReward:
 
 
 class RecvMessage:
+    """Class representing a received message in a trial."""
+
     def __init__(self, message):
         self.receiver_name = message.receiver_name
         self.tick_id = message.tick_id
@@ -115,6 +137,8 @@ class RecvMessage:
 
 
 class EventType(Enum):
+    """Enum class for the types of received events in a trial."""
+
     NONE = 0
     ACTIVE = 1
     ENDING = 2
@@ -122,6 +146,8 @@ class EventType(Enum):
 
 
 class RecvEvent:
+    """Class representing a received event in a trial."""
+
     def __init__(self, etype):
         self.type = etype
         self.observation = None
@@ -143,27 +169,28 @@ class RecvEvent:
 
 
 class Session(ABC):
+    """Base class representing the session of an actor or environment for a trial."""
+
     def __init__(self, trial, name, impl, impl_name, config):
         self._trial = trial
         self.name = name
         self.impl_name = impl_name
-        self.config = config
         self._impl = impl
-        self._event_queue = asyncio.Queue()
+        self.config = config
+        self._incoming_event_queue = asyncio.Queue()
+        self._outgoing_data_queue = asyncio.Queue()
         self._started = False
         self._last_event_delivered = False
-        self._user_task = None  # Task used to call _run()
-        self._data_queue = asyncio.Queue()
+        self._user_task = None  # Task used to call user implementation
         self._auto_ack = True
 
         # Pre-compute since it will be used regularly
         self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
 
     def __str__(self):
-        result = f"Session: name = {self.name}, impl_name = {self.impl_name}"
+        result = f"Session: trial id = {self.trial.id}, name = {self.name}, impl_name = {self.impl_name}"
         return result
 
-    # TODO: Should we tie the start with the init reply to the Orchestrator?
     def _start(self, auto_done_sending):
         if self._started:
             raise CogmentError(f"Cannot start [{self.name}] more than once.")
@@ -172,11 +199,11 @@ class Session(ABC):
 
         self._auto_ack = auto_done_sending
         self._started = True
+        self._post_outgoing_data(_InitAck())
 
     def _exit_queues(self):
-        self._event_queue.put_nowait(None)
-        self._data_queue.put_nowait(None)
-        # TODO: Should be do a 'self._user_task.cancel()' after a delay? Or is it not our reponsibility!
+        self._incoming_event_queue.put_nowait(None)
+        self._outgoing_data_queue.put_nowait(None)
 
     async def _run(self):
         try:
@@ -195,7 +222,7 @@ class Session(ABC):
         self._user_task = asyncio.create_task(self._run())
         return self._user_task
 
-    def _new_event(self, event):
+    def _post_incoming_event(self, event):
         if not self._started:
             logging.warning(f"[{self.name}] received an event before session was started.")
             return
@@ -205,9 +232,9 @@ class Session(ABC):
         if event is None:
             logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: New event is `None`")
 
-        self._event_queue.put_nowait(event)
+        self._incoming_event_queue.put_nowait(event)
 
-    def _post_data(self, data):
+    def _post_outgoing_data(self, data):
         if not self._started:
             logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                             f"Cannot send until session is started.")
@@ -225,18 +252,18 @@ class Session(ABC):
         elif type(data) == _EndingAck:
             self._trial.ending_ack = True
 
-        self._data_queue.put_nowait(data)
+        self._outgoing_data_queue.put_nowait(data)
 
-    async def _retrieve_data(self):
+    async def _retrieve_outgoing_data(self):
         try:
             while True:
-                data = await self._data_queue.get()
+                data = await self._outgoing_data_queue.get()
                 if data is None:
                     logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                                   f"Forcefull data loop exit")
                     break
                 yield data
-                self._data_queue.task_done()
+                self._outgoing_data_queue.task_done()
 
         except RuntimeError as exc:
             # Unfortunatelty asyncio returns a standard RuntimeError in this case
@@ -250,7 +277,16 @@ class Session(ABC):
             logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
                         f"data retrieval coroutine cancelled: [{exc}]")
 
-        logging.debug(f"Exiting [{self.name}] _retrieve_data loop generator")
+        logging.debug(f"Exiting [{self.name}] _retrieve_outgoing_data loop generator")
+
+    def get_trial_id(self):
+        return self._trial.id
+
+    def get_tick_id(self):
+        return self._trial.tick_id
+
+    def is_trial_over(self):
+        return self._trial.ended
 
     def sending_done(self):
         if self._auto_ack:
@@ -263,7 +299,7 @@ class Session(ABC):
         elif self._trial.ending_ack:
             logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}] cannot end sending more than once")
         else:
-            self._post_data(_EndingAck())
+            self._post_outgoing_data(_EndingAck())
 
     async def event_loop(self):
         if not self._started:
@@ -276,7 +312,7 @@ class Session(ABC):
         loop_active = not self._last_event_delivered
         while loop_active:
             try:
-                event = await self._event_queue.get()
+                event = await self._incoming_event_queue.get()
                 if event is None:
                     logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
                                   f"Forcefull event loop exit")
@@ -289,7 +325,7 @@ class Session(ABC):
 
             self._last_event_delivered = (event.type == EventType.FINAL)
             keep_looping = yield event
-            self._event_queue.task_done()
+            self._incoming_event_queue.task_done()
             loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
             if not loop_active:
                 if self._last_event_delivered:
@@ -298,15 +334,6 @@ class Session(ABC):
                     logging.debug(f"End of event loop for [{self.name}] requested by user")
 
         logging.debug(f"Exiting [{self.name}] event loop generator")
-
-    def get_trial_id(self):
-        return self._trial.id
-
-    def get_tick_id(self):
-        return self._trial.tick_id
-
-    def is_trial_over(self):
-        return self._trial.ended
 
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         if not self._started:
@@ -325,7 +352,7 @@ class Session(ABC):
                 reward_source.user_data.Pack(user_data)
             reward.sources.append(reward_source)
 
-            self._post_data(reward)
+            self._post_outgoing_data(reward)
 
     def _send_message(self, payload, to):
         if not self._started:
@@ -342,4 +369,4 @@ class Session(ABC):
             if payload is not None:
                 message.payload.Pack(payload)
 
-            self._post_data(message)
+            self._post_outgoing_data(message)
