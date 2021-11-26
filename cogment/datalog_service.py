@@ -52,7 +52,7 @@ class LogParams:
     # a backward or forward incompatible way. API 1.0 could be considered a type 0 or 1.
     # Current dependencies: TrialParams, DatalogParams, EnvironmentParams, ActorParams,
     #                       TrialConfig, EnvironmentConfig, ActorConfig
-    def get_serial_type(self):
+    def get_serialization_type(self):
         return 2
 
     def _set(self, raw_params):
@@ -166,7 +166,7 @@ class LogSample:
     # a backward or forward incompatible way. API 1.0 could be considered a type 0 or 1.
     # Current dependencies: DatalogSample, SampleInfo, TrialState, ObservationSet,
     #                       Action, Reward, RewardSource, Message
-    def get_serial_type(self):
+    def get_serialization_type(self):
         return 2
 
     def _set(self, raw_sample):
