@@ -57,4 +57,3 @@ class PrehookSession():
             for att in actor:
                 if att not in self._actor_attributes:
                     raise CogmentError(f"Unknown actor attribute [{att}] for parameters")
-
