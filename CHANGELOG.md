@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Major internal changes to match API 2.0
+- Minor use changes to match API 2.0 and improve usability
+
 ## v1.3.1 - 2021-11-18
 
-## Changed
+### Changed
 
 - Restrict the SDK to python >= 3.7 and <3.10 to maintain compatiblity with tensorflow ^2.7.0.
 - Update the cogment api to v1.0.0 to v1.2.1
@@ -26,7 +31,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add `python -m cogment.generate` to compile the protobuf files and generate `cog_settings.py` for a cogment project.
   This is designed as a replacement for the `cogment generate` command for python cogment components.
 
-## Changed
+### Changed
 
 - Update grpc version used to 1.38.1
 - Better management of exception in user implementation coroutine

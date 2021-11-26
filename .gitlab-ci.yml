@@ -77,8 +77,8 @@ integration_test:
     extends: .base_docker
     stage: test
     variables:
-        COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v1.0.3"
-        #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
+        #COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v2.0.0"
+        COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
     script:
         - ./scripts/run_integration_test.sh
     artifacts:
