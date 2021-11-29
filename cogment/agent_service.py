@@ -67,7 +67,7 @@ def get_actor_impl(trial_id, actor_impls, init_data):
 
     actor_impl = actor_impls.get(init_data.impl_name)
     if actor_impl is not None:
-        # Check compatibility 
+        # Check compatibility
         compatible = (len(actor_impl.actor_classes) == 0)
         for class_name in actor_impl.actor_classes:
             if class_name == init_data.actor_class:
@@ -363,7 +363,7 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
         self._prometheus_data.actors_started.labels(init_input.impl_name).inc()
 
         trial = Trial(trial_id, [], self._cog_settings)
-        new_session = ActorSession(actor_impl.impl, actor_class, trial, actor_name, init_input.impl_name, 
+        new_session = ActorSession(actor_impl.impl, actor_class, trial, actor_name, init_input.impl_name,
                                    init_input.env_name, config)
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)

@@ -305,4 +305,3 @@ class Context:
         actor_impl = get_actor_impl(trial_id, self._actor_impls, init_data)
 
         await servicer.run_session(actor_impl.impl, init_data)
-
