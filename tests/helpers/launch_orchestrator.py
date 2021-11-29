@@ -34,8 +34,8 @@ def launch_orchestrator(
     if docker_image:
         subprocess.run(["docker", "pull",  docker_image])
 
-    config_file_template = "cogment.yaml"
-    config_file = f"cogment_{test_port}.yaml"
+    params_file_template = "params.yaml"
+    params_file = f"params_{test_port}.yaml"
 
     test_host = f"grpc://localhost:{test_port}"
     if docker_image and (platform.system() == "Windows" or platform.system() == "Darwin"):
@@ -44,8 +44,8 @@ def launch_orchestrator(
         test_host = f"grpc://host.docker.internal:{test_port}"
 
 
-    with open(os.path.join(app_directory, config_file_template), "r") as cogment_yaml_in:
-        with open(os.path.join(app_directory, config_file), "w") as cogment_yaml_out:
+    with open(os.path.join(app_directory, params_file_template), "r") as cogment_yaml_in:
+        with open(os.path.join(app_directory, params_file), "w") as cogment_yaml_out:
             for line in cogment_yaml_in:
                 cogment_yaml_out.write(line.replace("<<token_placeholder>>", test_host))
 
@@ -82,7 +82,8 @@ def launch_orchestrator(
     launch_orchestator_args.extend([
         f"--lifecycle_port={orchestrator_port}",
         f"--actor_port={orchestrator_port}",
-        f"--config={config_file}"
+        f"--params={params_file}",
+        f"--pre_trial_hooks={test_host}",
     ])
 
     if private_key is not None:

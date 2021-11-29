@@ -13,16 +13,13 @@
 # limitations under the License.
 
 import os
-import glob
-from typing import Any
+import sys
 
 try:
     import yaml
 except ModuleNotFoundError:
-    raise Exception('''
-        The `cogment.generate` module requires extra dependencies,
-        please install by running `pip install cogment[generate]`
-    ''')
+    raise Exception("The 'cogment.generate' module requires extra dependencies, "
+                    "please install by running 'pip install cogment[generate]'")
 
 
 def py_path_from_proto_path(proto: str) -> str:
@@ -40,13 +37,11 @@ def token_as_proto_token(yaml_token: str, proto_file_content) -> str:
         if token in proto_file_content[file]:
             return f"{py_alias_from_proto_path(file)}.{token}"
 
-    raise Exception(f"TOKEN {token} NOT FOUND IN ANY FILE")
+    raise Exception(f"Token [{token}] not found in any file")
 
 
 def proto_import_line(proto: str) -> str:
-    return (
-        f"import {py_path_from_proto_path(proto)} as {py_alias_from_proto_path(proto)}"
-    )
+    return f"import {py_path_from_proto_path(proto)} as {py_alias_from_proto_path(proto)}"
 
 
 def python_import_line(py_module: str) -> str:
@@ -62,7 +57,7 @@ def actor_class_line(actor_class) -> str:
     return f"_{actor_className}_class"
 
 
-def main():
+def main(config_file: str, output_file: str):
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
@@ -73,14 +68,10 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
         if 'config_type' in actor_class else 'None'},
     action_space={token_as_proto_token(actor_class['action']['space'], proto_file_content)},
     observation_space={token_as_proto_token(actor_class['observation']['space'], proto_file_content)},
-    observation_delta={token_as_proto_token(actor_class['observation']['delta'], proto_file_content)
-        if 'delta' in actor_class['observation']
-        else token_as_proto_token(actor_class['observation']['space'], proto_file_content)},
-    observation_delta_apply_fn=_cog.delta_encoding._apply_delta_replace,
 )
         """
 
-    with open("cogment.yaml", "r") as stream:
+    with open(config_file, "r") as stream:
         cog_settings = yaml.safe_load(stream)
 
         proto_files = cog_settings["import"]["proto"]
@@ -100,7 +91,6 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
         cog_settings_string = f"""
 import cogment as _cog
 from types import SimpleNamespace
-from typing import List
 
 {line_break.join(map(proto_import_line, cog_settings.get('import', {}).get('proto', [])))}
 {line_break.join(map(python_import_line, cog_settings.get('import', {}).get('python', [])))}
@@ -121,9 +111,18 @@ environment = SimpleNamespace(config_type={
     if 'environment' in cog_settings and 'config_type' in cog_settings['environment']
     else 'None'})
         """
-        with open("cog_settings.py", "w") as text_file:
+
+        with open(output_file, "w") as text_file:
             text_file.write(cog_settings_string)
 
 
 if __name__ == "__main__":
-    main()
+    arg1 = "cogment.yaml"
+    if len(sys.argv) >= 2:
+        arg1 = sys.argv[1]
+
+    arg2 = "cog_settings.py"
+    if len(sys.argv) >= 3:
+        arg2 = sys.argv[2]
+
+    main(arg1, arg2)

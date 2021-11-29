@@ -75,6 +75,10 @@ class TestIntegration:
             nonlocal environment_trial_id
             nonlocal environment_call_count
             nonlocal environment_tick_count
+
+            assert environment_session.config is not None
+            assert environment_session.config.env_config_value == 0
+
             environment_trial_id = environment_session.get_trial_id()
             environment_call_count += 1
 
@@ -127,9 +131,9 @@ class TestIntegration:
 
             assert session.trial_config is not None
             assert session.trial_config.trial_config_value == 31
-            assert session.environment_config is not None
-            assert session.environment_config.env_config_value == 29
             assert session.trial_config.env_config is not None
+
+            session.environment_config = session.trial_config.env_config
 
             session.actors.append(
                 {

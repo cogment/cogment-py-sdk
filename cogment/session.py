@@ -189,6 +189,7 @@ class Session(ABC):
 
     def __str__(self):
         result = f"Session: trial id = {self.trial.id}, name = {self.name}, impl_name = {self.impl_name}"
+        result += f"config = {self.config}"
         return result
 
     def _start(self, auto_done_sending):
