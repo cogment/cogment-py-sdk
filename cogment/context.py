@@ -31,7 +31,7 @@ from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
 from cogment.control import Controller
 from cogment.errors import CogmentError
-from cogment.agent_service import AgentServicer
+from cogment.agent_service import AgentServicer, get_actor_impl
 from cogment.client_service import ClientServicer
 from cogment.env_service import EnvironmentServicer
 from cogment.hooks_service import PrehookServicer
@@ -296,46 +296,13 @@ class Context:
             raise CogmentError(f"Internal failure: Actor name [{requested_name}] requested, received: {init_data}")
         if requested_class is not None and requested_class != init_data.actor_class:
             raise CogmentError(f"Internal failure: Actor class [{requested_class}] requested, received: {init_data}")
-        joined_actor_class_name = init_data.actor_class
 
-        if impl_name is None:
-            impl_name = init_data.impl_name
-        elif init_data.impl_name and init_data.impl_name != impl_name:
-            logging.warning(f"Requested impl_name [{impl_name}] does not match parameters impl_name "
-                            f"[{init_data.impl_name}] for the trial: Requested impl_name will be used.")
+        if impl_name is not None and init_data.impl_name and init_data.impl_name != impl_name:
+            logging.warning(f"Requested impl_name [{impl_name}] does not match trial impl_name "
+                            f"[{init_data.impl_name}]: Requested impl_name will be used.")
+            init_data.impl_name = impl_name
 
-        actor_impl = self._actor_impls.get(impl_name)
-        if actor_impl is not None:
-            # Check compatibility 
-            compatible = (len(actor_impl.actor_classes) == 0)
-            for class_name in actor_impl.actor_classes:
-                if class_name == joined_actor_class_name:
-                    compatible = True
-                    break
-            if not compatible:
-                raise CogmentError(f"Joined actor class [{joined_actor_class_name}] is not compatible "
-                                   f" with registered actor implementation [{init_data.impl_name}]")
-        else:
-            # Find a compatible actor class in the registered actors
-
-            # Search for exact match first
-            for impl in self._actor_impls.values():
-                for class_name in impl.actor_classes:
-                    if class_name == joined_actor_class_name:
-                        actor_impl = impl
-                        break
-                if actor_impl is not None:
-                    break
-
-            # Search for a "generic" implementation
-            if actor_impl is None:
-                for impl in self._actor_impls.values():
-                    if len(impl.actor_classes) == 0:
-                        actor_impl = impl
-                        break
-
-            if actor_impl is None:
-                raise CogmentError(f"Joined actor class [{joined_actor_class_name}] is not compatible "
-                                   f" with any registered actor")
+        actor_impl = get_actor_impl(trial_id, self._actor_impls, init_data)
 
         await servicer.run_session(actor_impl.impl, init_data)
+

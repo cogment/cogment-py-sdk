@@ -59,14 +59,50 @@ def _trial_key(trial_id, actor_name):
     return f"{trial_id}_{actor_name}"
 
 
-def _impl_can_serve_actor_class(impl, actor_class):
-    if impl.actor_classes:
-        for ac in impl.actor_classes:
-            if ac == actor_class.name:
-                return True
-        return False
+def get_actor_impl(trial_id, actor_impls, init_data):
+    if not init_data.actor_name:
+        raise CogmentError(f"Trial [{trial_id}] - Empty actor name")
+    if not init_data.actor_class:
+        raise CogmentError(f"Trial [{trial_id}] - Empty actor class for actor [{init_data.actor_name}]")
+
+    actor_impl = actor_impls.get(init_data.impl_name)
+    if actor_impl is not None:
+        # Check compatibility 
+        compatible = (len(actor_impl.actor_classes) == 0)
+        for class_name in actor_impl.actor_classes:
+            if class_name == init_data.actor_class:
+                compatible = True
+                break
+        if not compatible:
+            raise CogmentError(f"Trial [{trial_id}] - actor [{init_data.actor_name}] class [{init_data.actor_class}] "
+                               f"is not compatible with actor implementation [{init_data.impl_name}]")
     else:
-        return True
+        # Find a compatible actor class in the registered actors
+
+        # Search for exact match first
+        for init_data.impl_name, impl in actor_impls.items():
+            for class_name in impl.actor_classes:
+                if class_name == init_data.actor_class:
+                    actor_impl = impl
+                    break
+            if actor_impl is not None:
+                break
+
+        # Search for a "generic" implementation
+        if actor_impl is None:
+            for init_data.impl_name, impl in actor_impls.items():
+                if len(impl.actor_classes) == 0:
+                    actor_impl = impl
+                    break
+
+        if actor_impl is None:
+            raise CogmentError(f"Trial [{trial_id}] - actor [{init_data.actor_name}] class [{init_data.actor_class}] "
+                               f"is not compatible with with any registered actor")
+
+        logging.info(f"Trial [{trial_id}] - "
+                     f"impl [{init_data.impl_name}] arbitrarily chosen for actor [{init_data.actor_name}]")
+
+    return actor_impl
 
 
 def _process_normal_data(data, session):
@@ -304,29 +340,13 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
     def _start_session(self, trial_id, init_input):
+        actor_impl = get_actor_impl(trial_id, self._impls, init_input)
+
         actor_name = init_input.actor_name
-        if not actor_name:
-            raise CogmentError(f"Trial [{trial_id}] - Empty actor name for service actor")
-
-        if init_input.impl_name:
-            impl_name = init_input.impl_name
-            impl = self._impls.get(impl_name)
-            if impl is None:
-                raise CogmentError(f"Trial [{trial_id}] - "
-                                   f"Unknown impl [{impl_name}] for service actor [{actor_name}]")
-        else:
-            impl_name, impl = next(iter(self._impls.items()))  # "First" impl of the dict
-            logging.info(f"Trial [{trial_id}] - "
-                         f"impl [{impl_name}] arbitrarily chosen for service actor [{actor_name}]")
-
         actor_class = self._cog_settings.actor_classes.get(init_input.actor_class)
         if actor_class is None:
             raise CogmentError(f"Trial [{trial_id}] - "
                                f"Unknown class [{init_input.actor_class}] for service actor [{actor_name}]")
-
-        if not _impl_can_serve_actor_class(impl, actor_class):
-            raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}]: "
-                               f"[{impl}] does not implement actor class [{init_input.actor_class}]")
 
         key = _trial_key(trial_id, actor_name)
         if key in self._sessions:
@@ -340,14 +360,15 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
             config = actor_class.config_type()
             config.ParseFromString(init_input.config.content)
 
-        self._prometheus_data.actors_started.labels(impl_name).inc()
+        self._prometheus_data.actors_started.labels(init_input.impl_name).inc()
 
         trial = Trial(trial_id, [], self._cog_settings)
-        new_session = ActorSession(impl.impl, actor_class, trial, actor_name, impl_name, init_input.env_name, config)
+        new_session = ActorSession(actor_impl.impl, actor_class, trial, actor_name, init_input.impl_name, 
+                                   init_input.env_name, config)
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)
 
-        logging.debug(f"Trial [{trial_id}] - impl [{impl_name}] for service actor [{actor_name}] started")
+        logging.debug(f"Trial [{trial_id}] - impl [{init_input.impl_name}] for service actor [{actor_name}] started")
 
         return new_session
 
