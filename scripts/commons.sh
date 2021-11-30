@@ -67,11 +67,11 @@ function validate_version() {
 }
 
 function retrieve_package_version() {
-  sed -n "s/.*version\ *\=\ *\"\(${VERSION_SED_REGEX}\)\"/\1/p" "${ROOT_DIR}/pyproject.toml"
+  sed -n "s/^version\ *\=\ *\"\(${VERSION_SED_REGEX}\)\"/\1/p" "${ROOT_DIR}/pyproject.toml"
 }
 
 function update_package_version() {
   local version=$1
-  sed -i.bak "/.*version\ *\=/s/${VERSION_SED_REGEX}/${version}/" "${ROOT_DIR}/pyproject.toml"
+  sed -i.bak "/^version\ *\=/s/${VERSION_SED_REGEX}/${version}/" "${ROOT_DIR}/pyproject.toml"
   retrieve_package_version
 }
