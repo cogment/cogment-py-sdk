@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import os
-import sys
+from typing import Any
 
 try:
     import yaml
 except ModuleNotFoundError:
-    raise Exception("The 'cogment.generate' module requires extra dependencies, "
-                    "please install by running 'pip install cogment[generate]'")
+    raise Exception(
+        """
+        The `cogment.generate` module requires extra dependencies,
+        please install by running `pip install cogment[generate]`
+    """
+    )
 
 
 def py_path_from_proto_path(proto: str) -> str:
@@ -37,15 +42,13 @@ def token_as_proto_token(yaml_token: str, proto_file_content) -> str:
         if token in proto_file_content[file]:
             return f"{py_alias_from_proto_path(file)}.{token}"
 
-    raise Exception(f"Token [{token}] not found in any file")
+    raise Exception(f"TOKEN {token} NOT FOUND IN ANY FILE")
 
 
 def proto_import_line(proto: str) -> str:
-    return f"import {py_path_from_proto_path(proto)} as {py_alias_from_proto_path(proto)}"
-
-
-def python_import_line(py_module: str) -> str:
-    return f"import {py_module}"
+    return (
+        f"import {py_path_from_proto_path(proto)} as {py_alias_from_proto_path(proto)}"
+    )
 
 
 def proto_lib_line(proto: str) -> str:
@@ -57,10 +60,19 @@ def actor_class_line(actor_class) -> str:
     return f"_{actor_className}_class"
 
 
-def main(config_file: str, output_file: str):
+def main():
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
+        if actor_class["observation"].get("delta") is not None:
+            raise Exception(
+                f"{actor_class['name']} has observation delta. This is not suported in Cogment 2.0"
+            )
+        if actor_class["observation"].get("delta_apply_fn") is not None:
+            raise Exception(
+                f"{actor_class['name']} has observation delta_apply_fn. This is not suported in Cogment 2.0"
+            )
+
         return f"""
 _{actor_class['name']}_class = _cog.actor.ActorClass(
     name="{actor_class['name']}",
@@ -71,7 +83,7 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
 )
         """
 
-    with open(config_file, "r") as stream:
+    with open("cogment.yaml", "r") as stream:
         cog_settings = yaml.safe_load(stream)
 
         proto_files = cog_settings["import"]["proto"]
@@ -88,12 +100,17 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
         line_break = "\n"  # f strings can't have backslashes in them
         comma_line_break_tab = ",\n\t"  # f strings can't have backslashes in them
 
+        if len(cog_settings.get("import", {}).get("python", [])) > 0:
+            raise Exception(
+                "Python imports in configuration files are not supported in Cogment 2.0"
+            )
+
         cog_settings_string = f"""
 import cogment as _cog
 from types import SimpleNamespace
+from typing import List
 
 {line_break.join(map(proto_import_line, cog_settings.get('import', {}).get('proto', [])))}
-{line_break.join(map(python_import_line, cog_settings.get('import', {}).get('python', [])))}
 {line_break.join(map(proto_lib_line, cog_settings.get('import', {}).get('proto', [])))}
 {line_break.join(map(actor_classes_block, cog_settings.get('actor_classes', [])))}
 
@@ -111,18 +128,9 @@ environment = SimpleNamespace(config_type={
     if 'environment' in cog_settings and 'config_type' in cog_settings['environment']
     else 'None'})
         """
-
-        with open(output_file, "w") as text_file:
+        with open("cog_settings.py", "w") as text_file:
             text_file.write(cog_settings_string)
 
 
 if __name__ == "__main__":
-    arg1 = "cogment.yaml"
-    if len(sys.argv) >= 2:
-        arg1 = sys.argv[1]
-
-    arg2 = "cog_settings.py"
-    if len(sys.argv) >= 3:
-        arg2 = sys.argv[2]
-
-    main(arg1, arg2)
+    main()
