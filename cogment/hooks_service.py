@@ -30,7 +30,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
         self.__impl = impl
         self.__cog_settings = cog_settings
 
-        logging.info("Prehook Service started")
+        logging.info("Pre-trial hook service started")
 
     # Not all attributes can be tested for presence (i.e. non-optional, non-message ones)
     def _decode(self, session, proto_params):
@@ -143,7 +143,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
                 session.validate()
 
             except asyncio.CancelledError as exc:
-                logging.debug(f"Prehook implementation coroutine cancelled: [{exc}]")
+                logging.debug(f"Pre-trial hook implementation coroutine cancelled: [{exc}]")
                 return False
 
             except Exception:

@@ -207,7 +207,7 @@ class Context:
         if self._grpc_server is not None:
             raise CogmentError("Cannot register a pre-trial hook after the server is started")
         if self._prehook_impl is not None:
-            raise CogmentError("Only one prehook service can be registered")
+            raise CogmentError("Only one pre-trial hook service can be registered")
 
         self._prehook_impl = impl
 

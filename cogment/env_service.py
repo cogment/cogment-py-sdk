@@ -169,7 +169,8 @@ async def _process_incoming(context, session):
                               f"received an invalid state [{data.state}]")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] coroutine cancelled: [{exc}]")
+        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                      f"process incoming cancelled: [{exc}]")
         raise
 
     except Exception:
@@ -376,7 +377,7 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
 
         except asyncio.CancelledError as exc:
             logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                          f"user implementation was cancelled with exception")
+                          f"user implementation was cancelled with exception [{exc}]")
 
         except Exception:
             logging.exception("run_session")
@@ -405,20 +406,23 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
 
             session = self._start_session(trial_id, init_data)
 
-            await self._run_session(context, session)  # Blocking
-
-            self._sessions.remove(key)
-            return
-
         except asyncio.TimeoutError:
             logging.error("Failed to receive init data from Orchestrator")
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
             raise
 
+        except asyncio.CancelledError as exc:
+            logging.debug(f"Trial [{trial_id}] - Environment start cancelled: [{exc}]")
+            raise
+
         except Exception:
             logging.exception("RunTrial")
             raise
+
+        else:
+            await self._run_session(context, session)  # Blocking
+            self._sessions.remove(key)
 
     # Override
     async def Version(self, request, context):
