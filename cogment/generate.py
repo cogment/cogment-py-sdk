@@ -61,6 +61,7 @@ def actor_class_line(actor_class) -> str:
     actor_className = actor_class["name"]
     return f"_{actor_className}_class"
 
+
 @click.command()
 @click.option('--config', default='cogment.yaml', help='Cogment config file')
 @click.option('--output', default='cog_settings.py', help='Output python file')
