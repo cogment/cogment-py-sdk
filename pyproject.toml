@@ -29,6 +29,7 @@ prometheus-client = "^0.8"
 PyYAML = { version = "^5.3.1", optional = true }
 # version locked at 1.38 because of M1 mac support (doesn't work with 1.39 for some reason)
 grpcio-tools = { version = "1.38", optional = true }
+click = "^8.0.3"
 
 [tool.poetry.extras]
 generate = ["PyYAML", "grpcio-tools"]

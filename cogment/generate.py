@@ -16,6 +16,8 @@ import glob
 import os
 from typing import Any
 
+import click
+
 try:
     import yaml
 except ModuleNotFoundError:
@@ -59,18 +61,20 @@ def actor_class_line(actor_class) -> str:
     actor_className = actor_class["name"]
     return f"_{actor_className}_class"
 
-
-def main():
+@click.command()
+@click.option('--config', default='cogment.yaml', help='Cogment config file')
+@click.option('--output', default='cog_settings.py', help='Output python file')
+def main(config: str, output: str):
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
         if actor_class["observation"].get("delta") is not None:
             raise Exception(
-                f"{actor_class['name']} has observation delta. This is not suported in Cogment 2.0"
+                f"{actor_class['name']} defines 'observation.delta' which is no longer supported."
             )
         if actor_class["observation"].get("delta_apply_fn") is not None:
             raise Exception(
-                f"{actor_class['name']} has observation delta_apply_fn. This is not suported in Cogment 2.0"
+                f"{actor_class['name']} defines 'observation.delta_apply_fn' which is no longer supported."
             )
 
         return f"""
@@ -83,7 +87,7 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
 )
         """
 
-    with open("cogment.yaml", "r") as stream:
+    with open(config, "r") as stream:
         cog_settings = yaml.safe_load(stream)
 
         proto_files = cog_settings["import"]["proto"]
@@ -128,7 +132,7 @@ environment = SimpleNamespace(config_type={
     if 'environment' in cog_settings and 'config_type' in cog_settings['environment']
     else 'None'})
         """
-        with open("cog_settings.py", "w") as text_file:
+        with open(output, "w") as text_file:
             text_file.write(cog_settings_string)
 
 
