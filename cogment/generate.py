@@ -71,11 +71,11 @@ def main(config: str, output: str):
     def actor_classes_block(actor_class) -> str:
         if actor_class["observation"].get("delta") is not None:
             raise Exception(
-                f"{actor_class['name']} has observation delta. This is not suported in Cogment 2.0"
+                f"{actor_class['name']} defines 'observation.delta' which is no longer supported."
             )
         if actor_class["observation"].get("delta_apply_fn") is not None:
             raise Exception(
-                f"{actor_class['name']} has observation delta_apply_fn. This is not suported in Cogment 2.0"
+                f"{actor_class['name']} defines 'observation.delta_apply_fn' which is no longer supported."
             )
 
         return f"""
