@@ -107,8 +107,14 @@ class ServedEndpoint:
 
 
 def _make_client_channel(endpoint: Endpoint):
+    if endpoint.url[:7] == "grpc://":
+        url = endpoint.url[7:]
+    else:
+        logging.warning(f"Endpoint URL must be of gRPC type (start with 'grpc://') [{endpoint.url}]")
+        url = endpoint.url
+
     if endpoint.private_key is None:
-        channel = grpc.aio.insecure_channel(endpoint.url)
+        channel = grpc.aio.insecure_channel(url)
     else:
         if endpoint.root_certificates:
             root = bytes(endpoint.root_certificates, "utf-8")
@@ -123,7 +129,7 @@ def _make_client_channel(endpoint: Endpoint):
         else:
             certs = None
         creds = grpc.ssl_channel_credentials(root, key, certs)
-        channel = grpc.aio.secure_channel(endpoint.url, creds)
+        channel = grpc.aio.secure_channel(url, creds)
 
     return channel
 
