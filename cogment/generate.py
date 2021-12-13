@@ -67,6 +67,8 @@ def actor_class_line(actor_class) -> str:
 @click.option("--output", default="cog_settings.py", help="Output python file")
 def main(spec: str, output: str):
 
+    output_directory = os.path.dirname(output)
+
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
         if actor_class["observation"].get("delta") is not None:
@@ -99,7 +101,10 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
                 proto_file_content[file] = file_data.read()
 
         os.system(
-            "python -m grpc_tools.protoc -I . --python_out=. " + " ".join(proto_files)
+            "python -m grpc_tools.protoc -I . --python_out="
+            + output_directory
+            + " "
+            + " ".join(proto_files)
         )
 
         line_break = "\n"  # f strings can't have backslashes in them
