@@ -16,9 +16,8 @@ import glob
 import os
 from typing import Any
 
-import click
-
 try:
+    import click
     import yaml
 except ModuleNotFoundError:
     raise Exception(
@@ -131,7 +130,6 @@ actor_classes = _cog.actor.ActorClassList(
 trial = SimpleNamespace(config_type={token_as_proto_token(cog_settings['trial']['config_type'], proto_file_content)
     if 'trial' in cog_settings and 'config_type' in cog_settings['trial']
     else 'None'})
-
 # Environment
 environment = SimpleNamespace(config_type={
     token_as_proto_token(cog_settings['environment']['config_type'], proto_file_content)
