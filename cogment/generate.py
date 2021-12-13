@@ -63,9 +63,9 @@ def actor_class_line(actor_class) -> str:
 
 
 @click.command()
-@click.option('--config', default='cogment.yaml', help='Cogment config file')
-@click.option('--output', default='cog_settings.py', help='Output python file')
-def main(config: str, output: str):
+@click.option("--spec", default="cogment.yaml", help="Cogment spec file")
+@click.option("--output", default="cog_settings.py", help="Output python file")
+def main(spec: str, output: str):
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
@@ -88,7 +88,7 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
 )
         """
 
-    with open(config, "r") as stream:
+    with open(spec, "r") as stream:
         cog_settings = yaml.safe_load(stream)
 
         proto_files = cog_settings["import"]["proto"]
