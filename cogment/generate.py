@@ -101,10 +101,10 @@ _{actor_class['name']}_class = _cog.actor.ActorClass(
                 proto_file_content[file] = file_data.read()
 
         os.system(
-            "python -m grpc_tools.protoc -I . --python_out="
-            + output_directory
-            + " "
-            + " ".join(proto_files)
+            "python -m grpc_tools.protoc -I . --python_out=" +
+            output_directory +
+            " " +
+            " ".join(proto_files)
         )
 
         line_break = "\n"  # f strings can't have backslashes in them
