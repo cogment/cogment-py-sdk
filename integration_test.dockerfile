@@ -38,7 +38,7 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root
 COPY . ./
 # Install the cogment-py-sdk package
-RUN poetry install
+RUN poetry install -E generate
 
 # Run the test with the local orchestrator
 ENTRYPOINT ["poetry", "run", "task", "test", "--launch-orchestrator"]

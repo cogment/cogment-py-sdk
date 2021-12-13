@@ -35,11 +35,13 @@ click = { version = "^8.0.3", optional = true }
 generate = ["PyYAML", "grpcio-tools", "click"]
 
 [tool.poetry.dev-dependencies]
+grpcio-tools = "1.38"
 taskipy = "^1.4.0"
 pycodestyle = "^2.6.0"
 mypy = "^0.790"
 pytest = "^6.1.1"
 PyYAML = "^5.3.1"
+click = "^8.0.3"
 pytest-dotenv = "^0.5.2"
 pytest-asyncio = "^0.14.0"
 pytest-timeout = "^1.4.2"
