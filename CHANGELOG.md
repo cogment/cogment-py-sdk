@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v2.0.0-rc2 - 2021-12-10
 
+### Changed
+
+- Cleanup user output
+- Require grpc protocol url for endpoints
+
 ## v2.0.0-rc1 - 2021-12-01
 
 ### Changed
