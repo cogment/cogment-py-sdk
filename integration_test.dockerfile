@@ -1,5 +1,5 @@
 # Some of the ENV (and ARG) defintions are also used inside the test
-ARG COGMENT_ORCHESTRATOR_IMAGE=cogment/orchestrator:latest
+ARG COGMENT_ORCHESTRATOR_IMAGE=cogment/orchestrator:v2.0.0-rc1
 
 FROM $COGMENT_ORCHESTRATOR_IMAGE as orchestrator
 FROM ubuntu:20.04
