@@ -71,9 +71,7 @@ class Controller:
         if len(rep.trial) == 0:
             raise CogmentError(f"Unknown trial [{trial_id}]")
         elif len(rep.trial) > 1:
-            raise CogmentError(
-                f"Unexpected response from orchestrator [{rep}] for [{trial_id}]"
-            )
+            raise CogmentError(f"Unexpected response from orchestrator [{rep}] for [{trial_id}]")
 
         result = [
             ActorInfo(actor.name, actor.actor_class)
@@ -94,9 +92,7 @@ class Controller:
 
         # For compatibility with Cogment 1.0, we can't return an empty string.
         if not rep.trial_id:
-            raise CogmentError(
-                f"Requested trial id [{trial_id_requested}] could not be used"
-            )
+            raise CogmentError(f"Requested trial id [{trial_id_requested}] could not be used")
 
         logging.debug(f"Trial [{rep.trial_id}] started")
 
@@ -106,18 +102,14 @@ class Controller:
         req = orchestrator_api.TerminateTrialRequest()
         req.hard_termination = hard
         if type(trial_ids) == str:
-            logging.warning(
-                "Using Controller.TerminateTrial() with a string trial ID is deprecated.  Use a list."
-            )
+            logging.warning("Using Controller.TerminateTrial() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
             for id in trial_ids:
                 metadata.append(("trial-id", id))
 
-        logging.debug(
-            f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])"
-        )
+        logging.debug(f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])")
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
 
     async def get_remote_versions(self):
@@ -131,14 +123,10 @@ class Controller:
     async def get_trial_info(self, trial_ids):
         req = orchestrator_api.TrialInfoRequest()
         if trial_ids is None:
-            logging.warning(
-                "Using Controller.GetTrialInfo() with a null trial ID is deprecated.  Use a list."
-            )
+            logging.warning("Using Controller.GetTrialInfo() with a null trial ID is deprecated.  Use a list.")
             metadata = []
         elif type(trial_ids) == str:
-            logging.warning(
-                "Using Controller.GetTrialInfo() with a string trial ID is deprecated.  Use a list."
-            )
+            logging.warning("Using Controller.GetTrialInfo() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
@@ -161,9 +149,7 @@ class Controller:
         request = orchestrator_api.TrialListRequest()
         for filter in trial_state_filters:
             if type(filter) != TrialState:
-                raise CogmentError(
-                    f"Unknown filter type [{type(filter)}]: must of type 'cogment.TrialState'"
-                )
+                raise CogmentError(f"Unknown filter type [{type(filter)}]: must of type 'cogment.TrialState'")
             request.filter.append(filter.value)
 
         reply_itor = self._lifecycle_stub.WatchTrials(request=request)
@@ -180,9 +166,7 @@ class Controller:
         except grpc.aio.AioRpcError as exc:
             logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
-                logging.error(
-                    f"Watch_trials Orchestrator communication lost: [{exc.details()}]"
-                )
+                logging.error(f"Watch_trials Orchestrator communication lost: [{exc.details()}]")
             else:
                 logging.exception("watch_trials -- Unexpected aio failure")
                 raise
@@ -191,9 +175,7 @@ class Controller:
             raise
 
         except asyncio.CancelledError as exc:
-            logging.debug(
-                f"watch_trial coroutine cancelled while waiting for trial info: [{exc}]"
-            )
+            logging.debug(f"watch_trial coroutine cancelled while waiting for trial info: [{exc}]")
 
         except Exception:
             logging.exception("watch_trials")

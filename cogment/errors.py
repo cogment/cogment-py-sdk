@@ -17,3 +17,10 @@ class CogmentError(Exception):
 
     def __init__(self, msg):
         super().__init__(msg)
+
+
+class CogmentGenerateError(Exception):
+    """Cogment generate specific exception class. All exceptions raised by Cogment generate are of this type."""
+
+    def __init__(self, msg):
+        super().__init__(msg)
