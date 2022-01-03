@@ -84,7 +84,7 @@ def actor_class_line(actor_class) -> str:
 @click.option("--output", default="cog_settings.py", help="Output python file")
 def main(spec: str, output: str):
 
-    output_directory = os.path.dirname(output)
+    output_directory = os.path.dirname(os.path.abspath(output))
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
