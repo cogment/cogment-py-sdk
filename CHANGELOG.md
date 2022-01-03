@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v2.0.0-rc3 - 2021-12-16
 
+- cogment.generate now requires semantic arguments
+
 ## v2.0.0-rc2 - 2021-12-10
 
 ### Changed
