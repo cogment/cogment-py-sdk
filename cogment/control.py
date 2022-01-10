@@ -102,7 +102,7 @@ class Controller:
         req = orchestrator_api.TerminateTrialRequest()
         req.hard_termination = hard
         if type(trial_ids) == str:
-            logging.warning("Using Controller.TerminateTrial() with a string trial ID is deprecated.  Use a list.")
+            logging.warning("Using Controller.terminate_trial() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
@@ -123,10 +123,10 @@ class Controller:
     async def get_trial_info(self, trial_ids):
         req = orchestrator_api.TrialInfoRequest()
         if trial_ids is None:
-            logging.warning("Using Controller.GetTrialInfo() with a null trial ID is deprecated.  Use a list.")
+            logging.warning("Using Controller.get_trial_info() with a null trial ID is deprecated.  Use a list.")
             metadata = []
         elif type(trial_ids) == str:
-            logging.warning("Using Controller.GetTrialInfo() with a string trial ID is deprecated.  Use a list.")
+            logging.warning("Using Controller.get_trial_info() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
