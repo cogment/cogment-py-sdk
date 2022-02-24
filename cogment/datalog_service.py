@@ -21,10 +21,9 @@ import cogment.api.datalog_pb2 as datalog_api
 from cogment.control import TrialState
 from cogment.datalog import DatalogSession
 from cogment.errors import CogmentError
-from cogment.utils import list_versions
+from cogment.utils import list_versions, logger
 from cogment.session import RecvObservation, RecvAction, RecvMessage, RecvReward
 
-import logging
 import asyncio
 
 
@@ -255,7 +254,7 @@ async def _read_sample(context, session, settings):
             request = await context.read()
 
             if request == grpc.aio.EOF:
-                logging.info(f"The orchestrator disconnected from LogExpoterService.")
+                logger.info(f"The orchestrator disconnected from LogExpoterService.")
                 break
 
             elif request.HasField("sample"):
@@ -264,17 +263,17 @@ async def _read_sample(context, session, settings):
                 sample._set(request.sample)
                 session._new_sample(sample)
                 if trial_ended:
-                    logging.debug("Last log sample received for trial")
+                    logger.debug("Last log sample received for trial")
                     break
             else:
-                logging.warning(f"Invalid request received from the orchestrator : {request}")
+                logger.warning(f"Invalid request received from the orchestrator : {request}")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"DatalogServicer '_read_sample' coroutine cancelled: [{exc}]")
+        logger.debug(f"DatalogServicer '_read_sample' coroutine cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("_read_sample")
+        logger.exception("_read_sample")
         raise
 
     # Exit the loop
@@ -287,7 +286,7 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
     def __init__(self, impl, cog_settings):
         self._impl = impl
         self.__cog_settings = cog_settings
-        logging.info("Datalog Service started")
+        logger.info("Datalog Service started")
 
     # Override
     async def RunTrialDatalog(self, request_iterator, context):
@@ -300,7 +299,7 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
             request = await context.read()
 
             if not request.HasField("trial_params"):
-                raise CogmentError(f"Initial logging request for [{trial_id}] does not contain parameters.")
+                raise CogmentError(f"Initial data log request for [{trial_id}] does not contain parameters.")
 
             trial_params = LogParams(self.__cog_settings)
             trial_params._set(request.trial_params)
@@ -313,15 +312,15 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
             normal_return = await user_task
 
             if normal_return:
-                logging.debug(f"User datalog implementation returned")
+                logger.debug(f"User datalog implementation returned")
             else:
-                logging.debug(f"User datalog implementation was cancelled")
+                logger.debug(f"User datalog implementation was cancelled")
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
+            logger.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
 
         except Exception:
-            logging.exception("RunTrialDatalog")
+            logger.exception("RunTrialDatalog")
             raise
 
         finally:
@@ -333,5 +332,5 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
         try:
             return list_versions()
         except Exception:
-            logging.exception("Version")
+            logger.exception("Version")
             raise

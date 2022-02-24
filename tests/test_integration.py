@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
-import os
-import logging
-import unittest
-import urllib.request
-
-import pytest
-import mock
-
 import cogment
 
 from helpers.find_free_port import find_free_port
 from helpers.launch_orchestrator import launch_orchestrator
 
+import pytest
+import mock
+
+import asyncio
+import unittest
+import urllib.request
+import logging
+
+logger = logging.getLogger("cogment.unit-tests")
 
 @pytest.fixture(scope="function")
 def unittest_case():
@@ -94,7 +94,7 @@ class TestIntegration:
                 environment_tick_count += 1
 
                 if environment_tick_count == 1:
-                    logging.debug(f"--Sending message and rewards to Actors")
+                    logger.debug(f"--Sending message and rewards to Actors")
 
                     actors = environment_session.get_active_actors()
                     for actor in actors:
@@ -311,13 +311,13 @@ class TestIntegration:
 
         async def state_tracking(trial_controller):
             nonlocal trial_ended
-            logging.debug(f"--Iterating over trial state...")
+            logger.debug(f"--Iterating over trial state...")
 
             state_count = 0
             state_trial_id = []
             state_itor = trial_controller.watch_trials()
             async for info in state_itor:
-                logging.debug(f"--Trial state: {info}")
+                logger.debug(f"--Trial state: {info}")
                 assert info.trial_id != 0
                 assert info.state != cogment.TrialState.UNKNOWN
 
@@ -340,9 +340,7 @@ class TestIntegration:
 
             await state_itor.aclose()
             trial_ended.set_result((state_count, state_trial_id))
-            logging.debug(
-                f"--Finished iterating over trial state: trial [{controller_trial_id}] ended"
-            )
+            logger.debug(f"--Finished iterating over trial state: trial [{controller_trial_id}] ended")
 
         asyncio.create_task(state_tracking(controller))
         await asyncio.sleep(1)
@@ -355,7 +353,7 @@ class TestIntegration:
         )
 
         await trial_ended
-        logging.info("--State reported trial ended")
+        logger.info("--State reported trial ended")
 
         count, ids = trial_ended.result()
         assert count == 11111
@@ -419,7 +417,7 @@ class TestIntegration:
 
         assert pre_hook_called_count == 1
 
-        logging.info(f"test_environment_controlled_trial finished")
+        logger.info(f"test_environment_controlled_trial finished")
         await context._grpc_server.stop(grace=5.0)  # To prepare for next test
 
     @pytest.mark.use_orchestrator
@@ -532,18 +530,18 @@ class TestIntegration:
 
         endp = cogment.Endpoint(cogment_test_setup["orchestrator_endpoint"])
         controller = context.get_controller(endpoint=endp)
-        logging.info("--starting trial--")
+        logger.info("--starting trial--")
         trial_id = await controller.start_trial(trial_config=data_pb2.TrialConfig())
-        logging.info("--trial started--")
+        logger.info("--trial started--")
 
         pre_trial_hook.assert_called_once()
         pre_trial_hook.assert_awaited_once()
 
         await asyncio.sleep(3)
 
-        logging.info("--requesting trial termination--")
+        logger.info("--requesting trial termination--")
         await controller.terminate_trial(trial_id)
-        logging.info("--trial termination request sent--")
+        logger.info("--trial termination request sent--")
 
         await asyncio.wait(agents_ended.values())
 
@@ -560,7 +558,7 @@ class TestIntegration:
             environment_tick_count, agents_tick_count["actor_1"]
         )
 
-        logging.info(f"test_controller_controlled_trial finished")
+        logger.info(f"test_controller_controlled_trial finished")
         await context._grpc_server.stop(grace=5.0)  # To prepare for next test
 
     @pytest.mark.use_orchestrator
@@ -677,5 +675,5 @@ class TestIntegration:
 
         await asyncio.wait(agents_ended.values())
 
-        logging.info(f"test_actor_order_trial finished")
+        logger.info(f"test_actor_order_trial finished")
         await context._grpc_server.stop(grace=5.0)  # To prepare for next test

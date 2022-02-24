@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
-import logging
-from enum import Enum
-
 import grpc
 import grpc.aio  # type: ignore
 
@@ -23,6 +19,10 @@ import cogment.api.common_pb2 as common_api
 import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.errors import CogmentError
 from cogment.session import ActorInfo
+from cogment.utils import logger
+
+import asyncio
+from enum import Enum
 
 
 class TrialState(Enum):
@@ -87,14 +87,14 @@ class Controller:
         if trial_id_requested is not None:
             req.trial_id_requested = trial_id_requested
 
-        logging.debug(f"Requesting start of a trial with [{req}] ...")
+        logger.debug(f"Requesting start of a trial with [{req}] ...")
         rep = await self._lifecycle_stub.StartTrial(req)
 
         # For compatibility with Cogment 1.0, we can't return an empty string.
         if not rep.trial_id:
             raise CogmentError(f"Requested trial id [{trial_id_requested}] could not be used")
 
-        logging.debug(f"Trial [{rep.trial_id}] started")
+        logger.debug(f"Trial [{rep.trial_id}] started")
 
         return rep.trial_id
 
@@ -102,14 +102,14 @@ class Controller:
         req = orchestrator_api.TerminateTrialRequest()
         req.hard_termination = hard
         if type(trial_ids) == str:
-            logging.warning("Using Controller.terminate_trial() with a string trial ID is deprecated.  Use a list.")
+            logger.warning("Using Controller.terminate_trial() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
             for id in trial_ids:
                 metadata.append(("trial-id", id))
 
-        logging.debug(f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])")
+        logger.debug(f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])")
         await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
 
     async def get_remote_versions(self):
@@ -123,10 +123,10 @@ class Controller:
     async def get_trial_info(self, trial_ids):
         req = orchestrator_api.TrialInfoRequest()
         if trial_ids is None:
-            logging.warning("Using Controller.get_trial_info() with a null trial ID is deprecated.  Use a list.")
+            logger.warning("Using Controller.get_trial_info() with a null trial ID is deprecated.  Use a list.")
             metadata = []
         elif type(trial_ids) == str:
-            logging.warning("Using Controller.get_trial_info() with a string trial ID is deprecated.  Use a list.")
+            logger.warning("Using Controller.get_trial_info() with a string trial ID is deprecated.  Use a list.")
             metadata = [("trial-id", trial_ids)]
         else:
             metadata = []
@@ -164,19 +164,19 @@ class Controller:
                     break
 
         except grpc.aio.AioRpcError as exc:
-            logging.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
+            logger.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
-                logging.error(f"Watch_trials Orchestrator communication lost: [{exc.details()}]")
+                logger.error(f"Watch_trials Orchestrator communication lost: [{exc.details()}]")
             else:
-                logging.exception("watch_trials -- Unexpected aio failure")
+                logger.exception("watch_trials -- Unexpected aio failure")
                 raise
 
         except GeneratorExit:
             raise
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"watch_trial coroutine cancelled while waiting for trial info: [{exc}]")
+            logger.debug(f"watch_trial coroutine cancelled while waiting for trial info: [{exc}]")
 
         except Exception:
-            logging.exception("watch_trials")
+            logger.exception("watch_trials")
             raise

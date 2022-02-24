@@ -15,10 +15,10 @@
 import cogment.api.common_pb2 as common_api
 
 from cogment.errors import CogmentError
+from cogment.utils import logger
 
 from abc import ABC
 from enum import Enum
-import logging
 import asyncio
 
 
@@ -212,11 +212,11 @@ class Session(ABC):
             return True
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"[{self.name}] implementation coroutine cancelled: [{exc}]")
+            logger.debug(f"[{self.name}] implementation coroutine cancelled: [{exc}]")
             return False
 
         except Exception:
-            logging.exception(f"An exception occured in user implementation of [{self.name}]:")
+            logger.exception(f"An exception occured in user implementation of [{self.name}]")
             raise
 
     def _start_user_task(self):
@@ -225,24 +225,24 @@ class Session(ABC):
 
     def _post_incoming_event(self, event):
         if not self._started:
-            logging.warning(f"[{self.name}] received an event before session was started.")
+            logger.warning(f"[{self.name}] received an event before session was started.")
             return
         if self._trial.ended:
-            logging.debug(f"Event received after trial is over: [{event}]")
+            logger.debug(f"Event received after trial is over: [{event}]")
             return
         if event is None:
-            logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: New event is `None`")
+            logger.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: New event is `None`")
 
         self._incoming_event_queue.put_nowait(event)
 
     def _post_outgoing_data(self, data):
         if not self._started:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send until session is started.")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send until session is started.")
             return
         if self._trial.ending_ack:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send after acknowledging ending")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send after acknowledging ending")
             return
 
         if data is None:
@@ -260,8 +260,8 @@ class Session(ABC):
             while True:
                 data = await self._outgoing_data_queue.get()
                 if data is None:
-                    logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                                  f"Forcefull data loop exit")
+                    logger.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                                 f"Forcefull data loop exit")
                     break
                 yield data
                 self._outgoing_data_queue.task_done()
@@ -271,14 +271,14 @@ class Session(ABC):
             if exc.args[0] != "Event loop is closed":
                 raise
             else:
-                logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                              f"Normal exception on retrieving data at close: [{exc}]")
+                logger.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                             f"Normal exception on retrieving data at close: [{exc}]")
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                        f"data retrieval coroutine cancelled: [{exc}]")
+            logger.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                         f"data retrieval coroutine cancelled: [{exc}]")
 
-        logging.debug(f"Exiting [{self.name}] _retrieve_outgoing_data loop generator")
+        logger.debug(f"Exiting [{self.name}] _retrieve_outgoing_data loop generator")
 
     def get_trial_id(self):
         return self._trial.id
@@ -295,33 +295,35 @@ class Session(ABC):
         elif not self._trial.ending:
             raise CogmentError("Cannot stop sending before trial is ready to end")
         elif self._trial.ended:
-            logging.warning(f"Trial [{self._trial.id}] - Session [{self.name}] "
-                            f"end sending ignored because the trial has already ended.")
+            logger.warning(f"Trial [{self._trial.id}] - Session [{self.name}] "
+                           f"end sending ignored because the trial has already ended.")
         elif self._trial.ending_ack:
-            logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}] cannot end sending more than once")
+            logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}] cannot end sending more than once")
         else:
             self._post_outgoing_data(_EndingAck())
 
     async def event_loop(self):
         if not self._started:
-            logging.warning(f"Event loop is not enabled until the [{self.name}] is started.")
+            logger.warning(f"Event loop is not enabled until the [{self.name}] is started.")
             return
         if self._trial.ended:
-            logging.info(f"No more events for [{self.name}] because the trial has ended.")
+            logger.info(f"No more events for [{self.name}] because the trial has ended.")
             return
+
+        logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}] starting event loop")
 
         loop_active = not self._last_event_delivered
         while loop_active:
             try:
                 event = await self._incoming_event_queue.get()
                 if event is None:
-                    logging.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
-                                  f"Forcefull event loop exit")
+                    logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
+                                 f"Forcefull event loop exit")
                     self._last_event_delivered = True
                     break
 
             except asyncio.CancelledError as exc:
-                logging.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
+                logger.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
                 break
 
             self._last_event_delivered = (event.type == EventType.FINAL)
@@ -330,20 +332,20 @@ class Session(ABC):
             loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
             if not loop_active:
                 if self._last_event_delivered:
-                    logging.debug(f"Last event delivered, exiting [{self.name}] event loop")
+                    logger.debug(f"Last event delivered, exiting [{self.name}] event loop")
                 else:
-                    logging.debug(f"End of event loop for [{self.name}] requested by user")
+                    logger.debug(f"End of event loop for [{self.name}] requested by user")
 
-        logging.debug(f"Exiting [{self.name}] event loop generator")
+        logger.debug(f"Exiting [{self.name}] event loop generator")
 
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         if not self._started:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send reward until session is started.")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send reward until session is started.")
             return
         if self._trial.ending_ack:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send reward after acknowledging ending.")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send reward after acknowledging ending.")
             return
 
         for dest in to:
@@ -357,12 +359,12 @@ class Session(ABC):
 
     def _send_message(self, payload, to):
         if not self._started:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send message until session is started.")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send message until session is started.")
             return
         if self._trial.ending_ack:
-            logging.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
-                            f"Cannot send message after acknowledging ending.")
+            logger.warning(f"Trial [{self._trial.id}] - Session for [{self.name}]: "
+                           f"Cannot send message after acknowledging ending.")
             return
 
         for dest in to:

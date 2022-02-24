@@ -19,14 +19,12 @@ import cogment.api.environment_pb2_grpc as env_grpc_api
 import cogment.api.environment_pb2 as env_api
 import cogment.api.common_pb2 as common_api
 
-from cogment.utils import list_versions, TRACE, INIT_TIMEOUT
+from cogment.utils import list_versions, logger, INIT_TIMEOUT
 from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType, _InitAck, _EndingAck, _Ending
 from cogment.errors import CogmentError
 from cogment.environment import EnvironmentSession
 from cogment.trial import Trial
 
-from abc import ABC, abstractmethod
-import logging
 import asyncio
 
 
@@ -79,7 +77,7 @@ def _process_normal_data(data, session):
         recv_event = RecvEvent(EventType.ACTIVE)
 
     if data.HasField("action_set"):
-        logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}] received action set")
+        logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}] received action set")
 
         len_actions = len(data.action_set.actions)
         len_actors = len(session._trial.actors)
@@ -97,7 +95,7 @@ def _process_normal_data(data, session):
         session._post_incoming_event(recv_event)
 
     elif data.HasField("message"):
-        logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}] received message")
+        logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
         session._post_incoming_event(recv_event)
@@ -105,12 +103,12 @@ def _process_normal_data(data, session):
         session._prometheus_data.messages_received.labels(session.impl_name).inc()
 
     elif data.HasField("details"):
-        logging.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                        f"received unexpected detail data [{data.details}]")
+        logger.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                       f"received unexpected detail data [{data.details}]")
 
     else:
-        logging.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                      f"received unexpected data [{data.WhichOneof('data')}]")
+        logger.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                     f"received unexpected data [{data.WhichOneof('data')}]")
 
 
 async def _process_incoming(context, session):
@@ -118,63 +116,63 @@ async def _process_incoming(context, session):
         while True:
             data = await context.read()
             if data == grpc.aio.EOF:
-                logging.info(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
-                             f"The orchestrator disconnected the environment")
+                logger.info(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
+                            f"The orchestrator disconnected the environment")
                 break
-            logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}]: "
-                               f"Received data [{data.state}] [{data.WhichOneof('data')}]")
+            logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
+                         f"Received data [{data.state}] [{data.WhichOneof('data')}]")
 
             if data.state == common_api.CommunicationState.NORMAL:
                 _process_normal_data(data, session)
 
             elif data.state == common_api.CommunicationState.HEARTBEAT:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                                   f"received 'HEARTBEAT' and responding in kind")
+                logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                             f"received 'HEARTBEAT' and responding in kind")
                 reply = env_api.EnvRunTrialOutput()
                 reply.state = data.state
                 await context.write(reply)
 
             elif data.state == common_api.CommunicationState.LAST:
-                logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                              f"received 'LAST' state")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                             f"received 'LAST' state")
                 session._trial.ending = True
 
             elif data.state == common_api.CommunicationState.LAST_ACK:
-                logging.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                              f"received an unexpected 'LAST_ACK'")
+                logger.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                             f"received an unexpected 'LAST_ACK'")
                 # TODO: Should we `return` or raise instead of continuing?
 
             elif data.state == common_api.CommunicationState.END:
                 if session._trial.ending:
                     if data.HasField("details"):
-                        logging.info(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                                     f"ended [{data.details}]")
+                        logger.info(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                                    f"ended [{data.details}]")
                     else:
-                        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] ended")
+                        logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] ended")
                     session._post_incoming_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
                     else:
                         details = ""
-                    logging.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                                    f"ended forcefully [{details}]")
+                    logger.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                                   f"ended forcefully [{details}]")
 
                 session._trial.ended = True
                 session._exit_queues()
                 break
 
             else:
-                logging.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                              f"received an invalid state [{data.state}]")
+                logger.error(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                             f"received an invalid state [{data.state}]")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                      f"process incoming cancelled: [{exc}]")
+        logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                     f"process incoming cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("_process_incoming")
+        logger.exception("_process_incoming")
         raise
 
 
@@ -186,47 +184,47 @@ async def _process_outgoing(context, session):
 
             # Using strict comparison: there is no reason to receive derived classes here
             if type(data) == env_api.ObservationSet:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}]: "
-                                   f"Sending observation set")
+                logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
+                             f"Sending observation set")
                 package.observation_set.CopyFrom(data)
 
             elif type(data) == common_api.Reward:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending reward")
+                logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending reward")
                 package.reward.CopyFrom(data)
 
             elif type(data) == common_api.Message:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending message")
+                logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending message")
                 session._prometheus_data.messages_sent.labels(session.impl_name).inc()
                 package.message.CopyFrom(data)
 
             elif type(data) == _InitAck:
                 package.init_output.SetInParent()
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending Init Data")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending Init Data")
 
             elif type(data) == _Ending:
                 package.state = common_api.CommunicationState.LAST
-                logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending 'LAST'")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending 'LAST'")
 
             elif type(data) == _EndingAck:
                 package.state = common_api.CommunicationState.LAST_ACK
-                logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending 'LAST_ACK'")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}]: Sending 'LAST_ACK'")
                 await context.write(package)
                 break
 
             else:
-                logging.error(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
-                              f"Unknown data type to send [{type(data)}]")
+                logger.error(f"Trial [{session._trial.id}] - Environment [{session.name}]: "
+                             f"Unknown data type to send [{type(data)}]")
                 continue
 
             await context.write(package)
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                      f"process outgoing cancelled: [{exc}]")
+        logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                     f"process outgoing cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("_process_outgoing")
+        logger.exception("_process_outgoing")
         raise
 
 
@@ -239,35 +237,35 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
         self._cog_settings = cog_settings
         self._prometheus_data = _PrometheusData(prometheus_registry)
 
-        logging.info("Environment Service started")
+        logger.info("Environment Service started")
 
     async def _get_init_data(self, context, trial_id):
-        logging.debug(f"Trial [{trial_id}] - Processing init for environment")
+        logger.debug(f"Trial [{trial_id}] - Processing init for environment")
 
         last_received = False
         while True:
             request = await context.read()
-            logging.debug(f"Trial [{trial_id}] - Read initial environment request: {request}")
+            logger.debug(f"Trial [{trial_id}] - Read initial environment request: {request}")
 
             if request == grpc.aio.EOF:
-                logging.info(f"Trial [{trial_id}] - Orchestrator disconnected environment before start")
+                logger.info(f"Trial [{trial_id}] - Orchestrator disconnected environment before start")
                 return None
 
             if request.state == common_api.CommunicationState.NORMAL:
                 if last_received:
                     error_str = (f"Trial [{trial_id}] - Environment received init data after 'LAST'")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
                 if request.HasField("init_input"):
                     return request.init_input
                 elif reply.HasField("details"):
-                    logging.warning(f"Trial [{trial_id}] - Received unexpected detail data "
-                                    f"[{reply.details}] before start")
+                    logger.warning(f"Trial [{trial_id}] - Received unexpected detail data "
+                                   f"[{reply.details}] before start")
                 else:
                     data_set = request.WhichOneof("data")
                     error_str = (f"Trial [{trial_id}] - Environment received unexpected init data [{data_set}]")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
             elif request.state == common_api.CommunicationState.HEARTBEAT:
@@ -279,10 +277,10 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
                 if last_received:
                     error_str = (f"Trial [{trial_id}] - Before start, environment "
                                  f"received unexpected 'LAST' when waiting for 'END'")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
-                logging.debug(f"Trial [{trial_id}] - Ending before init data")
+                logger.debug(f"Trial [{trial_id}] - Ending before init data")
                 reply = env_api.EnvRunTrialOutput()
                 reply.state = common_api.CommunicationState.LAST_ACK
                 await context.write(reply)
@@ -290,20 +288,20 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
 
             elif request.state == common_api.CommunicationState.LAST_ACK:
                 error_str = (f"Trial [{trial_id}] - Before start, environment received an unexpected 'LAST_ACK'")
-                logging.error(error_str)
+                logger.error(error_str)
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
             elif request.state == common_api.CommunicationState.END:
                 if request.HasField("details"):
-                    logging.info(f"Trial [{trial_id}] - Ended before environment start [{request.details}]")
+                    logger.info(f"Trial [{trial_id}] - Ended before environment start [{request.details}]")
                 else:
-                    logging.debug(f"Trial [{trial_id}] - Ended before environment start")
+                    logger.debug(f"Trial [{trial_id}] - Ended before environment start")
                 return None
 
             else:
                 error_str = (f"Trial [{trial_id}] - Before start, environment "
                              f"received an invalid state [{request.state}] [{request}]")
-                logging.error(error_str)
+                logger.error(error_str)
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
     def _start_session(self, trial_id, init_input):
@@ -319,8 +317,8 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
                                    f"Unknown impl [{impl_name}] for environment [{name}]")
         else:
             impl_name, impl = next(iter(self._impls.items()))
-            logging.info(f"Trial [{trial_id}] - "
-                         f"impl [{impl_name}] arbitrarily chosen for environment [{name}]")
+            logger.info(f"Trial [{trial_id}] - "
+                        f"impl [{impl_name}] arbitrarily chosen for environment [{name}]")
 
         key = _trial_key(trial_id, name)
         if key in self._sessions:
@@ -343,7 +341,7 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)
 
-        logging.debug(f"Trial [{trial_id}] - impl [{impl_name}] for environment [{name}] started")
+        logger.debug(f"Trial [{trial_id}] - impl [{impl_name}] for environment [{name}] started")
 
         return new_session
 
@@ -357,30 +355,30 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
             user_task = session._start_user_task()
 
             with self._prometheus_data.trial_duration.labels(session.impl_name).time():
-                logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] session started")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] session started")
                 normal_return = await user_task
 
             self._prometheus_data.update_count_per_trial.labels(session.impl_name).observe(session._trial.tick_id)
 
             if normal_return:
                 if not session._last_event_delivered:
-                    logging.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                                    f"user implementation returned before required")
+                    logger.warning(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                                   f"user implementation returned before required")
                 else:
-                    logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                                  f"user implementation returned")
+                    logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                                 f"user implementation returned")
             else:
-                logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                              f"user implementation was cancelled")
+                logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                             f"user implementation was cancelled")
 
             self._prometheus_data.trials_ended.labels(session.impl_name).inc()
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
-                          f"user implementation was cancelled with exception [{exc}]")
+            logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] "
+                         f"user implementation was cancelled with exception [{exc}]")
 
         except Exception:
-            logging.exception("run_session")
+            logger.exception("run_session")
             raise
 
         finally:
@@ -392,7 +390,7 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
     # Override
     async def RunTrial(self, request_iterator, context):
         if len(self._impls) == 0:
-            logging.warning("No implementation registered on trial run request")
+            logger.warning("No implementation registered on trial run request")
             raise CogmentError("No implementation registered")
 
         metadata = dict(context.invocation_metadata())
@@ -407,17 +405,17 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
             session = self._start_session(trial_id, init_data)
 
         except asyncio.TimeoutError:
-            logging.error("Failed to receive init data from Orchestrator")
+            logger.error("Failed to receive init data from Orchestrator")
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
             raise
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{trial_id}] - Environment start cancelled: [{exc}]")
+            logger.debug(f"Trial [{trial_id}] - Environment start cancelled: [{exc}]")
             raise
 
         except Exception:
-            logging.exception("RunTrial")
+            logger.exception("RunTrial")
             raise
 
         else:
@@ -430,5 +428,5 @@ class EnvironmentServicer(env_grpc_api.EnvironmentSPServicer):
             return list_versions()
 
         except Exception:
-            logging.exception("Version")
+            logger.exception("Version")
             raise

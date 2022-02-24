@@ -16,8 +16,8 @@ import cogment.api.common_pb2 as common_api
 
 from cogment.session import Session
 from cogment.errors import CogmentError
+from cogment.utils import logger
 
-import logging
 import time
 
 
@@ -100,8 +100,8 @@ class ActorSession(Session):
 
     def send_message(self, payload, to, to_environment=None):
         if to_environment is not None:
-            logging.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
-                            "Use 'self.env_name' as environment name in the 'to' parameter.")
+            logger.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                           "Use 'self.env_name' as environment name in the 'to' parameter.")
             if to_environment:
                 self._send_message(payload, to + [self.env_name])
                 return

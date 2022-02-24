@@ -36,8 +36,8 @@ from cogment.client_service import ClientServicer
 from cogment.env_service import EnvironmentServicer
 from cogment.hooks_service import PrehookServicer
 from cogment.datalog_service import DatalogServicer
+from cogment.utils import logger
 
-import logging
 from typing import Callable, Awaitable, Dict, List, Any
 from types import ModuleType
 import os
@@ -83,7 +83,7 @@ class Endpoint:
                     self.certificate_chain = None
 
         except Exception:
-            logging.error(f"Failed loading file from CWD: {os.getcwd()}")
+            logger.error(f"Failed loading file from CWD: {os.getcwd()}")
             raise
 
 
@@ -110,7 +110,7 @@ def _make_client_channel(endpoint: Endpoint):
     if endpoint.url[:7] == "grpc://":
         url = endpoint.url[7:]
     else:
-        logging.warning(f"Endpoint URL must be of gRPC type (start with 'grpc://') [{endpoint.url}]")
+        logger.warning(f"Endpoint URL must be of gRPC type (start with 'grpc://') [{endpoint.url}]")
         url = endpoint.url
 
     if endpoint.private_key is None:
@@ -255,9 +255,9 @@ class Context:
             start_prometheus_server(prometheus_port, "", self._prometheus_registry)
 
         await self._grpc_server.start()
-        logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] started")
+        logger.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] started")
         await self._grpc_server.wait_for_termination()
-        logging.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
+        logger.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
 
     def get_controller(self, endpoint: Endpoint):
         channel = _make_client_channel(endpoint)
@@ -269,7 +269,7 @@ class Context:
         requested_name = None
         if impl_name is not None:
             # For backward compatibility
-            logging.warning(f"`join_trial` parameter `impl_name` is deprecated")
+            logger.warning(f"`join_trial` parameter `impl_name` is deprecated")
             if actor_name is None:
                 actor_impl = self._actor_impls[impl_name]
                 if len(actor_impl.actor_classes) == 0:
@@ -282,7 +282,7 @@ class Context:
         elif actor_name is not None:
             requested_name = actor_name
             if actor_class is not None:
-                logging.warning(f"`actor_class` will be ignored because `actor_name` is provided in `join_trial")
+                logger.warning(f"`actor_class` will be ignored because `actor_name` is provided in `join_trial")
 
         elif actor_class is not None:
             requested_class = actor_class
@@ -304,8 +304,8 @@ class Context:
             raise CogmentError(f"Internal failure: Actor class [{requested_class}] requested, received: {init_data}")
 
         if impl_name is not None and init_data.impl_name and init_data.impl_name != impl_name:
-            logging.warning(f"Requested impl_name [{impl_name}] does not match trial impl_name "
-                            f"[{init_data.impl_name}]: Requested impl_name will be used.")
+            logger.warning(f"Requested impl_name [{impl_name}] does not match trial impl_name "
+                           f"[{init_data.impl_name}]: Requested impl_name will be used.")
             init_data.impl_name = impl_name
 
         actor_impl = get_actor_impl(trial_id, self._actor_impls, init_data)

@@ -18,10 +18,20 @@ import cogment.api.common_pb2 as common_api
 
 from cogment.version import __version__
 
+import logging
+import types
 
-# logging level for "trace" (i.e. repeated output in critical path) since Python logging does not have a TRACE level
-# Use: logging.log(TRACE, f"This is a trace message for {my_pgm}")
-TRACE = 5
+
+def _logger_trace(self, msg, *args, **kwargs):
+    """Simplified trace log output method"""
+    self.log(self.TRACE, msg, *args, **kwargs)
+
+
+logger = logging.getLogger("cogment.sdk")
+setattr(logger, "TRACE", 5)
+setattr(logger, "trace", types.MethodType(_logger_trace, logger))
+logger.setLevel(logging.INFO)
+
 
 # Timeout (in seconds) for the init data to come from the Orchestrator before we consider a failure.
 INIT_TIMEOUT = 30

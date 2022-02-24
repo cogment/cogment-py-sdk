@@ -18,8 +18,8 @@ import cogment.api.hooks_pb2 as hooks_api
 from cogment.trial import Trial
 from cogment.prehook import PrehookSession
 from cogment.errors import CogmentError
+from cogment.utils import logger
 
-import logging
 import asyncio
 
 
@@ -30,7 +30,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
         self.__impl = impl
         self.__cog_settings = cog_settings
 
-        logging.info("Pre-trial hook service started")
+        logger.info("Pre-trial hook service started")
 
     # Not all attributes can be tested for presence (i.e. non-optional, non-message ones)
     def _decode(self, session, proto_params):
@@ -130,7 +130,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
 
         try:
             metadata = dict(context.invocation_metadata())
-            logging.debug(f"Received metadata: [{metadata}]")
+            logger.debug(f"Received metadata: [{metadata}]")
             trial_id = metadata["trial-id"]
             user_id = metadata["user-id"]
 
@@ -143,11 +143,11 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
                 session.validate()
 
             except asyncio.CancelledError as exc:
-                logging.debug(f"Pre-trial hook implementation coroutine cancelled: [{exc}]")
+                logger.debug(f"Pre-trial hook implementation coroutine cancelled: [{exc}]")
                 return False
 
             except Exception:
-                logging.exception(f"An exception occured in user prehook implementation:")
+                logger.exception(f"An exception occured in user prehook implementation:")
                 raise
 
             reply = hooks_api.PreTrialParams()
@@ -156,5 +156,5 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
             return reply
 
         except Exception:
-            logging.exception("OnPreTrial")
+            logger.exception("OnPreTrial")
             raise

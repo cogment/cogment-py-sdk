@@ -16,9 +16,9 @@ import cogment.api.environment_pb2 as env_api
 
 from cogment.session import Session, _Ending, _EndingAck
 from cogment.errors import CogmentError
+from cogment.utils import logger
 
 import time
-import logging
 
 
 class EnvironmentSession(Session):
@@ -37,8 +37,8 @@ class EnvironmentSession(Session):
 
     def send_message(self, payload, to, to_environment=None):
         if to_environment is not None:
-            logging.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
-                            "No message will be sent back to the environment!")
+            logger.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                           "No message will be sent back to the environment!")
         self._send_message(payload, to)
 
     def start(self, observations=None, auto_done_sending=True):
@@ -55,15 +55,15 @@ class EnvironmentSession(Session):
             if self._trial.ending and self._auto_ack:
                 self._post_outgoing_data(_EndingAck())
         else:
-            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
-                            f"Cannot send observation because the trial has ended.")
+            logger.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
+                           f"Cannot send observation because the trial has ended.")
 
     def end(self, final_observations):
         if self._trial.ended:
-            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
-                            f"end request ignored because the trial has already ended.")
+            logger.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] "
+                           f"end request ignored because the trial has already ended.")
         elif self._trial.ending_ack:
-            logging.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] cannot end more than once")
+            logger.warning(f"Trial [{self._trial.id}] - Environment [{self.name}] cannot end more than once")
         else:
             if not self._trial.ending:
                 self._post_outgoing_data(_Ending())

@@ -19,13 +19,12 @@ from prometheus_client import Summary, Counter, Gauge
 import cogment.api.agent_pb2_grpc as agent_grpc_api
 import cogment.api.common_pb2 as common_api
 
-from cogment.utils import list_versions, TRACE, INIT_TIMEOUT
+from cogment.utils import list_versions, logger, INIT_TIMEOUT
 from cogment.trial import Trial
 from cogment.actor import ActorSession
 from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _InitAck, _EndingAck
 from cogment.errors import CogmentError
 
-import logging
 import asyncio
 
 
@@ -99,8 +98,8 @@ def get_actor_impl(trial_id, actor_impls, init_data):
             raise CogmentError(f"Trial [{trial_id}] - actor [{init_data.actor_name}] class [{init_data.actor_class}] "
                                f"is not compatible with with any registered actor")
 
-        logging.info(f"Trial [{trial_id}] - "
-                     f"impl [{init_data.impl_name}] arbitrarily chosen for actor [{init_data.actor_name}]")
+        logger.info(f"Trial [{trial_id}] - "
+                    f"impl [{init_data.impl_name}] arbitrarily chosen for actor [{init_data.actor_name}]")
 
     return actor_impl
 
@@ -112,7 +111,7 @@ def _process_normal_data(data, session):
         recv_event = RecvEvent(EventType.ACTIVE)
 
     if data.HasField("observation"):
-        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received an observation")
+        logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] received an observation")
 
         if session._trial.ending and session._auto_ack:
             session._post_outgoing_data(_EndingAck())
@@ -126,7 +125,7 @@ def _process_normal_data(data, session):
         session._post_incoming_event(recv_event)
 
     elif data.HasField("reward"):
-        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
+        logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
 
         recv_event.rewards = [RecvReward(data.reward)]
         session._post_incoming_event(recv_event)
@@ -139,7 +138,7 @@ def _process_normal_data(data, session):
             session._prometheus_data.rewards_received.labels(session.name, session.impl_name).inc(value)
 
     elif data.HasField("message"):
-        logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
+        logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
         session._post_incoming_event(recv_event)
@@ -147,12 +146,12 @@ def _process_normal_data(data, session):
         session._prometheus_data.messages_received.labels(session.name, session.impl_name).inc()
 
     elif data.HasField("details"):
-        logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                        f"received unexpected detail data [{data.details}]")
+        logger.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                       f"received unexpected detail data [{data.details}]")
 
     else:
-        logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                      f"received unexpected data [{data.WhichOneof('data')}]")
+        logger.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                     f"received unexpected data [{data.WhichOneof('data')}]")
 
 
 async def _process_incoming(context, session):
@@ -160,61 +159,61 @@ async def _process_incoming(context, session):
         while True:
             data = await context.read()
             if data == grpc.aio.EOF:
-                logging.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                             f"The orchestrator disconnected the actor")
+                logger.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                            f"The orchestrator disconnected the actor")
                 break
-            logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                               f"Received data [{data.state}] [{data.WhichOneof('data')}]")
+            logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                         f"Received data [{data.state}] [{data.WhichOneof('data')}]")
 
             if data.state == common_api.CommunicationState.NORMAL:
                 _process_normal_data(data, session)
 
             elif data.state == common_api.CommunicationState.HEARTBEAT:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                   f"received 'HEARTBEAT' and responding in kind")
+                logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                             f"received 'HEARTBEAT' and responding in kind")
                 reply = common_api.ActorRunTrialOutput()
                 reply.state = data.state
                 await context.write(reply)
 
             elif data.state == common_api.CommunicationState.LAST:
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] received 'LAST' state")
+                logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] received 'LAST' state")
                 session._trial.ending = True
 
             elif data.state == common_api.CommunicationState.LAST_ACK:
-                logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                              f"received an unexpected 'LAST_ACK'")
+                logger.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                             f"received an unexpected 'LAST_ACK'")
                 # TODO: Should we `return` or raise instead of continuing?
 
             elif data.state == common_api.CommunicationState.END:
                 if session._trial.ending:
                     if data.HasField("details"):
-                        logging.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                                     f"Trial ended with explanation [{data.details}]")
+                        logger.info(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                                    f"Trial ended with explanation [{data.details}]")
                     else:
-                        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
+                        logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
                     session._post_incoming_event(RecvEvent(EventType.FINAL))
                 else:
                     if data.HasField("details"):
                         details = data.details
                     else:
                         details = ""
-                    logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                                    f"Trial ended forcefully [{details}]")
+                    logger.warning(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                                   f"Trial ended forcefully [{details}]")
 
                 session._trial.ended = True
                 session._exit_queues()
                 break
 
             else:
-                logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                              f"received an invalid state [{data.state}]")
+                logger.error(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                             f"received an invalid state [{data.state}]")
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] coroutine cancelled: [{exc}]")
+        logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] coroutine cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("_process_incoming")
+        logger.exception("_process_incoming")
         raise
 
 
@@ -226,40 +225,40 @@ async def _process_outgoing(context, session):
 
             # Using strict comparison: there is no reason to receive derived classes here
             if type(data) == common_api.Action:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending action")
+                logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending action")
                 package.action.CopyFrom(data)
 
             elif type(data) == common_api.Reward:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending reward")
+                logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending reward")
                 package.reward.CopyFrom(data)
 
             elif type(data) == common_api.Message:
-                logging.log(TRACE, f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending message")
+                logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending message")
                 package.message.CopyFrom(data)
 
             elif type(data) == _InitAck:
                 package.init_output.SetInParent()
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending Init Data")
+                logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending Init Data")
 
             elif type(data) == _EndingAck:
                 package.state = common_api.CommunicationState.LAST_ACK
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending 'LAST_ACK'")
+                logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Sending 'LAST_ACK'")
                 await context.write(package)
                 break
 
             else:
-                logging.error(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
-                              f"Unknown data type to send [{type(data)}]")
+                logger.error(f"Trial [{session._trial.id}] - Actor [{session.name}]: "
+                             f"Unknown data type to send [{type(data)}]")
                 continue
 
             await context.write(package)
 
     except asyncio.CancelledError as exc:
-        logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] process outgoing cancelled: [{exc}]")
+        logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] process outgoing cancelled: [{exc}]")
         raise
 
     except Exception:
-        logging.exception("_process_outgoing")
+        logger.exception("_process_outgoing")
         raise
 
 
@@ -272,35 +271,35 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
         self._cog_settings = cog_settings
         self._prometheus_data = _PrometheusData(prometheus_registry)
 
-        logging.info("Agent Service started")
+        logger.info("Agent Service started")
 
     async def _get_init_data(self, context, trial_id):
-        logging.debug(f"Trial [{trial_id}] - Processing init for service actor")
+        logger.debug(f"Trial [{trial_id}] - Processing init for service actor")
 
         last_received = False
         while True:
             request = await context.read()
-            logging.debug(f"Trial [{trial_id}] - Read initial request: {request}")
+            logger.debug(f"Trial [{trial_id}] - Read initial request: {request}")
 
             if request == grpc.aio.EOF:
-                logging.info(f"Trial [{trial_id}] - Orchestrator disconnected service actor before start")
+                logger.info(f"Trial [{trial_id}] - Orchestrator disconnected service actor before start")
                 return None
 
             if request.state == common_api.CommunicationState.NORMAL:
                 if last_received:
                     error_str = (f"Trial [{trial_id}] - Received init data after 'LAST'")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
                 if request.HasField("init_input"):
                     return request.init_input
                 elif reply.HasField("details"):
-                    logging.warning(f"Trial [{trial_id}] - Received unexpected detail data "
-                                    f"[{reply.details}] before start")
+                    logger.warning(f"Trial [{trial_id}] - Received unexpected detail data "
+                                   f"[{reply.details}] before start")
                 else:
                     data_set = request.WhichOneof("data")
                     error_str = (f"Trial [{trial_id}] - Received unexpected init data [{data_set}]")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
             elif request.state == common_api.CommunicationState.HEARTBEAT:
@@ -312,10 +311,10 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
                 if last_received:
                     error_str = (f"Trial [{trial_id}] - Before start, received unexpected 'LAST' "
                                     f"when waiting for 'END'")
-                    logging.error(error_str)
+                    logger.error(error_str)
                     await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
-                logging.debug(f"Trial [{trial_id}] - Ending before init data")
+                logger.debug(f"Trial [{trial_id}] - Ending before init data")
                 reply = common_api.ActorRunTrialOutput()
                 reply.state = common_api.CommunicationState.LAST_ACK
                 await context.write(reply)
@@ -323,20 +322,20 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
 
             elif request.state == common_api.CommunicationState.LAST_ACK:
                 error_str = (f"Trial [{trial_id}] - Before start, received an unexpected 'LAST_ACK'")
-                logging.error(error_str)
+                logger.error(error_str)
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
             elif request.state == common_api.CommunicationState.END:
                 if request.HasField("details"):
-                    logging.info(f"Trial [{trial_id}] - Ended before start [{request.details}]")
+                    logger.info(f"Trial [{trial_id}] - Ended before start [{request.details}]")
                 else:
-                    logging.debug(f"Trial [{trial_id}] - Ended before start")
+                    logger.debug(f"Trial [{trial_id}] - Ended before start")
                 return None
 
             else:
                 error_str = (f"Trial [{trial_id}] - Before start, received an invalid state "
                                 f"[{request.state}] [{request}]")
-                logging.error(error_str)
+                logger.error(error_str)
                 await context.abort(grpc.StatusCode.UNKNOWN, error_str)
 
     def _start_session(self, trial_id, init_input):
@@ -368,7 +367,7 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)
 
-        logging.debug(f"Trial [{trial_id}] - impl [{init_input.impl_name}] for service actor [{actor_name}] started")
+        logger.debug(f"Trial [{trial_id}] - impl [{init_input.impl_name}] for service actor [{actor_name}] started")
 
         return new_session
 
@@ -382,28 +381,28 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
             user_task = session._start_user_task()
 
             with self._prometheus_data.decide_request_time.labels(session.name, session.impl_name).time():
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] session started")
+                logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] session started")
                 normal_return = await user_task
 
             if normal_return:
                 if not session._last_event_delivered:
-                    logging.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                    f"user implementation returned before required")
+                    logger.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                                   f"user implementation returned before required")
                 else:
-                    logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                                f"user implementation returned")
+                    logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                                 f"user implementation returned")
             else:
-                logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                            f"user implementation was cancelled")
+                logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                             f"user implementation was cancelled")
 
             self._prometheus_data.actors_ended.labels(session.impl_name).inc()
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
-                          f"user implementation was cancelled")
+            logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}] "
+                         f"user implementation was cancelled")
 
         except Exception:
-            logging.exception("run_session")
+            logger.exception("run_session")
             raise
 
         finally:
@@ -415,7 +414,7 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
     # Override
     async def RunTrial(self, request_iterator, context):
         if len(self._impls) == 0:
-            logging.warning("No implementation registered on trial run request")
+            logger.warning("No implementation registered on trial run request")
             raise CogmentError("No implementation registered")
 
         metadata = dict(context.invocation_metadata())
@@ -434,13 +433,13 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
             self._sessions.remove(key)
 
         except asyncio.TimeoutError:
-            logging.error("Failed to receive init data from Orchestrator")
+            logger.error("Failed to receive init data from Orchestrator")
 
         except grpc._cython.cygrpc.AbortError:  # Exception from context.abort()
             pass
 
         except Exception:
-            logging.exception("RunTrial")
+            logger.exception("RunTrial")
             raise
 
     # Override
@@ -449,5 +448,5 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
             return list_versions()
 
         except Exception:
-            logging.exception("Version")
+            logger.exception("Version")
             raise

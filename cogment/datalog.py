@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cogment.utils import logger
+
 import asyncio
-import logging
 
 
 class DatalogSession():
@@ -51,14 +52,14 @@ class DatalogSession():
                     raise
 
                 except asyncio.CancelledError as exc:
-                    logging.debug(f"Datalog coroutine cancelled while waiting for a sample: [{exc}]")
+                    logger.debug(f"Datalog coroutine cancelled while waiting for a sample: [{exc}]")
                     break
 
     def _new_sample(self, sample):
         if self.__queue is not None:
             self.__queue.put_nowait(sample)
         else:
-            logging.warning("Datalog received a sample that it was unable to handle.")
+            logger.warning("Datalog received a sample that it was unable to handle.")
 
     async def _run(self):
         try:
@@ -66,11 +67,11 @@ class DatalogSession():
             return True
 
         except asyncio.CancelledError as exc:
-            logging.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
+            logger.debug(f"Datalog implementation coroutine cancelled: [{exc}]")
             return False
 
         except Exception:
-            logging.exception(f"An exception occured in user datalog implementation:")
+            logger.exception(f"An exception occured in user datalog implementation:")
             raise
 
     def _start_user_task(self):

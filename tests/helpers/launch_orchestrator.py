@@ -18,8 +18,12 @@ import tempfile
 import os
 import logging
 
+logger = logging.getLogger("cogment.unit-tests.launcher")
+
+
 COGMENT_ORCHESTRATOR_IMAGE = os.environ.get("COGMENT_ORCHESTRATOR_IMAGE")
 COGMENT_ORCHESTRATOR = os.environ.get("COGMENT_ORCHESTRATOR")
+
 
 def launch_orchestrator(
     app_directory,
@@ -58,7 +62,7 @@ def launch_orchestrator(
         os.mkfifo(status_file)
 
     if docker_image:
-        logging.info(f"Launching Orchestrator Docker image [{docker_image}]")
+        logger.info(f"Launching Orchestrator Docker image [{docker_image}]")
         cwd = None
         launch_orchestator_args = [
             "docker", "run",
@@ -75,7 +79,7 @@ def launch_orchestrator(
         launch_orchestator_args.extend([docker_image, "--status_file=/status/cogment_orchestrator_status"])
 
     else:
-        logging.info(f"Launching Orchestrator binary [{binary}]")
+        logger.info(f"Launching Orchestrator binary [{binary}]")
         cwd = app_directory
         launch_orchestator_args = [binary, f"--status_file={status_file}"]
 
@@ -94,9 +98,9 @@ def launch_orchestrator(
         launch_orchestator_args.extend([f"--trust_chain={trust_chain}"])
 
     process = subprocess.Popen(args=launch_orchestator_args, cwd=cwd)
-    logging.debug(f"Started orchestrator with: {process.args}")
+    logger.debug(f"Started orchestrator with: {process.args}")
 
-    logging.info("Orchestrator starting")
+    logger.info("Orchestrator starting")
     status = None
     if docker_image:
         while(True):
@@ -106,7 +110,7 @@ def launch_orchestrator(
     else:
         status = open(status_file, "r")
         assert(status.read(1) == "I")
-    logging.info("Orchestrator initialized")
+    logger.info("Orchestrator initialized")
     if docker_image:
         while(True):
             with open(status_file, "r") as status:
@@ -114,10 +118,10 @@ def launch_orchestrator(
                     break
     else:
         assert(status.read(1) == "R")
-    logging.info("Orchestrator ready")
+    logger.info("Orchestrator ready")
 
     def terminate_orchestrator():
-        logging.info("Orchestrator terminating")
+        logger.info("Orchestrator terminating")
         nonlocal status
         process.terminate()
         try:
@@ -125,15 +129,15 @@ def launch_orchestrator(
             if docker_image:
                 with open(status_file, "r") as status:
                     if status.read(3) != "IRT":
-                        logging.warning("Orchestrator failed to update status file.")
+                        logger.warning("Orchestrator failed to update status file.")
             else:
                 if (status.read(1) != "T"):
-                    logging.warning("Orchestrator failed to update status file.")
+                    logger.warning("Orchestrator failed to update status file.")
                 status.close()
-            logging.info("Orchestrator terminated")
+            logger.info("Orchestrator terminated")
         except subprocess.TimeoutExpired:
             process.kill()
-            logging.warning("Orchestrator failed to terminate properly (it was forcibly killed).")
+            logger.warning("Orchestrator failed to terminate properly (it was forcibly killed).")
         # Get rid of the status file
         os.remove(status_file)
         os.rmdir(status_dir)

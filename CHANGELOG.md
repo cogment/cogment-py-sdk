@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+- Update of gRPC version to (exactly) 1.42
+
 ## v2.0.2 - 2022-01-03
 
 ## v2.0.1 - 2022-01-03
