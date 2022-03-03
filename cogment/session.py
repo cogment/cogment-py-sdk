@@ -188,8 +188,8 @@ class Session(ABC):
         self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
 
     def __str__(self):
-        result = f"Session: trial id = {self.trial.id}, name = {self.name}, impl_name = {self.impl_name}"
-        result += f"config = {self.config}"
+        result = f"Session: name = {self.name}, impl_name = {self.impl_name}, config = {self.config}"
+        result += f", trial = {self._trial}"
         return result
 
     def _start(self, auto_done_sending):

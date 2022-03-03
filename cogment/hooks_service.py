@@ -17,6 +17,7 @@ import cogment.api.hooks_pb2 as hooks_api
 
 from cogment.trial import Trial
 from cogment.prehook import PrehookSession
+from cogment.parameters import TrialParameters
 from cogment.errors import CogmentError
 from cogment.utils import logger
 
@@ -27,15 +28,15 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
     """Internal pre-trial hook servicer class."""
 
     def __init__(self, impl, cog_settings, prometheus_registry=None):
-        self.__impl = impl
-        self.__cog_settings = cog_settings
+        self._impl = impl
+        self._cog_settings = cog_settings
 
         logger.info("Pre-trial hook service started")
 
     # Not all attributes can be tested for presence (i.e. non-optional, non-message ones)
     def _decode(self, session, proto_params):
         if proto_params.HasField("trial_config"):
-            session.trial_config = self.__cog_settings.trial.config_type()
+            session.trial_config = self._cog_settings.trial.config_type()
             session.trial_config.ParseFromString(proto_params.trial_config.content)
         else:
             session.trial_config = None
@@ -52,7 +53,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
 
         if proto_params.HasField("environment"):
             if proto_params.environment.HasField("config"):
-                session.environment_config = self.__cog_settings.environment.config_type()
+                session.environment_config = self._cog_settings.environment.config_type()
                 session.environment_config.ParseFromString(proto_params.environment.config.content)
             else:
                 session.environment_config = None
@@ -68,7 +69,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
         session.actors = []
         for actor in proto_params.actors:
             if actor.HasField("config"):
-                a_c = self.__cog_settings.actor_classes.__getattribute__(actor.actor_class)
+                a_c = self._cog_settings.actor_classes.__getattribute__(actor.actor_class)
                 actor_config = a_c.config_type()
                 actor_config.ParseFromString(actor.config.content)
             else:
@@ -125,7 +126,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
 
     # Override
     async def OnPreTrial(self, request, context):
-        if not self.__impl:
+        if not self._impl:
             raise CogmentError("No implementation registered")
 
         try:
@@ -134,12 +135,16 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
             trial_id = metadata["trial-id"]
             user_id = metadata["user-id"]
 
-            trial = Trial(trial_id, [], self.__cog_settings)
+            trial = Trial(trial_id, [], self._cog_settings)
 
-            session = PrehookSession(trial, user_id)
+            trial_parameters = TrialParameters(None)
+            trial_parameters._set(self._cog_settings, request.params)
+
+            session = PrehookSession(trial, user_id, trial_parameters)
             self._decode(session, request.params)
+
             try:
-                await self.__impl(session)
+                await self._impl(session)
                 session.validate()
 
             except asyncio.CancelledError as exc:
@@ -151,7 +156,12 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
                 raise
 
             reply = hooks_api.PreTrialParams()
-            self._recode(reply.params, session)
+
+            if session._trial_parameters_use:
+                reply.params.CopyFrom(session._trial_parameters._raw_params)
+            else:
+                logger.warning(f"Use of pre-trial hook session in a deprecated way")
+                self._recode(reply.params, session)
 
             return reply
 

@@ -39,3 +39,10 @@ class Trial:
             actor_class = self.cog_settings.actor_classes[actor.actor_class]
             new_actor = self.Actor(name=actor.name, actor_class=actor_class)
             self.actors.append(new_actor)
+
+    def __str__(self):
+        result = f"Trial: id = {self.id}, tick id = {self.tick_id}, ended = {self.ended}"
+        result += f", actors = "
+        for actor in self.actors:
+            result += f"{{name = {actor.name}, class = {actor.actor_class.name}}},"
+        return result

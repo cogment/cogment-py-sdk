@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cogment"
-version = "2.0.3"
+version = "2.1.0"
 description = "Cogment python SDK"
 authors = ["Artificial Intelligence Redefined <dev+cogment@ai-r.com>"]
 license = "Apache-2.0"
@@ -22,8 +22,8 @@ exclude = [
 
 [tool.poetry.dependencies]
 python = ">=3.7, <3.10"
-grpcio = "^1.42"
-grpcio-reflection = "^1.42"
+grpcio = ">=1.42, <1.43"
+grpcio-reflection = ">=1.42, <1.43"
 protobuf = "^3.7"
 prometheus-client = "^0.8"
 PyYAML = { version = "^5.3.1", optional = true }
@@ -34,7 +34,7 @@ click = { version = "^8.0.3", optional = true }
 generate = ["PyYAML", "grpcio-tools", "click"]
 
 [tool.poetry.dev-dependencies]
-grpcio-tools = "1.42"
+grpcio-tools = ">=1.42, <1.43"
 taskipy = "^1.4.0"
 pycodestyle = "^2.6.0"
 mypy = "^0.790"

@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
 - Update of gRPC version to (exactly) 1.42
+- Deprecate `cogment.LogParams`
+- Deprecate current way to use `PrehookSession`
+
+### Added
+
+- `cogment.TrialParameters` and `cogment.ActorParameters`
+- Add ability to provide parameters on trial start call
 
 ## v2.0.2 - 2022-01-03
 
@@ -16,6 +25,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## v2.0.0 - 2022-01-03
 
 ## v2.0.0-rc3 - 2021-12-16
+
+### Changed
 
 - cogment.generate now requires semantic arguments
 

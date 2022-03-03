@@ -79,22 +79,29 @@ class Controller:
         ]
         return result
 
-    async def start_trial(self, trial_config=None, trial_id_requested=None):
+    async def start_trial(self, trial_config=None, trial_id_requested=None, trial_params=None):
         req = orchestrator_api.TrialStartRequest()
         req.user_id = self._user_id
+
         if trial_config is not None:
+            if trial_params is not None:
+                raise CogmentError(f"Cannot provide both a start config and start parameters")
             req.config.content = trial_config.SerializeToString()
+        elif trial_params is not None:
+            req.params.CopyFrom(trial_params._raw_params)
+            if trial_params._raw_params.HasField("trial_config"):
+                logger.warning(f"Trial config from trial parameters will be ignored")
+
         if trial_id_requested is not None:
             req.trial_id_requested = trial_id_requested
 
         logger.debug(f"Requesting start of a trial with [{req}] ...")
         rep = await self._lifecycle_stub.StartTrial(req)
 
-        # For compatibility with Cogment 1.0, we can't return an empty string.
-        if not rep.trial_id:
-            raise CogmentError(f"Requested trial id [{trial_id_requested}] could not be used")
-
-        logger.debug(f"Trial [{rep.trial_id}] started")
+        if rep.trial_id:
+            logger.debug(f"Trial [{rep.trial_id}] started")
+        else:
+            logger.warning(f"Requested trial id [{trial_id_requested}] could not be used")
 
         return rep.trial_id
 
