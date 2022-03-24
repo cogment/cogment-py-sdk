@@ -12,11 +12,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Update of gRPC version to (exactly) 1.42
 - Deprecate `cogment.LogParams`
 - Deprecate current way to use `PrehookSession`
+- Deprecate Session 'event_loop', renamed to 'all_events'
+- Deprecate DatalogSession 'get_all_samples' renamed 'all_samples'
+- Standardize string ouput of classes
 
 ### Added
 
 - `cogment.TrialParameters` and `cogment.ActorParameters`
 - Add ability to provide parameters on trial start call
+- Datastore SDK
 
 ## v2.0.2 - 2022-01-03
 

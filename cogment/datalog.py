@@ -149,13 +149,32 @@ class DatalogSession:
         self._queue = None
 
     def __str__(self):
-        result = f"DatalogSession: trial_id = {self.trial_id}, trial_parameters = {self.trial_parameters}"
+        result = f"DatalogSession: trial_id = {self.trial_id}, user_id = {self.user_id}"
+        result += f", trial_parameters = {self.trial_parameters}"
         return result
 
     def start(self):
         self._queue = asyncio.Queue()
 
+    async def all_samples(self):
+        if self._queue is not None:
+            while True:
+                try:
+                    sample = await self._queue.get()
+                    if sample is None:
+                        break
+                    keep_looping = yield sample
+                    self._queue.task_done()
+                    if keep_looping is not None and not bool(keep_looping):
+                        break
+
+                except asyncio.CancelledError as exc:
+                    logger.debug(f"Datalog coroutine cancelled while waiting for a sample: [{exc}]")
+                    break
+
     async def get_all_samples(self):
+        logger.warning("'get_all_samples' is deprecated. Use 'all_samples' instead.")
+
         if self._queue is not None:
             while True:
                 try:

@@ -41,7 +41,7 @@ class Trial:
             self.actors.append(new_actor)
 
     def __str__(self):
-        result = f"Trial: id = {self.id}, tick id = {self.tick_id}, ended = {self.ended}"
+        result = f"Trial: id = {self.id}, tick_id = {self.tick_id}, ended = {self.ended}"
         result += f", actors = "
         for actor in self.actors:
             result += f"{{name = {actor.name}, class = {actor.actor_class.name}}},"

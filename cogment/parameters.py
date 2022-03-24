@@ -29,6 +29,8 @@ class ActorParameters:
             self._raw_params = common_api.ActorParams()
             self._raw_params.actor_class = class_name
             for name, value in kwargs.items():
+                if name[0] == "_" or name not in dir(self):
+                    raise CogmentError(f"Unknown attribute [{name}]")
                 setattr(self, name, value)
 
     def _set(self, raw_params):
@@ -199,7 +201,11 @@ class TrialParameters:
             self._cog_settings = cog_settings
             self._raw_params = common_api.TrialParams()
             self._actors = _ActorsList(cog_settings, self._raw_params)
+
+            # Provide an easy way for users to set parameter attributes on construction
             for name, value in kwargs.items():
+                if name[0] == "_" or name not in dir(self):
+                    raise CogmentError(f"Unknown attribute [{name}]")
                 setattr(self, name, value)
 
     def _set(self, cog_settings, raw_params):

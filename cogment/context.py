@@ -23,12 +23,13 @@ import cogment.api.agent_pb2_grpc as agent_grpc_api
 import cogment.api.environment_pb2_grpc as env_grpc_api
 import cogment.api.hooks_pb2_grpc as hooks_grpc_api
 import cogment.api.datalog_pb2_grpc as datalog_grpc_api
-import cogment.api.agent_pb2 as agent_api
+import cogment.api.trial_datastore_pb2_grpc as datastore_grpc_api
 
 from cogment.actor import ActorSession
 from cogment.environment import EnvironmentSession
 from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
+from cogment.datastore import Datastore
 from cogment.control import Controller
 from cogment.errors import CogmentError
 from cogment.agent_service import AgentServicer, get_actor_impl
@@ -263,6 +264,11 @@ class Context:
         channel = _make_client_channel(endpoint)
         stub = orchestrator_grpc_api.TrialLifecycleSPStub(channel)
         return Controller(stub, self._user_id)
+
+    def get_datastore(self, endpoint: Endpoint):
+        channel = _make_client_channel(endpoint)
+        stub = datastore_grpc_api.TrialDatastoreSPStub(channel)
+        return Datastore(stub, self._cog_settings)
 
     async def join_trial(self, trial_id, endpoint: Endpoint, impl_name=None, actor_name=None, actor_class=None):
         requested_class = None

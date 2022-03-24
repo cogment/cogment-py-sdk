@@ -47,7 +47,7 @@ class ActorInfo:
         self.actor_class_name = class_name
 
     def __str__(self):
-        result = f"ActorInfo: actor name = {self.actor_name}, actor class name = {self.actor_class_name}"
+        result = f"ActorInfo: actor_name = {self.actor_name}, actor_class_name = {self.actor_class_name}"
         return result
 
 
@@ -78,7 +78,7 @@ class RecvAction:
 
     def __str__(self):
         result = f"RecvAction: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
-        result += f", actor index = {self.actor_index}, action = {self.action}"
+        result += f", actor_index = {self.actor_index}, action = {self.action}"
         return result
 
 
@@ -93,7 +93,7 @@ class RecvRewardSource:
 
     def __str__(self):
         result = f"RecvRewardSource: value = {self.value}, confidence = {self.confidence}"
-        result += f", sender name = {self.sender_name}, user data = {self.user_data}"
+        result += f", sender_name = {self.sender_name}, user_data = {self.user_data}"
         return result
 
 
@@ -116,7 +116,7 @@ class RecvReward:
             yield RecvRewardSource(src)
 
     def __str__(self):
-        result = f"RecvReward: tick_id = {self.tick_id}, receiver name = {self.receiver_name}"
+        result = f"RecvReward: tick_id = {self.tick_id}, receiver_name = {self.receiver_name}"
         result += f", value = {self.value}, sources = {self._sources}"
         return result
 
@@ -131,7 +131,7 @@ class RecvMessage:
         self.payload = message.payload
 
     def __str__(self):
-        result = f"RecvMessage: tick_id = {self.tick_id}, receiver name = {self.receiver_name}"
+        result = f"RecvMessage: tick_id = {self.tick_id}, receiver_name = {self.receiver_name}"
         result += f", sender_name = {self.sender_name}, payload = {self.payload}"
         return result
 
@@ -302,7 +302,45 @@ class Session(ABC):
         else:
             self._post_outgoing_data(_EndingAck())
 
+    async def all_events(self):
+        if not self._started:
+            logger.warning(f"Cannot retrieve events until [{self.name}] is started.")
+            return
+        if self._trial.ended:
+            logger.info(f"No more events for [{self.name}] because the trial has ended.")
+            return
+
+        logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}] starting event loop")
+
+        loop_active = not self._last_event_delivered
+        while loop_active:
+            try:
+                event = await self._incoming_event_queue.get()
+                if event is None:
+                    logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
+                                 f"Forcefull event loop exit")
+                    self._last_event_delivered = True
+                    break
+
+            except asyncio.CancelledError as exc:
+                logger.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
+                break
+
+            self._last_event_delivered = (event.type == EventType.FINAL)
+            keep_looping = yield event
+            self._incoming_event_queue.task_done()
+            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
+            if not loop_active:
+                if self._last_event_delivered:
+                    logger.debug(f"Last event delivered, exiting [{self.name}] event loop")
+                else:
+                    logger.debug(f"End of event loop for [{self.name}] requested by user")
+
+        logger.debug(f"Exiting [{self.name}] event loop generator")
+
     async def event_loop(self):
+        logger.warning("`event_loop` is deprecated. Use `all_events` instead.")
+
         if not self._started:
             logger.warning(f"Event loop is not enabled until the [{self.name}] is started.")
             return

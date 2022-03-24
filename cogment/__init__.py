@@ -30,6 +30,7 @@ from cogment.session import EventType
 from cogment.control import TrialState
 from cogment.datalog_service import LogParams, LogSample
 from cogment.parameters import ActorParameters, TrialParameters
+from cogment.datastore import DatastoreFields
 
 from cogment.errors import CogmentError
 
