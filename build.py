@@ -177,7 +177,7 @@ def build(setup_kwargs):
             "package_data": {
                 'cogment.api': ['*.proto', '*.py'],
             },
-            "setup_requires": ["grpcio-tools>=1.19"],
+            "setup_requires": ["grpcio-tools>=1.42,<1.45"],
             "cmdclass": {
                 'retrieve_cogment_api': RetrieveCogmentApi,
                 'generate_version_dot_py': GenerateVersionDotPy,

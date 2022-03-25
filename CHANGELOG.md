@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-- Update of gRPC version to (exactly) 1.42
+- Update of gRPC version to (exactly) 1.44
 - Deprecate `cogment.LogParams`
 - Deprecate current way to use `PrehookSession`
 - Deprecate Session 'event_loop', renamed to 'all_events'
