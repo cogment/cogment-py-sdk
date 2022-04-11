@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.1.1 - 2022-04-11
+
 ## Fixed
 
 - Fixed a typo in the TrialParameter "environemnt_name" to "environment_name"
