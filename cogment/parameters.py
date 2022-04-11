@@ -350,12 +350,12 @@ class TrialParameters:
             raise CogmentError(f"Wrong type [{type(val)}]")
 
     @property
-    def environemnt_name(self):
+    def environment_name(self):
         """Name of the environment"""
         return self._raw_params.environment.name
 
-    @environemnt_name.setter
-    def environemnt_name(self, val):
+    @environment_name.setter
+    def environment_name(self, val):
         if val is None:
             self._raw_params.environment.ClearField("name")
         elif type(val) is str:
