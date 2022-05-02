@@ -21,24 +21,22 @@ import pytest
 import mock
 
 import asyncio
-import unittest
 import urllib.request
 import logging
 
 logger = logging.getLogger("cogment.unit-tests")
 
-@pytest.fixture(scope="function")
-def unittest_case():
-    return unittest.TestCase()
-
 
 @pytest.fixture(scope="function")
-def cogment_test_setup(test_cogment_app_dir):
+def cogment_test_setup(test_cogment_app_dir, cogment_path):
     orchestrator_port = find_free_port()
     test_port = find_free_port()
     # Launch the orchestrator
     terminate_orchestrator = launch_orchestrator(
-        test_cogment_app_dir, orchestrator_port=orchestrator_port, test_port=test_port
+        test_cogment_app_dir,
+        cogment_path=cogment_path,
+        orchestrator_port=orchestrator_port,
+        test_port=test_port
     )
 
     # Execute the test

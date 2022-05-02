@@ -12,8 +12,8 @@ This module, `cogment-py-sdk`, is the Python SDK for making use of Cogment when 
 
 Make sure you have the following installed:
 
--   [Python](https://www.python.org) (any version >=3.7 should work),
--   [Poetry](https://python-poetry.org).
+- [Python](https://www.python.org) (any version >=3.7 should work),
+- [Poetry](https://python-poetry.org).
 
 Install the dependencies, including downloading and building the cogment protobuf API, by navigating to the python SDK directory and run the following
 
@@ -25,66 +25,40 @@ poetry install
 
 The version of the used cogment protobuf API is defined in the `.cogment-api.yaml` file at the root of the repository. The following can be defined:
 
--   `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
--   `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
--   `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
+- `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
+- `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
+- `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
 
 > ⚠️ when building a docker image, `cogment_api_path` needs to exists in the docker file system. In practice it means it should be a subdirectory of the current directory.
 
 ### Tests
 
-To run them the first step is to configure the way to launch the orchestrator and the cli in a `.env` file.
-
-You can copy `.env.template` for an example of what's expected.
-
-#### Module tests
-
-These tests only rely on the sdk, no connection to an orchestrator is done.
-
-To execute the module tests, simply run
-
-```
-poetry run task test
-```
-
 #### Integration tests
 
-These tests launch and use an orchestrator they are slower but more in depth.
+These tests launch and use Cogment, by default they'll use they'll download and use the latest released version of Cogment.
 
-##### Run in a docker image
-
-This is the easiest way to run the tests.
-
-```
-./scripts/run_integration_test.sh
-```
-
-By default it will use the latest public version `cogment/orchestrator` released on [DockerHub](https://hub.docker.com/u/cogment). To use specific versions define `COGMENT_ORCHESTRATOR_IMAGE`.
-
-```
-./scripts/run_integration_test.sh
-```
-
-##### Run locally
-
-```
+```console
 poetry run task test --launch-orchestrator
 ```
 
-You'll need to define:
-- Either `COGMENT_ORCHESTRATOR_IMAGE` (as above) or `COGMENT_ORCHESTRATOR` as the path to a locally built Cogment orchestrator executable.
+The following environment can be defined to change this behavior, either directly in the terminal or in a `.env` file located at the root of the repository:
+
+```bash
+COGMENT_PATH="/path/to/cogment" # local path to cogment binary
+COGMENT_VERSION="v2.2.0" # cogment version to download
+```
 
 ### Lint
 
 Run the linter using
 
-```
+```console
 poetry run task lint
 ```
 
 ### Check conflicting dependencies with "popular" Python packages
 
-```
+```console
 ./scripts/check_dependencies_conflicts.sh
 ```
 
@@ -94,7 +68,7 @@ This script will check for conflicts required by the cogment-py-sdk and the popu
 
 Build the source package (this step will only be succesfull if `poetry install` succeeded)
 
-```
+```console
 poetry build -f sdist
 ```
 
@@ -105,8 +79,7 @@ People having mainteners rights of the repository can follow these steps to rele
 1. Run `./scripts/create_release_branch.sh MAJOR.MINOR.PATCH` to create the release branch and update the version of the package,
 2. On the release branch, check and update the changelog if needed,
 3. Update `./.cogment-api.yaml` to use the public release of the API,
-4. Update `./.gitlab-ci.yml`, `integration_test`, and `COGMENT_ORCHESTRATOR_IMAGE` to match the latest public releases of the orchestrator and cli
-5. Make sure everything's fine on CI,
-6. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
+4. Make sure everything's fine on CI,
+5. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
 
 The rest, publishing the package to PyPI and updating the mirror repositories, is handled directly by the CI.

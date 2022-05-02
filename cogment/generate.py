@@ -79,12 +79,9 @@ def actor_class_line(actor_class) -> str:
     return f"_{actor_className}_class"
 
 
-@click.command()
-@click.option("--spec", default="cogment.yaml", help="Cogment spec file")
-@click.option("--output", default="cog_settings.py", help="Output python file")
-def main(spec: str, output: str):
-
+def generate(spec: str, output: str):
     output_directory = os.path.dirname(os.path.abspath(output))
+    spec_directory = os.path.dirname(os.path.abspath(spec))
 
     # Closure with proto_file_content in it
     def actor_classes_block(actor_class) -> str:
@@ -114,7 +111,7 @@ def main(spec: str, output: str):
         proto_file_content = {}
 
         for file in proto_files:
-            with open(file, "r") as file_data:
+            with open(os.path.join(spec_directory, file), "r") as file_data:
                 proto_file_content[file] = file_data.read()
 
         os.system(f"python -m grpc_tools.protoc -I . --python_out={output_directory} {' '.join(proto_files)}")
@@ -160,6 +157,13 @@ def main(spec: str, output: str):
 
         with open(output, "w") as text_file:
             text_file.write(cog_settings_string)
+
+
+@click.command()
+@click.option("--spec", default="cogment.yaml", help="Cogment spec file")
+@click.option("--output", default="cog_settings.py", help="Output python file")
+def main(spec: str, output: str):
+    generate(spec, output)
 
 
 if __name__ == "__main__":

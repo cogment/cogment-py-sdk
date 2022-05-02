@@ -11,17 +11,6 @@ stages:
         - source $HOME/.poetry/env
         - poetry install
 
-.base_docker:
-    image: docker:19.03.1
-    services:
-        - docker:19.03.1-dind
-    variables:
-        # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
-        DOCKER_HOST: tcp://docker:2376
-        DOCKER_TLS_CERTDIR: "/certs"
-    before_script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-
 .base_gh_ssh_agent:
     before_script:
         ## _Inspired by https://docs.gitlab.com/ee/ci/ssh_keys/_
@@ -74,13 +63,10 @@ check_dependencies_conflicts:
         - ./scripts/check_dependencies_conflicts.sh
 
 integration_test:
-    extends: .base_docker
+    extends: .base_poetry
     stage: test
-    variables:
-        COGMENT_ORCHESTRATOR_IMAGE: "cogment/orchestrator:v2.0.0-rc2"
-        #COGMENT_ORCHESTRATOR_IMAGE: $CI_REGISTRY/$CI_PROJECT_NAMESPACE/cogment-orchestrator:latest
     script:
-        - ./scripts/run_integration_test.sh
+        - poetry run task test --launch-orchestrator
     artifacts:
         when: always
         reports:

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Introduce `cogment.generate.generate`, a function making the code generation previously available through `python -m cogment.generate` accessible as a function.
+
+### Changed
+
+- Integration tests are now able to install the Cogment CLI on their own.
+- Integration tests no longer uses a Docker image.
+
+## Fixed
+
+- Fix integration test junit report output.
+
 ## v2.1.1 - 2022-04-11
 
 ## Fixed

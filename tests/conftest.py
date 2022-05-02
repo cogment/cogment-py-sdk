@@ -14,18 +14,37 @@
 
 import pytest
 import sys
+import unittest
 import os
 
-from helpers.cogment_generate import cogment_generate
+import cogment
+from cogment.generate import generate
+
+from helpers.download_cogment import download_cogment
+
 
 TEST_COGMENT_APP_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "test_cogment_app"
 )
 
+DEFAULT_COGMENT_INSTALL_DIR = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    "../.cogment",
+)
+
+@pytest.fixture(scope="session")
+def cogment_path():
+    cogment_path = os.environ.get("COGMENT_PATH", None)
+    if cogment_path is None:
+        cogment_path = download_cogment(
+            desired_version=os.environ.get("COGMENT_VERSION", None),
+            output_dir=os.environ.get("COGMENT_INSTALL_DIR", DEFAULT_COGMENT_INSTALL_DIR)
+        )
+    return cogment_path
 
 @pytest.fixture(scope="session")
 def test_cogment_app_dir():
-    cogment_generate(TEST_COGMENT_APP_DIR)
+    generate(os.path.join(TEST_COGMENT_APP_DIR,"cogment.yaml"), os.path.join(TEST_COGMENT_APP_DIR, "cog_settings.py"))
     return TEST_COGMENT_APP_DIR
 
 
@@ -70,3 +89,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "use_orchestrator" in item.keywords:
             item.add_marker(skip_requiring_orchestrator)
+
+@pytest.fixture(scope="function")
+def unittest_case():
+    return unittest.TestCase()

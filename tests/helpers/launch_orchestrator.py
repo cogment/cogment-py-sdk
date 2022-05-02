@@ -20,33 +20,19 @@ import logging
 
 logger = logging.getLogger("cogment.unit-tests.launcher")
 
-
-COGMENT_ORCHESTRATOR_IMAGE = os.environ.get("COGMENT_ORCHESTRATOR_IMAGE")
-COGMENT_ORCHESTRATOR = os.environ.get("COGMENT_ORCHESTRATOR")
-
-
 def launch_orchestrator(
     app_directory,
     orchestrator_port,
     test_port,
-    docker_image=COGMENT_ORCHESTRATOR_IMAGE,
-    binary=COGMENT_ORCHESTRATOR,
+    cogment_path,
     private_key = None,
     root_cert = None,
     trust_chain = None
 ):
-    if docker_image:
-        subprocess.run(["docker", "pull",  docker_image])
-
     params_file_template = "params.yaml"
     params_file = f"params_{test_port}.yaml"
 
     test_host = f"grpc://localhost:{test_port}"
-    if docker_image and (platform.system() == "Windows" or platform.system() == "Darwin"):
-        # For platform where docker is runned in a VM, replacing localhost by the special host that loops back to the vm"s host
-        # cf. https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
-        test_host = f"grpc://host.docker.internal:{test_port}"
-
 
     with open(os.path.join(app_directory, params_file_template), "r") as cogment_yaml_in:
         with open(os.path.join(app_directory, params_file), "w") as cogment_yaml_out:
@@ -55,40 +41,20 @@ def launch_orchestrator(
 
     status_dir = tempfile.mkdtemp()
     status_file = os.path.join(status_dir, "cogment_orchestrator_status")
-    if docker_image:
-        # fifo don"t worker between the host and the running docker image let"s be less clever.
-        with open(status_file, "w"): pass
-    else:
-        os.mkfifo(status_file)
+    os.mkfifo(status_file)
 
-    if docker_image:
-        logger.info(f"Launching Orchestrator Docker image [{docker_image}]")
-        cwd = None
-        launch_orchestator_args = [
-            "docker", "run",
-            "--volume", f"{status_dir}:/status",
-            "--volume", f"{app_directory}:/app"
-        ]
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            # For platforms where docker is runned in a VM, we need to expose the orchestrator port
-            launch_orchestator_args.extend(["-p", f"{orchestrator_port}:{orchestrator_port}"])
-        else:
-            # For platforms where it's runned of the host we can use the host network
-            launch_orchestator_args.extend([ "--network", "host"])
-        
-        launch_orchestator_args.extend([docker_image, "--status_file=/status/cogment_orchestrator_status"])
-
-    else:
-        logger.info(f"Launching Orchestrator binary [{binary}]")
-        cwd = app_directory
-        launch_orchestator_args = [binary, f"--status_file={status_file}"]
-
-    launch_orchestator_args.extend([
+    logger.info(f"Launching orchestrator using [{cogment_path}]")
+    cwd = app_directory
+    launch_orchestator_args = [
+        cogment_path,
+        "services",
+        "orchestrator",
+        f"--status_file={status_file}",
         f"--lifecycle_port={orchestrator_port}",
         f"--actor_port={orchestrator_port}",
         f"--params={params_file}",
         f"--pre_trial_hooks={test_host}",
-    ])
+    ]
 
     if private_key is not None:
         launch_orchestator_args.extend([f"--private_key={private_key}"])
@@ -101,23 +67,10 @@ def launch_orchestrator(
     logger.debug(f"Started orchestrator with: {process.args}")
 
     logger.info("Orchestrator starting")
-    status = None
-    if docker_image:
-        while(True):
-            with open(status_file, "r") as status:
-                if status.read(1) == "I":
-                    break
-    else:
-        status = open(status_file, "r")
-        assert(status.read(1) == "I")
+    status = open(status_file, "r")
+    assert(status.read(1) == "I")
     logger.info("Orchestrator initialized")
-    if docker_image:
-        while(True):
-            with open(status_file, "r") as status:
-                if status.read(2) == "IR":
-                    break
-    else:
-        assert(status.read(1) == "R")
+    assert(status.read(1) == "R")
     logger.info("Orchestrator ready")
 
     def terminate_orchestrator():
@@ -126,14 +79,9 @@ def launch_orchestrator(
         process.terminate()
         try:
             process.wait(5)
-            if docker_image:
-                with open(status_file, "r") as status:
-                    if status.read(3) != "IRT":
-                        logger.warning("Orchestrator failed to update status file.")
-            else:
-                if (status.read(1) != "T"):
-                    logger.warning("Orchestrator failed to update status file.")
-                status.close()
+            if (status.read(1) != "T"):
+                logger.warning("Orchestrator failed to update status file.")
+            status.close()
             logger.info("Orchestrator terminated")
         except subprocess.TimeoutExpired:
             process.kill()
