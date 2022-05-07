@@ -22,13 +22,18 @@ from distutils import log
 from string import Template
 from os import path, makedirs
 from datetime import datetime
-from urllib.request import urlretrieve
+from urllib.request import urlretrieve, urlopen
 from shutil import unpack_archive, rmtree, copytree
 
+import json
 import sys
 
-DEFAULT_COGMENT_API_VERSION = "latest"
+COGMENT_LATEST_VERSION = "latest"
 
+def get_cogment_latest_release_version():
+    res = urlopen("https://api.github.com/repos/cogment/cogment/releases/latest")
+    parsedBody = json.load(res)
+    return parsedBody["tag_name"]
 
 class RetrieveCogmentApi(Command):
     description = 'retrieve the cogment api'
@@ -45,8 +50,6 @@ class RetrieveCogmentApi(Command):
 
         from yaml import load
 
-        cogment_api_version = DEFAULT_COGMENT_API_VERSION
-        cogment_api_path = None
         # In a lot of context the logs are not displayed,
         # putting everything in a string to be able to create a file output
         retrieve_cogment_api_logs = ""
@@ -54,8 +57,8 @@ class RetrieveCogmentApi(Command):
         fh = open(path.join(package_dir, ".cogment-api.yaml"), "r")
         cogment_api_cfg = load(fh)
 
-        cogment_api_version = cogment_api_cfg.get(
-            "cogment_api_version", DEFAULT_COGMENT_API_VERSION
+        cogment_version = cogment_api_cfg.get(
+            "cogment_version", COGMENT_LATEST_VERSION
         )
         cogment_api_path = cogment_api_cfg.get("cogment_api_path")
 
@@ -73,9 +76,10 @@ class RetrieveCogmentApi(Command):
                 f"cogment api copied from '{cogment_api_absolute_path}'\n"
             )
         else:
-            url = "https://cogment.github.io/cogment-api/{cogment_api_version}/cogment-api-{cogment_api_version}.tar.gz".format(
-                cogment_api_version=cogment_api_version
-            )
+            if cogment_version==COGMENT_LATEST_VERSION:
+                cogment_version=get_cogment_latest_release_version()
+
+            url = f"https://github.com/cogment/cogment/releases/download/{cogment_version}/cogment-api.tar.gz"
 
             # Download the archive to a temp file, will fail if the version doesn't exist
             # or if the network is down thus keeping what was alredy downloaded.
@@ -86,10 +90,10 @@ class RetrieveCogmentApi(Command):
                 rmtree(protos_dir, ignore_errors=True)
                 makedirs(protos_dir, exist_ok=True)
 
-                unpack_archive(temp_local_filename, protos_dir, "gztar")
+                unpack_archive(temp_local_filename,  path.join(package_dir, "cogment"), "gztar")
 
             retrieve_cogment_api_logs += (
-                f"cogment api version '{cogment_api_version}', downloaded from '{url}'\n"
+                f"cogment api version '{cogment_version}', downloaded from '{url}'\n"
             )
 
         log.info(retrieve_cogment_api_logs)

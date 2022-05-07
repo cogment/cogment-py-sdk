@@ -25,11 +25,9 @@ poetry install
 
 The version of the used cogment protobuf API is defined in the `.cogment-api.yaml` file at the root of the repository. The following can be defined:
 
-- `cogment_api_version: "latest"`, is the default, it retrieves the _latest_ build of the cogment-api `develop`,
-- `cogment_api_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves an official release of cogment-api.
-- `cogment_api_path: "../path/to/cogment-api"`, retrieves a local version of cogment-api found at the given path ; if set, this overrides `cogment_api_version`.
-
-> ⚠️ when building a docker image, `cogment_api_path` needs to exists in the docker file system. In practice it means it should be a subdirectory of the current directory.
+- `cogment_version: "latest"`, is the default, it retrieves the api from the _latest_ Cogment release (excluding pre-releases),
+- `cogment_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves the api from any Cogment release.
+- `cogment_api_path: "../RELATIVE/PATH/TO/LOCAL/COGMENT/INSTALL/include/cogment/api"`, retrieves a local version of the api found at the given path (e.g. `common.proto` should be at `${cogment_api_path}/common.proto`); if set, this overrides `cogment_version`.
 
 ### Tests
 
@@ -78,7 +76,7 @@ People having mainteners rights of the repository can follow these steps to rele
 
 1. Run `./scripts/create_release_branch.sh MAJOR.MINOR.PATCH` to create the release branch and update the version of the package,
 2. On the release branch, check and update the changelog if needed,
-3. Update `./.cogment-api.yaml` to use the public release of the API,
+3. Make sure `./.cogment-api.yaml` specifies fixed version to ensure rebuildability,
 4. Make sure everything's fine on CI,
 5. Run `./scripts/tag_release.sh MAJOR.MINOR.PATCH` to create the specific version section in the changelog, merge the release branch in `main`, create the release tag and update the `develop` branch with those.
 
