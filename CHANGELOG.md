@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.2.0 - 2022-05-07
+
 ### Added
 
 - Introduce `cogment.generate.generate`, a function making the code generation previously available through `python -m cogment.generate` accessible as a function.
