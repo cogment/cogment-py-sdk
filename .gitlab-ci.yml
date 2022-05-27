@@ -4,12 +4,25 @@ stages:
     - build
     - publish
 
-.base_poetry:
+.base:
     image: python:3.7
+    variables:
+        PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
     before_script:
-        - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-        - source $HOME/.poetry/env
-        - poetry install
+        - mkdir -p ${PIP_CACHE_DIR}
+        - python -m venv .venv
+        - source .venv/bin/activate
+        - pip install -e ".[generate]"
+        - pip install -r requirements.txt
+    cache: &default_cache
+        - paths:
+              - .cache/pip
+        - key:
+              files:
+                  - requirements.txt
+                  - setup.cfg
+          paths:
+              - ".venv"
 
 .base_gh_ssh_agent:
     before_script:
@@ -28,11 +41,17 @@ stages:
         - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
         - chmod 644 ~/.ssh/known_hosts
 
-python_lint:
-    extends: .base_poetry
+pycodestyle:
+    extends: .base
     stage: lint
     script:
-        - poetry run task lint
+        - pycodestyle
+
+mypy:
+    extends: .base
+    stage: lint
+    script:
+        - mypy cogment/
 
 apache_licenses_check:
     stage: lint
@@ -57,50 +76,41 @@ shfmt:
         - shfmt -i 2 -ci -d .
 
 check_dependencies_conflicts:
-    extends: .base_poetry
+    image: python:3.7
     stage: test
     script:
         - ./scripts/check_dependencies_conflicts.sh
 
 integration_test:
-    extends: .base_poetry
+    extends: .base
     stage: test
     script:
-        - poetry run task test --launch-orchestrator
+        - pytest --launch-orchestrator
     artifacts:
         when: always
         reports:
             junit: integration_test_report.xml
 
 build_sdist:
-    extends: .base_poetry
+    extends: .base
     stage: build
     script:
-        - poetry build -f sdist
+        - python -m build
+        - twine check dist/*
     artifacts:
         expire_in: 1 week
         paths:
             - dist/*.tar.gz
+            - dist/*.whl
 
 publish_to_pypi:
-    extends: .base_poetry
+    extends: .base
     stage: publish
     script:
-        - poetry build -f sdist
-        - poetry publish -u $PYPI_USERNAME -p $PYPI_PASSWORD
+        - python -m build
+        - python -m twine upload dist/* --non-interactive -u $PYPI_USERNAME -p $PYPI_PASSWORD
     only:
-        - /^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(?:-[[:alnum:]]+)?$/
-
-publish_to_gitlab:
-    extends: .base_poetry
-    stage: publish
-    script:
-        - poetry config repositories.private https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/packages/pypi
-        - poetry version $(poetry version --short)+${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}
-        - poetry build -f sdist
-        - poetry publish --repository private -u gitlab-ci-token -p $CI_JOB_TOKEN
-    only:
-        - develop
+        - /^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9]+)?$/
 
 publish_branch_to_github:
     extends: .base_gh_ssh_agent

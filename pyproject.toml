@@ -1,56 +1,6 @@
-[tool.poetry]
-name = "cogment"
-version = "2.2.0"
-description = "Cogment python SDK"
-authors = ["Artificial Intelligence Redefined <dev+cogment@ai-r.com>"]
-license = "Apache-2.0"
-readme = "README.md"
-homepage = "https://cogment.ai"
-repository = "https://github.com/cogment/cogment-py-sdk"
-# Customized build.py to customize commands.
-build="build.py"
-# gitignored files need to be specifically included
-include = [
-  "CHANGELOG.md",
-  "./cogment/version.py",
-  "./cogment/api/*.proto",
-  "./cogment/api/*.py"
-]
-exclude = [
-  "./cogment/version.py.in"
-]
-
-[tool.poetry.dependencies]
-python = ">=3.7, <3.10"
-grpcio = ">=1.42, <1.45"
-grpcio-reflection = ">=1.42, <1.45"
-protobuf = "^3.7"
-prometheus-client = "^0.8"
-PyYAML = { version = "^5.3.1", optional = true }
-grpcio-tools = { version = "1.43", optional = true }
-click = { version = "^8.0.3", optional = true }
-
-[tool.poetry.extras]
-generate = ["PyYAML", "grpcio-tools", "click"]
-
-[tool.poetry.dev-dependencies]
-grpcio-tools = ">=1.42, <1.45"
-taskipy = "^1.4.0"
-pycodestyle = "^2.6.0"
-mypy = "^0.790"
-pytest = "^6.1.1"
-PyYAML = "^5.3.1"
-click = "^8.0.3"
-pytest-dotenv = "^0.5.2"
-pytest-asyncio = "^0.14.0"
-pytest-timeout = "^1.4.2"
-mock = "^4.0.3"
-
-[tool.taskipy.tasks]
-lint = "task lint_pycodestyle && task lint_mypy"
-lint_pycodestyle = "pycodestyle --exclude=*pb2.py,*pb2_grpc.py cogment/"
-lint_mypy = "mypy --config-file mypy.ini cogment/"
-test = "pytest"
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"
@@ -62,11 +12,23 @@ addopts = "-rfs --capture=no --junit-xml=integration_test_report.xml"
 junit_suite_name = "cogment_py_sdk_tests"
 timeout = 15
 
-[build-system]
-requires = [
-  "poetry-core>=1.0.0",
-  "setuptools",
-  "wheel",
-  "pip"
+[tool.mypy]
+python_version = 3.7
+warn_return_any = true
+warn_unused_configs = true
+strict_optional = false
+exclude = [
+    '.*_pb2\.py$'
 ]
-build-backend = "poetry.core.masonry.api"
+
+[[tool.mypy.overrides]]
+module = "cogment.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "grpc"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "prometheus_client"
+ignore_missing_imports = true

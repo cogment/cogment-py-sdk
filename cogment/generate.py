@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+import subprocess
+import sys
 
 from cogment.errors import CogmentGenerateError
 
@@ -114,7 +116,14 @@ def generate(spec: str, output: str):
             with open(os.path.join(spec_directory, file), "r") as file_data:
                 proto_file_content[file] = file_data.read()
 
-        os.system(f"python -m grpc_tools.protoc -I . --python_out={output_directory} {' '.join(proto_files)}")
+        args = [
+            sys.executable,
+            "-m", "grpc_tools.protoc",
+            "-I", ".", f"--python_out={output_directory}"
+        ]
+        args.extend(proto_files)
+
+        subprocess.check_call(args, cwd=spec_directory)
 
         if len(cog_settings.get("import", {}).get("python", [])) > 0:
             raise CogmentGenerateError("Python imports in configuration file are not supported in Cogment 2.0 "

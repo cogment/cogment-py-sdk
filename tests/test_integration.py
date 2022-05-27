@@ -385,8 +385,8 @@ class TestIntegration:
         index = promethus_data.find("Can you find anything ?")
         assert index == -1
 
-        assert environment_trial_id != None
-        assert controller_trial_id != None
+        assert environment_trial_id is not None
+        assert controller_trial_id is not None
         assert "actor_1" in agent_trial_id
         assert "actor_2" in agent_trial_id
         assert controller_trial_id == environment_trial_id
@@ -481,8 +481,8 @@ class TestIntegration:
                 if event.observation:
                     agents_tick_count[actor_session.name] += 1
                     assert (
-                        event.observation.snapshot.observed_value
-                        == agents_tick_count[actor_session.name]
+                        event.observation.snapshot.observed_value ==
+                        agents_tick_count[actor_session.name]
                     )
                     actor_session.do_action(
                         data_pb2.Action(
@@ -496,8 +496,8 @@ class TestIntegration:
                     assert len(event.messages) == 0
 
                     assert (
-                        event.observation.snapshot.observed_value
-                        == agents_tick_count[actor_session.name]
+                        event.observation.snapshot.observed_value ==
+                        agents_tick_count[actor_session.name]
                     )
 
             agents_ended[actor_session.name].set_result(True)

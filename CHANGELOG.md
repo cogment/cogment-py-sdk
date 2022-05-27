@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Fix install of the package from a wheel
+
+### Changed
+
+- Replace poetry centric build process with modern setuptools
+
 ## v2.2.0 - 2022-05-07
 
 ### Added

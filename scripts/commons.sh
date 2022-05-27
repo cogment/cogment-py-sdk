@@ -56,7 +56,7 @@ function array_contains() {
 
 # Version related functions
 
-VERSION_SED_REGEX="[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(-[a-zA-Z0-9][a-zA-Z0-9]*\)\{0,1\}"
+VERSION_SED_REGEX="[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\(-[a-zA-Z0-9]\{1,\}\)\{0,1\}"
 
 function validate_version() {
   local input_version=$1
@@ -67,11 +67,11 @@ function validate_version() {
 }
 
 function retrieve_package_version() {
-  sed -n "s/^version\ *\=\ *\"\(${VERSION_SED_REGEX}\)\"/\1/p" "${ROOT_DIR}/pyproject.toml"
+  sed -n "s/^__version__[[:blank:]]*\=[[:blank:]]*\"\(${VERSION_SED_REGEX}\)\"/\1/p" "${ROOT_DIR}/cogment/version.py"
 }
 
 function update_package_version() {
   local version=$1
-  sed -i.bak "/^version\ *\=/s/${VERSION_SED_REGEX}/${version}/" "${ROOT_DIR}/pyproject.toml"
+  sed -i.bak "/^__version__[[:blank:]]*\=/s/${VERSION_SED_REGEX}/${version}/" "${ROOT_DIR}/cogment/version.py"
   retrieve_package_version
 }

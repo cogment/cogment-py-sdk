@@ -20,14 +20,15 @@ import logging
 
 logger = logging.getLogger("cogment.unit-tests.launcher")
 
+
 def launch_orchestrator(
     app_directory,
     orchestrator_port,
     test_port,
     cogment_path,
-    private_key = None,
-    root_cert = None,
-    trust_chain = None
+    private_key=None,
+    root_cert=None,
+    trust_chain=None
 ):
     params_file_template = "params.yaml"
     params_file = f"params_{test_port}.yaml"

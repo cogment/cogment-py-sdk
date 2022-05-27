@@ -8,17 +8,39 @@ This module, `cogment-py-sdk`, is the Python SDK for making use of Cogment when 
 
 ## Developers
 
-### Local setup
+### Prerequisites
 
 Make sure you have the following installed:
 
-- [Python](https://www.python.org) (any version >=3.7 should work),
-- [Poetry](https://python-poetry.org).
+- [Python](https://www.python.org) (any version >=3.7 and <3.10 should work).
 
-Install the dependencies, including downloading and building the cogment protobuf API, by navigating to the python SDK directory and run the following
+### Install dependencies
 
+We recommend using a virtualenv to isolate your dependencies. On most unix flavors you create and activate this by running the following:
+
+```console
+$ python -m venv .venv
+$ source .venv/bin/activate
 ```
-poetry install
+
+once you are finished with the virtualenv you can deactivate it by running:
+
+```console
+$ deactivate
+```
+
+Install the dependencies, including downloading and building the cogment protobuf API by running the following:
+
+```console
+$ pip install -e ".[generate]"
+$ pip install -r requirements.txt
+```
+
+The first line will actually install the package in _development_ mode, under the hood it's calling the following `setup.py` commands to deal with the cogment API (those can also be called seprately)
+
+```console
+$ python -m setup retrieve_cogment_api
+$ python -m setup build_cogment_api_protos
 ```
 
 ### Define used Cogment protobuf API
@@ -29,6 +51,8 @@ The version of the used cogment protobuf API is defined in the `.cogment-api.yam
 - `cogment_version: "vMAJOR.MINOR.PATCH[-PRERELEASE]"`, retrieves the api from any Cogment release.
 - `cogment_api_path: "../RELATIVE/PATH/TO/LOCAL/COGMENT/INSTALL/include/cogment/api"`, retrieves a local version of the api found at the given path (e.g. `common.proto` should be at `${cogment_api_path}/common.proto`); if set, this overrides `cogment_version`.
 
+After any change, do not forget to run `pip install -e .` for it to be taken into account.
+
 ### Tests
 
 #### Integration tests
@@ -36,7 +60,7 @@ The version of the used cogment protobuf API is defined in the `.cogment-api.yam
 These tests launch and use Cogment, by default they'll use they'll download and use the latest released version of Cogment.
 
 ```console
-poetry run task test --launch-orchestrator
+$ pytest --launch-orchestrator
 ```
 
 The following environment can be defined to change this behavior, either directly in the terminal or in a `.env` file located at the root of the repository:
@@ -48,10 +72,16 @@ COGMENT_VERSION="v2.2.0" # cogment version to download
 
 ### Lint
 
-Run the linter using
+Run the `pycodestyle` using
 
 ```console
-poetry run task lint
+$ pycodestyle
+```
+
+Run the `mypy` type annotations checks using
+
+```console
+$ mypy cogment/
 ```
 
 ### Check conflicting dependencies with "popular" Python packages
@@ -64,10 +94,10 @@ This script will check for conflicts required by the cogment-py-sdk and the popu
 
 ### Build the source package
 
-Build the source package (this step will only be succesfull if `poetry install` succeeded)
+Build the source package
 
 ```console
-poetry build -f sdist
+python -m build
 ```
 
 ### Release process

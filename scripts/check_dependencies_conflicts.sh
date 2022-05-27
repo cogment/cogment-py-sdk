@@ -2,28 +2,26 @@
 
 TARGET_DEPENDENCIES_LIST=(
   # Tensorflow
-  "tensorflow"      # latest version
-  "tensorflow~=2.5" # minor versions released in 2020 and 2021
-  "tensorflow~=2.4"
-  "tensorflow~=2.3"
-  "tensorflow~=2.2"
-  "tensorflow~=2.1"
+  "tensorflow" # latest version
+  #"tensorflow >=2.5, <2.6" # minor versions released in 2020 and 2021
+  #"tensorflow >=2.4, <2.5"
+  "tensorflow >=2.3, <2.4"
+  "tensorflow >=2.2, <2.3"
+  "tensorflow >=2.1, <2.3"
   # Pytorch
-  "torch"      # latest version
-  "torch~=1.9" # minor versions released in 2020 and 2021
-  "torch~=1.8"
-  "torch~=1.7"
-  "torch~=1.6"
-  "torch~=1.5"
-  "torch~=1.4"
+  "torch"              # latest version
+  "torch >=1.9, <1.10" # minor versions released in 2020 and 2021
+  "torch >=1.8, <1.9"
+  "torch >=1.7, <1.8"
+  "torch >=1.6, <1.7"
+  "torch >=1.5, <1.6"
+  "torch >=1.4, <1.5"
   # Jax
   "jax" # latest version
   # Pandas
-  #"pandas" # latest version
-  #"pandas~=1.3" # minor versions released in 2020 and 2021
-  #"pandas~=1.2" # Commenting out >=1.2 versions because they require python >=3.7.1 (we are compatible with ^3.7) and poetry counts that as a conflict
-  "pandas~=1.1"
-  "pandas~=1.0"
+  "pandas >=1.2, <1.3"
+  "pandas >=1.1, <1.2"
+  "pandas >=1.0, <1.1"
   # Jupyter
   "jupyter" # latest version
   # Scikit learn
@@ -35,15 +33,25 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.." || (
   exit 1
 )
 
+VENV_DEPENDENCY_CHECK='.venv.dep_check'
+
 CONFLICT_DEPENDENCIES_LIST=()
 
 for DEPENDENCY in "${TARGET_DEPENDENCIES_LIST[@]}"; do
-  if ! OUT=$(poetry add --dry-run "${DEPENDENCY}"); then
+  if ! (rm -rf "${VENV_DEPENDENCY_CHECK}" && python -m venv "${VENV_DEPENDENCY_CHECK}"); then
+    printf "Unable to reinitialize the virtual environment.\n"
+    exit 1
+  fi
+
+  # shellcheck source=/dev/null
+  source "${VENV_DEPENDENCY_CHECK}/bin/activate"
+  if ! OUT=$(pip install -e ".[generate]" "${DEPENDENCY}" 2>&1 && pip check); then
     CONFLICT_DEPENDENCIES_LIST+=("## ${DEPENDENCY} ${OUT}")
     printf "x"
   else
     printf "."
   fi
+  deactivate
 done
 
 printf "\n"

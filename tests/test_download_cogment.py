@@ -24,20 +24,25 @@ import subprocess
 
 logger = logging.getLogger("cogment.unit-tests")
 
+
 def test_get_latest_version(unittest_case):
     unittest_case.assertRegex(helpers.download_cogment.get_latest_release_version(), r"v[0-9]+\.[0-9]+\.[0-9]+")
+
 
 def test_get_os(unittest_case):
     unittest_case.assertIn(helpers.download_cogment.get_current_os(), helpers.download_cogment.Os)
 
+
 def test_get_arch(unittest_case):
     unittest_case.assertIn(helpers.download_cogment.get_current_arch(), helpers.download_cogment.Arch)
+
 
 def test_download_latest_cogment(unittest_case):
     cogment_path = helpers.download_cogment.download_cogment()
 
     # Can it run?
     subprocess.run([cogment_path, "version"], capture_output=True)
+
 
 def test_download_cogment_2_2(unittest_case):
     cogment_path = helpers.download_cogment.download_cogment(desired_version="v2.2.0")

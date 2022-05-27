@@ -32,6 +32,7 @@ DEFAULT_COGMENT_INSTALL_DIR = os.path.join(
     "../.cogment",
 )
 
+
 @pytest.fixture(scope="session")
 def cogment_path():
     cogment_path = os.environ.get("COGMENT_PATH", None)
@@ -42,9 +43,10 @@ def cogment_path():
         )
     return cogment_path
 
+
 @pytest.fixture(scope="session")
 def test_cogment_app_dir():
-    generate(os.path.join(TEST_COGMENT_APP_DIR,"cogment.yaml"), os.path.join(TEST_COGMENT_APP_DIR, "cog_settings.py"))
+    generate(os.path.join(TEST_COGMENT_APP_DIR, "cogment.yaml"), os.path.join(TEST_COGMENT_APP_DIR, "cog_settings.py"))
     return TEST_COGMENT_APP_DIR
 
 
@@ -89,6 +91,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "use_orchestrator" in item.keywords:
             item.add_marker(skip_requiring_orchestrator)
+
 
 @pytest.fixture(scope="function")
 def unittest_case():

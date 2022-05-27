@@ -1,5 +1,6 @@
 ignore:
   - "cogment/api/"
+  - ".venv/"
   - "?eggs"
   - "**/__pycache__"
   - "**/cogment_*.yaml"
