@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Generate to handle multiple imports properly
+- Output deprecated warning for use of 'snapshot' in received observation
+
 ## v2.2.1 - 2022-05-27
 
 ## Fixed

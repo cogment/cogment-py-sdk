@@ -15,6 +15,8 @@
 import os
 import subprocess
 import sys
+import re
+import typing
 
 from cogment.errors import CogmentGenerateError
 
@@ -40,32 +42,42 @@ from types import SimpleNamespace
 
 {0}
 {1}
-{2}
 
-actor_classes = _cog.actor.ActorClassList({3})
+actor_classes = _cog.actor.ActorClassList({2})
 
-trial = SimpleNamespace(config_type={4})
+trial = SimpleNamespace(config_type={3})
 
-environment = SimpleNamespace(config_type={5})
+environment = SimpleNamespace(config_type={4})
 """
 
 
-def py_path_from_proto_path(proto: str) -> str:
-    return proto.split(".")[0] + "_pb2"
+def py_path_from_proto_path(proto_file_name: str) -> str:
+    return proto_file_name.split(".")[0] + "_pb2"
 
 
-def py_alias_from_proto_path(proto: str) -> str:
-    return proto.split(".")[0] + "_pb"
+def py_alias_from_proto_path(proto_file_name: str) -> str:
+    return proto_file_name.split(".")[0] + "_pb"
 
 
-def token_as_proto_token(yaml_token: str, proto_file_content) -> str:
-    token = yaml_token.split(".")[1]
+def token_as_proto_token(yaml_token: str, proto_files_content) -> str:
+    token_parts = yaml_token.split(".")
+    if len(token_parts) == 1:
+        token_package = ""
+        token_name = token_parts[0]
+    elif len(token_parts) == 2:
+        token_package, token_name = token_parts
+    else:
+        raise CogmentGenerateError(f"Invalid token format [{yaml_token}]")
 
-    for file in proto_file_content:
-        if token in proto_file_content[file]:
-            return f"{py_alias_from_proto_path(file)}.{token}"
+    if token_package not in proto_files_content:
+        raise CogmentGenerateError(f"Unknown token package [{yaml_token}]")
 
-    raise CogmentGenerateError(f"Token [{token}] not found in any file")
+    for proto_file_name, proto_file_data in proto_files_content[token_package]:
+        # TODO: Improve robustness of this (e.g. if name is found even in a comment, it will "work")!
+        if token_name in proto_file_data:
+            return f"{py_alias_from_proto_path(proto_file_name)}.{token_name}"
+
+    raise CogmentGenerateError(f"Token [{yaml_token}] not found in any file")
 
 
 def proto_import_line(proto: str) -> str:
@@ -85,7 +97,8 @@ def generate(spec: str, output: str):
     output_directory = os.path.dirname(os.path.abspath(output))
     spec_directory = os.path.dirname(os.path.abspath(spec))
 
-    # Closure with proto_file_content in it
+    proto_files_content: typing.Dict[str, typing.List[typing.Tuple[str, str]]] = {}
+
     def actor_classes_block(actor_class) -> str:
         if actor_class["observation"].get("delta") is not None:
             raise CogmentGenerateError(f"[{actor_class['name']}] defines 'observation.delta' "
@@ -95,31 +108,44 @@ def generate(spec: str, output: str):
                                         f"which is no longer supported.")
 
         if "config_type" in actor_class:
-            config_type = token_as_proto_token(actor_class["config_type"], proto_file_content)
+            config_type = token_as_proto_token(actor_class["config_type"], proto_files_content)
         else:
             config_type = "None"
 
         return ACTOR_CLASS_FORMAT.format(
             actor_class["name"],
             config_type,
-            token_as_proto_token(actor_class["action"]["space"], proto_file_content),
-            token_as_proto_token(actor_class["observation"]["space"], proto_file_content)
+            token_as_proto_token(actor_class["action"]["space"], proto_files_content),
+            token_as_proto_token(actor_class["observation"]["space"], proto_files_content)
         )
 
     with open(spec, "r") as stream:
         cog_settings = yaml.safe_load(stream)
 
         proto_files = cog_settings["import"]["proto"]
-        proto_file_content = {}
+        package_pattern = re.compile(r"^\s*package\s+(\w+)\s*;", re.MULTILINE)
 
-        for file in proto_files:
-            with open(os.path.join(spec_directory, file), "r") as file_data:
-                proto_file_content[file] = file_data.read()
+        for file_name in proto_files:
+            with open(os.path.join(spec_directory, file_name), "r") as file:
+                file_data = file.read()
+                package = re.findall(package_pattern, file_data)
+                if len(package) == 1:
+                    package_name = package[0]
+                elif len(package) == 0:
+                    package_name = ""
+                else:
+                    raise CogmentGenerateError(f"Only one package can be defined in proto file [{file_name}]")
+
+                if package_name not in proto_files_content:
+                    proto_files_content[package_name] = [(file_name, file_data)]
+                else:
+                    proto_files_content[package_name].append((file_name, file_data))
 
         args = [
             sys.executable,
             "-m", "grpc_tools.protoc",
-            "-I", ".", f"--python_out={output_directory}"
+            "-I", ".",
+            f"--python_out={output_directory}"
         ]
         args.extend(proto_files)
 
@@ -130,12 +156,12 @@ def generate(spec: str, output: str):
                                         "spec file")
 
         if "trial" in cog_settings and "config_type" in cog_settings["trial"]:
-            trial_config = token_as_proto_token(cog_settings["trial"]["config_type"], proto_file_content)
+            trial_config = token_as_proto_token(cog_settings["trial"]["config_type"], proto_files_content)
         else:
             trial_config = "None"
 
         if "environment" in cog_settings and "config_type" in cog_settings["environment"]:
-            env_config = token_as_proto_token(cog_settings["environment"]["config_type"], proto_file_content)
+            env_config = token_as_proto_token(cog_settings["environment"]["config_type"], proto_files_content)
         else:
             env_config = "None"
 
@@ -143,11 +169,8 @@ def generate(spec: str, output: str):
         comma_line_break_tab = ",\n\t"  # f strings can't have backslashes in them
 
         proto_import_lines = []
-        proto_lib_lines = []
-        proto_imports = cog_settings.get("import", {}).get("proto", [])
-        for proto_import in proto_imports:
-            proto_import_lines.append(proto_import_line(proto_import))
-            proto_lib_lines.append(proto_lib_line(proto_import))
+        for proto_import_file in proto_files:
+            proto_import_lines.append(proto_import_line(proto_import_file))
 
         actor_class_lines = []
         actor_class_blocks = []
@@ -158,7 +181,6 @@ def generate(spec: str, output: str):
 
         cog_settings_string = COG_SETTINGS_FORMAT.format(
             line_break.join(proto_import_lines),
-            line_break.join(proto_lib_lines),
             line_break.join(actor_class_blocks),
             comma_line_break_tab.join(actor_class_lines),
             trial_config,

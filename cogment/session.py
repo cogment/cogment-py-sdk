@@ -59,12 +59,20 @@ class RecvObservation:
         self.timestamp = obs.timestamp
         self.observation = obs_space
 
-        self.snapshot = obs_space  # Deprecated, from v1.0
-
     def __str__(self):
         result = f"RecvObservation: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
         result += f", observation = {self.observation}"
         return result
+
+    @property
+    def snapshot(self):
+        logger.warning(f"Deprecated use of 'snapshot' in RecvObservation")
+        return self.observation
+
+    @snapshot.setter
+    def snapshot(self, val):
+        logger.warning(f"Deprecated use of 'snapshot' in RecvObservation")
+        self.observation = val
 
 
 class RecvAction:
