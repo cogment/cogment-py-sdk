@@ -45,7 +45,7 @@ class LogParams:
     # serialize/deserialize, and should be incremented if any of them changes in
     # a backward or forward incompatible way. API 1.0 could be considered a type 0 or 1.
     # Current dependencies: TrialParams, DatalogParams, EnvironmentParams, ActorParams,
-    #                       TrialConfig, EnvironmentConfig, ActorConfig
+    #                       SerializedMessage
     def get_serialization_type(self):
         return 2
 

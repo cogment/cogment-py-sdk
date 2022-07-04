@@ -45,12 +45,13 @@ class EnvironmentSession(Session):
         self._start(auto_done_sending)
 
         if observations is not None:
-            packed_obs = self._pack_observations(observations)
+            logger.debug(f"Trial [{self._trial.id}] - Environment [{self.name}] Sending first observation.")
+            packed_obs = self._pack_observations(observations, -1)
             self._post_outgoing_data(packed_obs)
 
     def produce_observations(self, observations):
         if not self._trial.ended:
-            packed_obs = self._pack_observations(observations)
+            packed_obs = self._pack_observations(observations, -1)
             self._post_outgoing_data(packed_obs)
             if self._trial.ending and self._auto_ack:
                 self._post_outgoing_data(_EndingAck())
@@ -67,13 +68,13 @@ class EnvironmentSession(Session):
         else:
             if not self._trial.ending:
                 self._post_outgoing_data(_Ending())
-            packed_obs = self._pack_observations(final_observations)
+            packed_obs = self._pack_observations(final_observations, -1)
             self._post_outgoing_data(packed_obs)
             if self._auto_ack:
                 self._post_outgoing_data(_EndingAck())
 
-    def _pack_observations(self, observations, tick_id=-1):
-        timestamp = int(time.time() * 1000000000)
+    def _pack_observations(self, observations, tick_id):
+        timestamp = int(time.time() * 1e9)
 
         new_obs = [None] * len(self._trial.actors)
 

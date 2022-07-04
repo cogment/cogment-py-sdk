@@ -53,25 +53,26 @@ def _process_normal_data(data, session):
         if session._trial.ending and session._auto_ack:
             session._post_outgoing_data(_EndingAck())
 
-        session._trial.tick_id = data.observation.tick_id
+        tick_id = data.observation.tick_id
+        session._trial.tick_id = tick_id
 
         obs_space = session._actor_class.observation_space()
         obs_space.ParseFromString(data.observation.content)
 
         recv_event.observation = RecvObservation(data.observation, obs_space)
-        session._post_incoming_event(recv_event)
+        session._post_incoming_event((tick_id, recv_event))
 
     elif data.HasField("reward"):
         logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] received reward")
 
         recv_event.rewards = [RecvReward(data.reward)]
-        session._post_incoming_event(recv_event)
+        session._post_incoming_event((-1, recv_event))
 
     elif data.HasField("message"):
         logger.trace(f"Trial [{session._trial.id}] - Actor [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
-        session._post_incoming_event(recv_event)
+        session._post_incoming_event((-1, recv_event))
 
     elif data.HasField("details"):
         logger.warning(f"Trial [{session._trial.id}] - Actor [{session.name}] "
@@ -118,7 +119,7 @@ async def _process_incoming(reply_itor, req_queue, session):
                                     f"Trial ended with explanation [{data.details}]")
                     else:
                         logger.debug(f"Trial [{session._trial.id}] - Actor [{session.name}]: Trial ended")
-                    session._post_incoming_event(RecvEvent(EventType.FINAL))
+                    session._post_incoming_event((-1, RecvEvent(EventType.FINAL)))
                 else:
                     if data.HasField("details"):
                         details = data.details

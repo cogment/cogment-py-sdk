@@ -75,18 +75,28 @@ class RecvObservation:
         self.observation = val
 
 
+class ActorStatus(Enum):
+    """Enum class for the status of actors in a trial."""
+
+    UNKNOWN = 0
+    ACTIVE = 1
+    UNAVAILABLE = 2
+    DEFAULT = 3
+
+
 class RecvAction:
     """Class representing a received action in a trial."""
 
-    def __init__(self, actor_index, action_data, action):
-        self.tick_id = action_data.tick_id
-        self.timestamp = action_data.timestamp
+    def __init__(self, actor_index, tick_id, status, timestamp, action):
+        self.tick_id = tick_id
         self.actor_index = actor_index
+        self.status = status
+        self.timestamp = timestamp
         self.action = action
 
     def __str__(self):
-        result = f"RecvAction: tick_id = {self.tick_id}, timestamp = {self.timestamp}"
-        result += f", actor_index = {self.actor_index}, action = {self.action}"
+        result = f"RecvAction: tick_id = {self.tick_id}, actor_index = {self.actor_index}"
+        result += f", status = {self.status}, timestamp = {self.timestamp}, action = {self.action}"
         return result
 
 
@@ -188,6 +198,7 @@ class Session(ABC):
         self._incoming_event_queue = asyncio.Queue()
         self._outgoing_data_queue = asyncio.Queue()
         self._started = False
+        self._last_tick_delivered = -1
         self._last_event_delivered = False
         self._user_task = None  # Task used to call user implementation
         self._auto_ack = True
@@ -231,17 +242,16 @@ class Session(ABC):
         self._user_task = asyncio.create_task(self._run())
         return self._user_task
 
-    def _post_incoming_event(self, event):
+    def _post_incoming_event(self, event_tuple):
+        """event_tuple is a tuple (tick_id, event)"""
         if not self._started:
             logger.warning(f"[{self.name}] received an event before session was started.")
             return
         if self._trial.ended:
-            logger.debug(f"Event received after trial is over: [{event}]")
+            logger.debug(f"Event received after trial is over: [{event_tuple}]")
             return
-        if event is None:
-            logger.debug(f"Trial [{self._trial.id}] - Session for [{self.name}]: New event is `None`")
 
-        self._incoming_event_queue.put_nowait(event)
+        self._incoming_event_queue.put_nowait(event_tuple)
 
     def _post_outgoing_data(self, data):
         if not self._started:
@@ -323,8 +333,8 @@ class Session(ABC):
         loop_active = not self._last_event_delivered
         while loop_active:
             try:
-                event = await self._incoming_event_queue.get()
-                if event is None:
+                event_tuple = await self._incoming_event_queue.get()
+                if event_tuple is None:
                     logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
                                  f"Forcefull event loop exit")
                     self._last_event_delivered = True
@@ -334,9 +344,14 @@ class Session(ABC):
                 logger.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
                 break
 
+            tick_id, event = event_tuple
+            if tick_id >= 0:
+                self._last_tick_delivered = tick_id
             self._last_event_delivered = (event.type == EventType.FINAL)
+
             keep_looping = yield event
             self._incoming_event_queue.task_done()
+
             loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
             if not loop_active:
                 if self._last_event_delivered:
@@ -349,40 +364,8 @@ class Session(ABC):
     async def event_loop(self):
         logger.warning("`event_loop` is deprecated. Use `all_events` instead.")
 
-        if not self._started:
-            logger.warning(f"Event loop is not enabled until the [{self.name}] is started.")
-            return
-        if self._trial.ended:
-            logger.info(f"No more events for [{self.name}] because the trial has ended.")
-            return
-
-        logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}] starting event loop")
-
-        loop_active = not self._last_event_delivered
-        while loop_active:
-            try:
-                event = await self._incoming_event_queue.get()
-                if event is None:
-                    logger.debug(f"Trial [{self._trial.id}] - Session [{self.name}]: "
-                                 f"Forcefull event loop exit")
-                    self._last_event_delivered = True
-                    break
-
-            except asyncio.CancelledError as exc:
-                logger.debug(f"[{self.name}] coroutine cancelled while waiting for an event: [{exc}]")
-                break
-
-            self._last_event_delivered = (event.type == EventType.FINAL)
-            keep_looping = yield event
-            self._incoming_event_queue.task_done()
-            loop_active = (keep_looping is None or bool(keep_looping)) and not self._last_event_delivered
-            if not loop_active:
-                if self._last_event_delivered:
-                    logger.debug(f"Last event delivered, exiting [{self.name}] event loop")
-                else:
-                    logger.debug(f"End of event loop for [{self.name}] requested by user")
-
-        logger.debug(f"Exiting [{self.name}] event loop generator")
+        async for event in self.all_events():
+            yield event
 
     def add_reward(self, value, confidence, to, tick_id=-1, user_data=None):
         if not self._started:

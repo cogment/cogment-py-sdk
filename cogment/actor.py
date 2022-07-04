@@ -91,8 +91,8 @@ class ActorSession(Session):
 
     def do_action(self, action):
         action_req = common_api.Action()
-        action_req.timestamp = int(time.time() * 1000000000)
-        action_req.tick_id = -1
+        action_req.timestamp = int(time.time() * 1e9)
+        action_req.tick_id = self._last_tick_delivered
         if action is not None:
             action_req.content = action.SerializeToString()
 

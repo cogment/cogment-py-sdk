@@ -1,3 +1,3 @@
 #cogment_version: "latest"
-cogment_version: "v2.3.0"
-#cogment_api_path: "../cogment/install/macos_amd64/include/cogment/api"
+cogment_version: "v2.5.0"
+#cogment_api_path: "../cogment/packages/grpc_api/cogment/api"

@@ -23,7 +23,7 @@ from cogment.datalog import DatalogSession, LogParams
 from cogment.parameters import TrialParameters
 from cogment.errors import CogmentError
 from cogment.utils import list_versions, logger
-from cogment.session import RecvObservation, RecvAction, RecvMessage, RecvReward
+from cogment.session import RecvObservation, ActorStatus, RecvAction, RecvMessage, RecvReward
 
 import asyncio
 
@@ -130,15 +130,27 @@ class LogSample:
         if actor_index is None or actor_index < 0 or actor_index >= self._nb_actors:
             raise CogmentError(f"Invalid actor [{actor}] [{actor_index}]")
 
-        if self._log_params:
-            action_space = self._log_params.get_actor(actor_index)["action_space"]()
-        else:
-            action_space = self._parameters.actors[actor_index]._actor_class.action_space()
-
         if len(self._raw_sample.actions) > 0:
             data = self._raw_sample.actions[actor_index]
-            action_space.ParseFromString(data.content)
-            return RecvAction(actor_index, data, action_space)
+            if actor_index in self._raw_sample.unavailable_actors:
+                status = ActorStatus.UNAVAILABLE
+                timestamp = 0
+                action_space = None
+            elif actor_index in self._raw_sample.default_actors:
+                status = ActorStatus.DEFAULT
+                timestamp = 0
+                action_space = None
+            else:
+                status = ActorStatus.ACTIVE
+                timestamp = data.timestamp
+                if self._log_params:
+                    action_space = self._log_params.get_actor(actor_index)["action_space"]()
+                else:
+                    action_space = self._parameters.actors[actor_index]._actor_class.action_space()
+                action_space.ParseFromString(data.content)
+
+            return RecvAction(actor_index, data.tick_id, status, timestamp, action_space)
+
         else:
             return None
 

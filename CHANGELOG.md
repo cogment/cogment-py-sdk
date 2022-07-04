@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Support for actor diconnection and response timeout parameters
+
 ## v2.2.2 - 2022-06-20
 
 ## Fixed

@@ -20,12 +20,14 @@ import cogment.api.environment_pb2 as env_api
 import cogment.api.common_pb2 as common_api
 
 from cogment.utils import list_versions, logger, INIT_TIMEOUT
-from cogment.session import RecvEvent, RecvMessage, RecvAction, EventType, _InitAck, _EndingAck, _Ending
+from cogment.session import RecvEvent, RecvMessage, ActorStatus, RecvAction, EventType
+from cogment.session import _InitAck, _EndingAck, _Ending
 from cogment.errors import CogmentError
 from cogment.environment import EnvironmentSession
 from cogment.trial import Trial
 
 import asyncio
+import time
 
 
 class _PrometheusData:
@@ -79,26 +81,37 @@ def _process_normal_data(data, session):
     if data.HasField("action_set"):
         logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}] received action set")
 
-        len_actions = len(data.action_set.actions)
+        act_set = data.action_set
+
+        len_actions = len(act_set.actions)
         len_actors = len(session._trial.actors)
 
         if len_actions != len_actors:
             raise CogmentError(f"Received {len_actions} actions but have {len_actors} actors")
 
-        session._trial.tick_id = data.action_set.tick_id
+        tick_id = act_set.tick_id
+        session._trial.tick_id = tick_id
 
         for index, actor in enumerate(session._trial.actors):
-            action = actor.actor_class.action_space()
-            action.ParseFromString(data.action_set.actions[index])
-            recv_event.actions.append(RecvAction(index, data.action_set, action))
+            if index in act_set.unavailable_actors:
+                status = ActorStatus.UNAVAILABLE
+                timestamp = 0
+                action = None
+            else:
+                status = ActorStatus.ACTIVE
+                timestamp = act_set.timestamp
+                action = actor.actor_class.action_space()
+                action.ParseFromString(act_set.actions[index])
 
-        session._post_incoming_event(recv_event)
+            recv_event.actions.append(RecvAction(index, act_set.tick_id, status, timestamp, action))
+
+        session._post_incoming_event((tick_id, recv_event))
 
     elif data.HasField("message"):
         logger.trace(f"Trial [{session._trial.id}] - Environment [{session.name}] received message")
 
         recv_event.messages = [RecvMessage(data.message)]
-        session._post_incoming_event(recv_event)
+        session._post_incoming_event((-1, recv_event))
 
         session._prometheus_data.messages_received.labels(session.impl_name).inc()
 
@@ -149,7 +162,7 @@ async def _process_incoming(context, session):
                                     f"ended [{data.details}]")
                     else:
                         logger.debug(f"Trial [{session._trial.id}] - Environment [{session.name}] ended")
-                    session._post_incoming_event(RecvEvent(EventType.FINAL))
+                    session._post_incoming_event((-1, RecvEvent(EventType.FINAL)))
                 else:
                     if data.HasField("details"):
                         details = data.details
