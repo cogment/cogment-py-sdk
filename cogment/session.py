@@ -378,7 +378,7 @@ class Session(ABC):
             return
 
         for dest in to:
-            reward = common_api.Reward(receiver_name=dest, tick_id=-1, value=value)
+            reward = common_api.Reward(receiver_name=dest, tick_id=tick_id, value=value)
             reward_source = common_api.RewardSource(sender_name=self.name, value=value, confidence=confidence)
             if user_data is not None:
                 reward_source.user_data.Pack(user_data)

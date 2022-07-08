@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Reward tick ID was hard coded to -1
+
 ### Added
 
 - Support for actor diconnection and response timeout parameters
