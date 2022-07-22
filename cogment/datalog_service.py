@@ -34,7 +34,6 @@ class LogSample:
     """Class representing a trial sample for the datalog service."""
 
     def __init__(self, params):
-        global _deprecation_reported
         self.tick_id = None
         self.timestamp = None
         self.state = None
@@ -46,9 +45,7 @@ class LogSample:
         self._log_params = None
         self._parameters = None
         if type(params) == LogParams:
-            if not _deprecation_reported:
-                logger.warning(f"Deprecated use of LogParams")
-                _deprecation_reported = True
+            logger.deprecated(f"Deprecated use of LogParams")
             self._log_params = params
             self._nb_actors = params.nb_actors
         elif type(params) == TrialParameters:

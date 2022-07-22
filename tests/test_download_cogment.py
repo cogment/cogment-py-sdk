@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import helpers.download_cogment
+from cogment.errors import CogmentError
+
 
 import pytest
 
@@ -45,6 +47,10 @@ def test_download_latest_cogment(unittest_case):
 
 
 def test_download_cogment_2_2(unittest_case):
+    if helpers.download_cogment.get_current_arch() == helpers.download_cogment.Arch.ARM64:
+        with unittest_case.assertRaises(CogmentError):
+            helpers.download_cogment.download_cogment(desired_version="v2.2.0")
+        return
     cogment_path = helpers.download_cogment.download_cogment(desired_version="v2.2.0")
 
     completed_process = subprocess.run([cogment_path, "version"], capture_output=True)

@@ -173,7 +173,7 @@ class DatalogSession:
                     break
 
     async def get_all_samples(self):
-        logger.warning("'get_all_samples' is deprecated. Use 'all_samples' instead.")
+        logger.deprecated("'get_all_samples' is deprecated. Use 'all_samples' instead.")
 
         if self._queue is not None:
             while True:
@@ -218,12 +218,8 @@ class DatalogSession:
 
     @property
     def trial_params(self):
-        global _deprecation_reported
-
         if self._log_params is None:
-            if not _deprecation_reported:
-                logger.warning(f"DatalogSession's trial_params is deprecated")
-                _deprecation_reported = True
+            logger.deprecated(f"DatalogSession's trial_params is deprecated")
             self._log_params = LogParams(self.trial_parameters._cog_settings)
             self._log_params._set(self.trial_parameters._raw_params)
 

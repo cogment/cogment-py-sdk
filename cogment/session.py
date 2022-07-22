@@ -66,12 +66,12 @@ class RecvObservation:
 
     @property
     def snapshot(self):
-        logger.warning(f"Deprecated use of 'snapshot' in RecvObservation")
+        logger.deprecated(f"Deprecated use of 'snapshot' in RecvObservation. Use 'observation' instead.")
         return self.observation
 
     @snapshot.setter
     def snapshot(self, val):
-        logger.warning(f"Deprecated use of 'snapshot' in RecvObservation")
+        logger.deprecated(f"Deprecated use of 'snapshot' in RecvObservation. Use 'observation' instead.")
         self.observation = val
 
 
@@ -362,7 +362,7 @@ class Session(ABC):
         logger.debug(f"Exiting [{self.name}] event loop generator")
 
     async def event_loop(self):
-        logger.warning("`event_loop` is deprecated. Use `all_events` instead.")
+        logger.deprecated("`event_loop` is deprecated. Use `all_events` instead.")
 
         async for event in self.all_events():
             yield event

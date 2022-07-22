@@ -160,7 +160,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
             if session._trial_parameters_use:
                 reply.params.CopyFrom(session._trial_parameters._raw_params)
             else:
-                logger.warning(f"Use of pre-trial hook session in a deprecated way")
+                logger.deprecated(f"Use of pre-trial hook session in a deprecated way")
                 self._recode(reply.params, session)
 
             return reply

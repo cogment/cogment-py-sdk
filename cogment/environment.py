@@ -37,8 +37,8 @@ class EnvironmentSession(Session):
 
     def send_message(self, payload, to, to_environment=None):
         if to_environment is not None:
-            logger.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
-                           "No message will be sent back to the environment!")
+            logger.deprecated("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                              "No message will be sent back to the environment!")
         self._send_message(payload, to)
 
     def start(self, observations=None, auto_done_sending=True):
