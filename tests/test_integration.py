@@ -41,7 +41,7 @@ def cogment_test_setup(test_cogment_app_dir, cogment_path):
 
     # Execute the test
     yield {
-        "orchestrator_endpoint": f"localhost:{orchestrator_port}",
+        "orchestrator_endpoint": f"grpc://localhost:{orchestrator_port}",
         "test_port": test_port,
     }
 

@@ -27,8 +27,6 @@ from cogment.session import RecvObservation, ActorStatus, RecvAction, RecvMessag
 
 import asyncio
 
-_deprecation_reported = False
-
 
 class LogSample:
     """Class representing a trial sample for the datalog service."""

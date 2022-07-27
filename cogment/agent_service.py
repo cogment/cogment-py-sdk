@@ -87,13 +87,6 @@ def get_actor_impl(trial_id, actor_impls, init_data):
             if actor_impl is not None:
                 break
 
-        # Search for a "generic" implementation
-        if actor_impl is None:
-            for init_data.impl_name, impl in actor_impls.items():
-                if len(impl.actor_classes) == 0:
-                    actor_impl = impl
-                    break
-
         if actor_impl is None:
             raise CogmentError(f"Trial [{trial_id}] - actor [{init_data.actor_name}] class [{init_data.actor_class}] "
                                f"is not compatible with with any registered actor")

@@ -18,8 +18,6 @@ from cogment.errors import CogmentError
 
 import asyncio
 
-_deprecation_reported = False
-
 
 # Deprecated
 class LogParams:

@@ -25,7 +25,8 @@ framework python SDK by AI Redefined Inc.
 
 from cogment.version import __version__
 
-from cogment.context import Context, Endpoint, ServedEndpoint
+from cogment.context import Context
+from cogment.endpoints import Endpoint, ServedEndpoint
 from cogment.session import EventType, ActorStatus
 from cogment.control import TrialState
 from cogment.datalog_service import LogParams, LogSample

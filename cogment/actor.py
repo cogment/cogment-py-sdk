@@ -100,8 +100,8 @@ class ActorSession(Session):
 
     def send_message(self, payload, to, to_environment=None):
         if to_environment is not None:
-            logger.warning("Parameter 'to_environment' is deprecated for 'send_message' method. "
-                           "Use 'self.env_name' as environment name in the 'to' parameter.")
+            logger.deprecated("Parameter 'to_environment' is deprecated for 'send_message' method. "
+                              "Use 'self.env_name' as environment name in the 'to' parameter.")
             if to_environment:
                 self._send_message(payload, to + [self.env_name])
                 return
