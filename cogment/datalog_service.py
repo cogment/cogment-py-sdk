@@ -33,6 +33,7 @@ class LogSample:
 
     def __init__(self, params):
         self.tick_id = None
+        self.out_of_sync = None
         self.timestamp = None
         self.state = None
         self.events = None
@@ -83,11 +84,13 @@ class LogSample:
             raise CogmentError(f"Wrong type of sample provided [{type(sample)}]")
         if sample.HasField("info"):
             self.state = TrialState(sample.info.state)
+            self.out_of_sync = sample.info.out_of_sync
             self.tick_id = sample.info.tick_id
             self.timestamp = sample.info.timestamp
             self.events = sample.info.special_events
         else:
             self.state = None
+            self.out_of_sync = None
             self.tick_id = None
             self.timestamp = None
             self.events = None

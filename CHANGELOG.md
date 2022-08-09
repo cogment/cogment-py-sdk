@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Out-of-sync flag in datalog samples
+- Parameter 'nb_buffered_ticks'
 - Support for actor diconnection and response timeout parameters
 - Global Directory integration
 - Support for self registration to the Directory

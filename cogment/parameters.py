@@ -255,6 +255,7 @@ class TrialParameters:
     """Class wrapping the api parameters of a trial"""
 
     _SERIALIZATION_TYPE = 2
+    _METHODS = ["get_serialization_type", "serialize", "deserialize"]
 
     def __init__(self, cog_settings, **kwargs):
         # Done not to waste resources for internal use with a '_set' call
@@ -265,7 +266,8 @@ class TrialParameters:
 
             # Provide an easy way for users to set parameter attributes on construction
             for name, value in kwargs.items():
-                if name[0] == "_" or name not in dir(self):
+                # TODO: We could also protect the methods
+                if name[0] == "_" or name in self._METHODS or name not in dir(self):
                     raise CogmentError(f"Unknown attribute [{name}]")
                 setattr(self, name, value)
 
@@ -350,6 +352,20 @@ class TrialParameters:
             self._raw_params.ClearField("max_inactivity")
         elif type(val) is int:
             self._raw_params.max_inactivity = val
+        else:
+            raise CogmentError(f"Wrong type [{type(val)}]")
+
+    @property
+    def nb_buffered_ticks(self):
+        """Nb of buffered ticks before samples are sent to the datalog"""
+        return self._raw_params.nb_buffered_ticks
+
+    @nb_buffered_ticks.setter
+    def nb_buffered_ticks(self, val):
+        if val is None:
+            self._raw_params.ClearField("nb_buffered_ticks")
+        elif type(val) is int:
+            self._raw_params.nb_buffered_ticks = val
         else:
             raise CogmentError(f"Wrong type [{type(val)}]")
 
