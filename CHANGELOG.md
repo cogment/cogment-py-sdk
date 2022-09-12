@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Support for actor diconnection and response timeout parameters
 - Global Directory integration
 - Support for self registration to the Directory
+- Use environment variable for directory access details
 
 ## v2.2.2 - 2022-06-20
 

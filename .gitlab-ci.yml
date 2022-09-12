@@ -12,8 +12,8 @@ stages:
         - mkdir -p ${PIP_CACHE_DIR}
         - python -m venv .venv
         - source .venv/bin/activate
-        - pip install -e ".[generate]"
         - pip install -r requirements.txt
+        - python -m setup develop
     cache: &default_cache
         - paths:
               - .cache/pip

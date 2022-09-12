@@ -42,6 +42,7 @@ from cogment.errors import CogmentError
 from cogment.utils import logger
 from cogment.version import __version__
 
+import os
 from typing import Callable, Awaitable, Dict, List, Any, Tuple
 from types import ModuleType
 import asyncio
@@ -133,13 +134,27 @@ class Context:
             self.asyncio_loop = asyncio_loop
 
         if directory_endpoint is not None:
+            endpoint_to_use = directory_endpoint
+        else:
+            env_endpoint = os.environ.get("COGMENT_DIRECTORY_ENDPOINT")
+            if env_endpoint is not None:
+                endpoint_to_use = ep.Endpoint(env_endpoint)
+            else:
+                endpoint_to_use = None
+
+        if directory_auth_token is not None:
+            auth_token_to_use = directory_auth_token
+        else:
+            auth_token_to_use = os.environ.get("COGMENT_DIRECTORY_AUTHENTICATION_TOKEN")
+
+        if endpoint_to_use:
             try:
-                channel = _make_client_channel(directory_endpoint)
+                channel = _make_client_channel(endpoint_to_use)
             except CogmentError as exc:
                 raise CogmentError(f"Directory endpoint: {exc}")
 
             stub = directory_grpc_api.DirectorySPStub(channel)
-            self._directory = Directory(stub, directory_auth_token)
+            self._directory = Directory(stub, auth_token_to_use)
         else:
             self._directory = None
 
