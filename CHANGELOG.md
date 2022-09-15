@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- 'Version' grpc method for pre-trial hooks
 - Out-of-sync flag in datalog samples
 - Parameter 'nb_buffered_ticks'
 - Support for actor diconnection and response timeout parameters

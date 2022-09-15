@@ -19,7 +19,7 @@ from cogment.trial import Trial
 from cogment.prehook import PrehookSession
 from cogment.parameters import TrialParameters
 from cogment.errors import CogmentError
-from cogment.utils import logger
+from cogment.utils import list_versions, logger
 
 import asyncio
 
@@ -167,4 +167,13 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
 
         except Exception:
             logger.exception("OnPreTrial")
+            raise
+
+    # Override
+    async def Version(self, request, context):
+        try:
+            return list_versions()
+
+        except Exception:
+            logger.exception("Version")
             raise
