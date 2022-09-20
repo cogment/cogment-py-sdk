@@ -20,10 +20,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - 'Version' grpc method for pre-trial hooks
 - Out-of-sync flag in datalog samples
 - Parameter 'nb_buffered_ticks'
-- Support for actor diconnection and response timeout parameters
+- Support for actor disconnection and response timeout parameters
 - Global Directory integration
 - Support for self registration to the Directory
-- Use environment variable for directory access details
+- Use environment variable for Directory access details
 
 ## v2.2.2 - 2022-06-20
 

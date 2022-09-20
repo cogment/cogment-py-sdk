@@ -14,4 +14,4 @@
 
 # no import: add a comment to please linters
 
-__version__ = "2.2.2"
+__version__ = "2.3.0"
