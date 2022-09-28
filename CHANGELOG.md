@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- 'COGMENT_LOG_LEVEL' environment variable
+
 ## v2.3.0 - 2022-09-20
 
 ## Fixed

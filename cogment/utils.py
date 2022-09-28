@@ -20,6 +20,7 @@ from cogment.version import __version__
 
 import logging
 import types
+import os
 
 
 def _logger_trace(self, msg, *args, **kwargs):
@@ -34,13 +35,22 @@ def _logger_deprecated(self, msg):
         self.DEPRECATED_LOGGED.add(msg)
 
 
+_TRACE = 5
+
 logger = logging.getLogger("cogment.sdk")
-setattr(logger, "TRACE", 5)
+setattr(logger, "TRACE", _TRACE)  # We don't want a new global level name (i.e. with 'logging.addLevelName')
 setattr(logger, "trace", types.MethodType(_logger_trace, logger))
 setattr(logger, "DEPRECATED_LOGGED", set())
 setattr(logger, "deprecated", types.MethodType(_logger_deprecated, logger))
 
-logger.setLevel(logging.INFO)
+_COGMENT_LOG_LEVEL = os.environ.get("COGMENT_LOG_LEVEL", "INFO").upper()
+if _COGMENT_LOG_LEVEL == "OFF":
+    logger.setLevel(logging.CRITICAL)
+elif _COGMENT_LOG_LEVEL == "TRACE":
+    logger.setLevel(_TRACE)  # stupid pylint can't realize that 'TRACE' is part of 'logger'!
+else:
+    logger.setLevel(_COGMENT_LOG_LEVEL)
+logger.addHandler(logging.NullHandler())
 
 
 # Timeout (in seconds) for the init data to come from the Orchestrator before we consider a failure.
