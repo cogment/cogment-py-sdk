@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - 'COGMENT_LOG_LEVEL' environment variable
 
+## Fixed
+
+- Port parameter needs to be an int
+
 ## v2.3.0 - 2022-09-20
 
 ## Fixed

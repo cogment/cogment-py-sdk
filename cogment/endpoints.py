@@ -93,7 +93,11 @@ class ServedEndpoint:
     """Class representing a local Cogment endpoint where others can connect."""
 
     def __init__(self, port: int):
-        self.port = port
+        if type(port) == str:
+            logger.deprecated(f"'ServedEndpoint' port should be an integer, not a string")  # type: ignore
+            self.port = int(port)
+        else:
+            self.port = port
         self.private_key_certificate_chain_pairs: List[Tuple[str, str]] = None
         self.root_certificates: str = None
 
