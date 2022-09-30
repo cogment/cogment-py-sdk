@@ -359,7 +359,7 @@ class Context:
 
     async def _inquire_and_make_datastore(self, endpoint):
         inquired_endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.DATASTORE)
-        return self.get_datastore(inquired_endpoint)
+        return self._make_datastore(inquired_endpoint)
 
     # TODO: The non-async part is only kept for backward compatibility,
     #       remove it in a future (backward incompatible) release.
