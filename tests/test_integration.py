@@ -15,7 +15,7 @@
 import cogment
 
 from helpers.find_free_port import find_free_port
-from helpers.launch_orchestrator import launch_orchestrator
+from helpers.launch_cogment import launch_orchestrator
 
 import pytest
 import mock
@@ -45,7 +45,7 @@ def cogment_test_setup(test_cogment_app_dir, cogment_path):
         "test_port": test_port,
     }
 
-    # Terminate the orchestrator
+    # Terminate orchestrator
     terminate_orchestrator()
 
 
@@ -58,7 +58,7 @@ def create_pre_trial_hook(environment_implementation):
 
 
 class TestIntegration:
-    @pytest.mark.use_orchestrator
+    @pytest.mark.use_cogment
     @pytest.mark.asyncio
     async def test_environment_controlled_trial(
         self, cogment_test_setup, unittest_case, cog_settings, data_pb2
@@ -418,7 +418,7 @@ class TestIntegration:
         logger.info(f"test_environment_controlled_trial finished")
         await context._grpc_server.stop(grace=5.0)  # To prepare for next test
 
-    @pytest.mark.use_orchestrator
+    @pytest.mark.use_cogment
     @pytest.mark.asyncio
     async def test_controller_controlled_trial(
         self, cogment_test_setup, unittest_case, cog_settings, data_pb2
@@ -559,7 +559,7 @@ class TestIntegration:
         logger.info(f"test_controller_controlled_trial finished")
         await context._grpc_server.stop(grace=5.0)  # To prepare for next test
 
-    @pytest.mark.use_orchestrator
+    @pytest.mark.use_cogment
     @pytest.mark.asyncio
     async def test_actor_order(
         self, cogment_test_setup, unittest_case, cog_settings, data_pb2

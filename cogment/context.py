@@ -23,6 +23,7 @@ import cogment.api.environment_pb2_grpc as env_grpc_api
 import cogment.api.hooks_pb2_grpc as hooks_grpc_api
 import cogment.api.datalog_pb2_grpc as datalog_grpc_api
 import cogment.api.trial_datastore_pb2_grpc as datastore_grpc_api
+import cogment.api.model_registry_pb2_grpc as model_registry_api
 import cogment.api.directory_pb2_grpc as directory_grpc_api
 
 import cogment.endpoints as ep
@@ -32,6 +33,7 @@ from cogment.environment import EnvironmentSession
 from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
 from cogment.datastore import Datastore
+from cogment.model_registry import ModelRegistry
 from cogment.control import Controller
 from cogment.agent_service import AgentServicer, get_actor_impl
 from cogment.client_service import ClientServicer
@@ -381,6 +383,14 @@ class Context:
         channel = _make_client_channel(endpoint)
         stub = directory_grpc_api.DirectorySPStub(channel)
         return Directory(stub, authentication_token)
+
+    async def get_model_registry(self, endpoint=ep.Endpoint()):
+        if self._directory is not None:
+            endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.MODEL_REG)
+
+        channel = _make_client_channel(endpoint)
+        stub = model_registry_api.ModelRegistrySPStub(channel)
+        return ModelRegistry(stub)
 
     async def join_trial(self, trial_id, endpoint=ep.Endpoint(), impl_name=None, actor_name=None, actor_class=None):
         requested_class = None

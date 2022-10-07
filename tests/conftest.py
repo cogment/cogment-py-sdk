@@ -77,7 +77,7 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "use_orchestrator: mark test as requiring a live orchestrator to run"
+        "markers", "use_cogment: mark test as requiring a live orchestrator to run"
     )
 
 
@@ -85,12 +85,12 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--launch-orchestrator"):
         # --launch-orchestrator given in cli: launch the orchestrator
         return
-    skip_requiring_orchestrator = pytest.mark.skip(
+    skip_requiring_cogment = pytest.mark.skip(
         reason="needs --launch-orchestrator option to run"
     )
     for item in items:
-        if "use_orchestrator" in item.keywords:
-            item.add_marker(skip_requiring_orchestrator)
+        if "use_cogment" in item.keywords:
+            item.add_marker(skip_requiring_cogment)
 
 
 @pytest.fixture(scope="function")

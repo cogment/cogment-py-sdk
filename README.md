@@ -32,11 +32,11 @@ $ deactivate
 Install the dependencies, including downloading and building the cogment protobuf API by running the following:
 
 ```console
-$ pip install -e ".[generate]"
 $ pip install -r requirements.txt
+$ python -m setup develop
 ```
 
-The first line will actually install the package in _development_ mode, under the hood it's calling the following `setup.py` commands to deal with the cogment API (those can also be called seprately)
+The second line will call the following `setup.py` commands to deal with the cogment API (those can also be called seprately)
 
 ```console
 $ python -m setup retrieve_cogment_api
