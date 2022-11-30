@@ -76,10 +76,14 @@ shfmt:
         - shfmt -i 2 -ci -d .
 
 check_dependencies_conflicts:
-    image: python:3.7
+    image: python:$PYTHON_VERSION
     stage: test
+    parallel:
+        matrix:
+            - PYTHON_VERSION: ["3.7", "3.8", "3.9", "3.10"]
     script:
         - ./scripts/check_dependencies_conflicts.sh
+    timeout: 2h
 
 integration_test:
     extends: .base

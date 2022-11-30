@@ -165,10 +165,6 @@ class build_py(_build_py):
 
 
 setuptools.setup(
-    setup_requires=[
-        "grpcio-tools >=1.42,<1.45",
-        "PyYaml ~=5.3.1"
-    ],
     cmdclass={
         "retrieve_cogment_api": RetrieveCogmentApi,
         "build_cogment_api_protos": BuildCogmentApiProtos,

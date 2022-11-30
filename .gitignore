@@ -24,3 +24,6 @@ dist
 
 # Backup of "sed-ed" files
 *.bak
+
+# Pyenv
+.python-version

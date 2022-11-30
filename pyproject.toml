@@ -1,6 +1,69 @@
 [build-system]
-requires = ["setuptools>=42"]
+requires = [ 
+    "setuptools>=42", 
+    "grpcio-tools >=1.42,<1.45", 
+    "PyYaml ~=5.3.1",
+]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "cogment"
+description = "Cogment python SDK"
+classifiers = [ 
+    "Programming Language :: Python :: 3", 
+    "Development Status :: 5 - Production/Stable", 
+    "License :: OSI Approved :: Apache Software License", 
+    "Operating System :: OS Independent",
+]
+dynamic = [ "readme", "version",]
+requires-python = ">=3.7, <3.11"
+dependencies = [ 
+    "grpcio >=1.42, <1.45", 
+    "grpcio-reflection >=1.42, <1.45", 
+    "protobuf ~=3.7",
+    "prometheus-client >= 0.8, <0.9",
+]
+
+[[project.authors]]
+name = "Artificial Intelligence Redefined"
+email = "dev+cogment@ai-r.com"
+
+[project.urls]
+Homepage = "https://cogment.ai"
+repository = "https://github.com/cogment/cogment-py-sdk"
+"Reference Documentation" = "https://cogment.ai/docs/reference/python"
+
+[project.optional-dependencies]
+generate = [ 
+    "PyYaml ~=5.3.1", 
+    "grpcio-tools ==1.43", 
+    "click ~= 8.0.3",
+]
+
+[tool.setuptools]
+packages = [ "cogment", "cogment.api",]
+include-package-data = false
+
+[tool.pycodestyle]
+max-line-length = "120"
+ignore = "E127, E128, E203, W504"
+exclude = "*pb2.py,*pb2_grpc.py,.venv*,cog_settings.py"
+
+[tool.setuptools.package-data]
+"*" = [ "*.proto",]
+
+[tool.setuptools.data-files]
+"." = [ "CHANGELOG.md",]
+
+[tool.setuptools.dynamic.readme]
+file = [ 
+    "README.md", 
+    "CHANGELOG.md",
+]
+content-type = "text/markdown"
+
+[tool.setuptools.dynamic.version]
+attr = "cogment.version.__version__"
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"
@@ -22,13 +85,10 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = "cogment.*"
+module = [
+    "cogment.*",
+    "grpc",
+    "prometheus_client",
+]
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "grpc"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "prometheus_client"
-ignore_missing_imports = true

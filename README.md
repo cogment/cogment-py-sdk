@@ -12,7 +12,7 @@ This module, `cogment-py-sdk`, is the Python SDK for making use of Cogment when 
 
 Make sure you have the following installed:
 
-- [Python](https://www.python.org) (any version >=3.7 and <3.10 should work).
+- [Python](https://www.python.org) >=3.7, <3.11
 
 ### Install dependencies
 
