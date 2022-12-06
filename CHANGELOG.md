@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- In Datastore reward could be returned as 'None' instead of 0.0
+
 ## v2.4.1 - 2022-12-02
 - Support and dependency check for python 3.10
 

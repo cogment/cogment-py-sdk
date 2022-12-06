@@ -203,7 +203,7 @@ class DatastoreActorData:
         if self._raw_sample.HasField("reward"):
             return self._raw_sample.reward
         else:
-            return None
+            return 0.0
 
     def all_received_rewards(self):
         for rew in self._raw_sample.received_rewards:
