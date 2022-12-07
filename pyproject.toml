@@ -44,11 +44,6 @@ generate = [
 packages = [ "cogment", "cogment.api",]
 include-package-data = false
 
-[tool.pycodestyle]
-max-line-length = "120"
-ignore = "E127, E128, E203, W504"
-exclude = "*pb2.py,*pb2_grpc.py,.venv*,cog_settings.py"
-
 [tool.setuptools.package-data]
 "*" = [ "*.proto",]
 
