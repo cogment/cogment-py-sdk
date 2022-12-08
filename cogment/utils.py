@@ -20,6 +20,7 @@ from cogment.version import __version__
 
 import logging
 import types
+import typing
 import os
 
 
@@ -35,10 +36,10 @@ def _logger_deprecated(self, msg):
         self.DEPRECATED_LOGGED.add(msg)
 
 
-_TRACE = 5
-
-logger = logging.getLogger("cogment.sdk")
-setattr(logger, "TRACE", _TRACE)  # We don't want a new global level name (i.e. with 'logging.addLevelName')
+# `logger` type is set to `Any` to stop pylint from complaining
+# about: '"Logger" has no attribute "deprecated"'. Similarly for "trace".
+logger: typing.Any = logging.getLogger("cogment.sdk")
+setattr(logger, "TRACE", 5)  # We don't want a new global level name (i.e. with 'logging.addLevelName')
 setattr(logger, "trace", types.MethodType(_logger_trace, logger))
 setattr(logger, "DEPRECATED_LOGGED", set())
 setattr(logger, "deprecated", types.MethodType(_logger_deprecated, logger))
@@ -47,7 +48,7 @@ _COGMENT_LOG_LEVEL = os.environ.get("COGMENT_LOG_LEVEL", "INFO").upper()
 if _COGMENT_LOG_LEVEL == "OFF":
     logger.setLevel(logging.CRITICAL)
 elif _COGMENT_LOG_LEVEL == "TRACE":
-    logger.setLevel(_TRACE)  # stupid pylint can't realize that 'TRACE' is part of 'logger'!
+    logger.setLevel(logger.TRACE)
 else:
     logger.setLevel(_COGMENT_LOG_LEVEL)
 logger.addHandler(logging.NullHandler())

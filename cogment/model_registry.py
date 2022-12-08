@@ -78,7 +78,7 @@ class Model(ModelInfo):
     def __init__(self, model_id: str, serialized_model: bytes, **kwargs):
         super().__init__(model_id, {})
         self.version_user_data: Dict[str, str] = {}
-        self.deserialized_model = None
+        self._deserialized_model = None
         self.serialized_model = serialized_model
         self.stored_version_info = None
 
@@ -87,6 +87,15 @@ class Model(ModelInfo):
             if name[0] == "_" or name not in dir(self):
                 raise CogmentError(f"Unknown attribute [{name}]")
             setattr(self, name, value)
+
+    @property
+    def deserialized_model(self):
+        return self._deserialized_model
+
+    @deserialized_model.setter
+    def deserialized_model(self, val):
+        logger.deprecated("The storage of deserialized models in the Model Registry is deprecated")
+        self._deserialized_model = val
 
 
 class ModelRegistry:
@@ -186,8 +195,8 @@ class ModelRegistry:
         with MODEL_REGISTRY_STORE_VERSION_TIME.labels(model_id=model.id).time():
             rep = await self._model_registry_stub.CreateVersion(generate_chunks())
 
-        if model.deserialized_model:
-            self._data_cache[rep.version_info.data_hash] = model.deserialized_model
+        if model._deserialized_model:
+            self._data_cache[rep.version_info.data_hash] = model._deserialized_model
 
         return VersionInfo(rep.version_info)
 
@@ -204,6 +213,8 @@ class ModelRegistry:
         Returns
             model (Model): The stored model
         """
+        if deserialize_func is not None:
+            logger.deprecated("The use of a deserializing functions is deprecated")
         start_time = time.time()
 
         # First retrieve the model info and model version info
@@ -256,7 +267,7 @@ class ModelRegistry:
 
             if deserialize_func:
                 deserialized_model = deserialize_func(data)
-                model.deserialized_model = deserialized_model
+                model._deserialized_model = deserialized_model
                 self._data_cache[version_info.data_hash] = deserialized_model
 
         MODEL_REGISTRY_RETRIEVE_VERSION_TIME.labels(model_id=model_id, cached=cached).observe(time.time() - start_time)

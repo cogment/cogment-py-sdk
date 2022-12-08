@@ -187,7 +187,7 @@ class Context:
         if len(actor_classes) > 0:
             directory_actor_classes = [ac for ac in actor_classes]
         else:
-            logger.deprecated(f"The use of an empty list of actor_classes is deprecated")  # type: ignore
+            logger.deprecated(f"The use of an empty list of actor_classes is deprecated")
             directory_actor_classes = []
             for ac in self._cog_settings.actor_classes:
                 actor_classes.append(ac.name)
