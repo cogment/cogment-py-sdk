@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - In Datastore reward could be returned as 'None' instead of 0.0
 
+### Added
+
+- Simplified interface for Model Registry (context.get_model_registry_v2)
+
 ## v2.4.1 - 2022-12-02
 - Support and dependency check for python 3.10
 

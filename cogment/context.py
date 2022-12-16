@@ -34,6 +34,7 @@ from cogment.prehook import PrehookSession
 from cogment.datalog import DatalogSession
 from cogment.datastore import Datastore
 from cogment.model_registry import ModelRegistry
+from cogment.model_registry_v2 import ModelRegistry as ModelRegistryV2
 from cogment.control import Controller
 from cogment.agent_service import AgentServicer, get_actor_impl
 from cogment.client_service import ClientServicer
@@ -385,12 +386,21 @@ class Context:
         return Directory(stub, authentication_token)
 
     async def get_model_registry(self, endpoint=ep.Endpoint()):
+        logger.deprecated(f"'get_model_registry' is deprecated, use 'get_model_registry_v2'")
         if self._directory is not None:
             endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.MODEL_REG)
 
         channel = _make_client_channel(endpoint)
         stub = model_registry_api.ModelRegistrySPStub(channel)
         return ModelRegistry(stub)
+
+    async def get_model_registry_v2(self, endpoint=ep.Endpoint()):
+        if self._directory is not None:
+            endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.MODEL_REG)
+
+        channel = _make_client_channel(endpoint)
+        stub = model_registry_api.ModelRegistrySPStub(channel)
+        return ModelRegistryV2(stub)
 
     async def join_trial(self, trial_id, endpoint=ep.Endpoint(), impl_name=None, actor_name=None, actor_class=None):
         requested_class = None
