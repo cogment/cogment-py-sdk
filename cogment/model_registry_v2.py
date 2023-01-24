@@ -22,6 +22,11 @@ from cogment.utils import logger
 
 GRPC_BYTE_SIZE_LIMIT = 4 * 1024 * 1024  # 4 MB
 
+# This should not be a user decision, but we don't want to change the gRPC API at this time.
+# Arbitrary size hopefully small enough not to hit the gRPC size limit.
+# Unfortunately it is impossible to know without requesting the data, so we play it safe.
+_RETRIEVAL_COUNT = 10
+
 
 class ModelIterationInfo:
     def __init__(self, proto_version_info):
@@ -30,23 +35,23 @@ class ModelIterationInfo:
         self.timestamp = proto_version_info.creation_timestamp
         self.hash = proto_version_info.data_hash
         self.size = proto_version_info.data_size
-        self.properties = dict(proto_version_info.user_data)
+        self.stored = proto_version_info.archived
+        self.properties = proto_version_info.user_data  # Ideally 'dict(proto_version_info.user_data)' but slower
 
     def __str__(self):
         result = f"ModelIterationInfo: model_name = {self.model_name}, iteration = {self.iteration}"
         result += f", timestamp = {self.timestamp}, hash = {self.hash}, size = {self.size}"
-        result += f", properties = {self.properties}"
+        result += f", stored = {self.stored}, properties = {self.properties}"
         return result
 
 
 class ModelInfo:
     def __init__(self, proto_model_info):
-        self.name = None
-        self.nb_iterations = None
-        self.properties = dict(proto_model_info.user_data)
+        self.name = proto_model_info.model_id
+        self.properties = proto_model_info.user_data  # Ideally 'dict(proto_model_info.user_data)' but slower
 
     def __str__(self):
-        result = f"ModelInfo: nb_iterations = {self.nb_iterations}, properties = {self.properties}"
+        result = f"ModelInfo: name = {self.name}, properties = {self.properties}"
         return result
 
 
@@ -59,8 +64,15 @@ class ModelRegistry:
 
     async def store_model(self,
             name: str, model: bytes, iteration_properties: Dict[str, str] = None) -> ModelIterationInfo:
+        return await self._send_model(name, model, iteration_properties, True)
+
+    async def publish_model(self,
+            name: str, model: bytes, iteration_properties: Dict[str, str] = None) -> ModelIterationInfo:
+        return await self._send_model(name, model, iteration_properties, False)
+
+    async def _send_model(self, name, model, iteration_properties, store) -> ModelIterationInfo:
         if model is None and iteration_properties is not None:
-            raise CogmentError(f"Cannot store iteration properties with no model iteration")
+            raise CogmentError(f"Cannot send iteration properties with no model iteration")
         if model is not None and len(model) == 0:
             raise CogmentError("Model is empty")
 
@@ -79,7 +91,7 @@ class ModelRegistry:
             try:
                 version_info = model_registry_api.ModelVersionInfo()
                 version_info.model_id = name
-                version_info.archived = True
+                version_info.archived = store
                 version_info.data_size = len(model)
                 if iteration_properties is not None:
                     version_info.user_data.update(iteration_properties)
@@ -95,7 +107,7 @@ class ModelRegistry:
                     yield body_chunk
 
             except Exception as exc:
-                raise CogmentError(f"Failure to generate model data for storage [{exc}]")
+                raise CogmentError(f"Failure to generate model data for sending [{exc}]")
 
         reply = await self._model_registry_stub.CreateVersion(generate_chunks())
 
@@ -111,21 +123,17 @@ class ModelRegistry:
             async for chunk in self._model_registry_stub.RetrieveVersionData(req):
                 model += chunk.data_chunk
         except Exception as exc:
-            if iteration == -1:
-                # Probably the model does not exist or does not have an iteration
-                logger.debug(f"Failed to retrieve model [{name}]: [{exc}]")
-                return None
-            else:
-                raise CogmentError(f"Could not retrieve model name [{name}] and/or iteration [{iteration}]: [{exc}]")
+            # Either the model does not exist, the iteration does not exist, or there was a real error.
+            # The Model Registry should be fixed to differentiate
+            logger.debug(f"Failed to retrieve iteration [{iteration}] for model [{name}]: [{exc}]")
+            model = None
 
-        # This should be the one to use, but the Model Registry causes error instead of returning a 0 length model!
-        # We still keep this for completeness' sake.
-        if len(model) == 0:
-            if iteration == -1:
-                # The model does not have an iteration
-                return None
+        if model is None:
+            model_info = await self._get_model_info(name)
+            if model_info is None:
+                raise CogmentError(f"Unknown model [{name}]")
             else:
-                raise CogmentError(f"Unknown model name [{name}] and/or iteration [{iteration}]")
+                return None  # Model exists, but not the iteration (probably)
 
         return model
 
@@ -133,41 +141,69 @@ class ModelRegistry:
         req = model_registry_api.DeleteModelRequest(model_id=name)
         _ = await self._model_registry_stub.DeleteModel(req)
 
-    async def list_models(self) -> List[str]:
-        req = model_registry_api.RetrieveModelsRequest()
-        # TODO: use `req.models_count` to be able to retrieve a very large number of models
+    async def list_models(self) -> List[ModelInfo]:
+        req = model_registry_api.RetrieveModelsRequest(models_count=_RETRIEVAL_COUNT)
+        models = []
         try:
-            reply = await self._model_registry_stub.RetrieveModels(req)
+            while True:
+                reply = await self._model_registry_stub.RetrieveModels(req)
+                for model_info in reply.model_infos:
+                    models.append(ModelInfo(model_info))
+
+                # There is a bug in model registry and we can't rely on "next_model_handle" to know the end;
+                # this forces us to make one extra request if the number is a multiple of the count!
+                if len(reply.model_infos) < _RETRIEVAL_COUNT:
+                    break
+                req.model_handle = reply.next_model_handle
+
         except Exception as exc:
             raise CogmentError(f"Failed to retrieve model list [{exc}]")
 
-        return [model_info.model_id for model_info in reply.model_infos]
+        return models
 
-    async def _get_iteration_info(self, name, iteration):
+    async def list_iterations(self, model_name: str) -> List[ModelIterationInfo]:
+        req = model_registry_api.RetrieveVersionInfosRequest(model_id=model_name, versions_count=_RETRIEVAL_COUNT)
+        iterations = []
+        try:
+            while True:
+                reply = await self._model_registry_stub.RetrieveVersionInfos(req)
+                for iteration_info in reply.version_infos:
+                    iterations.append(ModelIterationInfo(iteration_info))
+
+                # There is a bug in model registry and we can't rely on "next_version_handle" to know the end;
+                # this forces us to make one extra request if the number is a multiple of the count!
+                if len(reply.version_infos) < _RETRIEVAL_COUNT:
+                    break
+                req.version_handle = reply.next_version_handle
+
+        except Exception as exc:
+            raise CogmentError(f"Failed to retrieve model [{model_name}] iteration list: [{exc}]")
+
+        return iterations
+
+    async def get_iteration_info(self, name: str, iteration: int) -> ModelIterationInfo:
         req = model_registry_api.RetrieveVersionInfosRequest(model_id=name, version_numbers=[iteration])
         try:
             reply = await self._model_registry_stub.RetrieveVersionInfos(req)
         except Exception as exc:
-            # Model Registry gRPC API has not way to ask if a model exists.
-            # So we assume any error is due to the model not existing!
-            # TODO: Update gRPC API accordingly.
-            logger.debug(f"Failed to retrieve last iteration info for model [{name}]: [{exc}]")
-            return None
+            # Either the model does not exist, the iteration does not exist, or there was a real error.
+            # The Model Registry should be fixed to differentiate.
+            logger.debug(f"Failed to retrieve iteration [{iteration}] info for model [{name}]: [{exc}]")
+            reply = None
+
+        if reply is None:
+            model_info = await self._get_model_info(name)
+            if model_info is None:
+                raise CogmentError(f"Unknown model [{name}]")
+            else:
+                return None  # Model exists, but not the iteration (probably)
 
         if len(reply.version_infos) == 0:
             return None
         if len(reply.version_infos) > 1:
             logger.warning(f"Model Registry unexpectedly returned multiple iterations [{len(reply.version_infos)}]")
 
-        return reply.version_infos[0]
-
-    # 'iteration' = -1 to get last iteration. List of all iterations: [0, last_iteration]
-    async def get_iteration_info(self, name: str, iteration: int) -> ModelIterationInfo:
-        info = await self._get_iteration_info(name, iteration)
-        if info is None:
-            return None
-
-        return ModelIterationInfo(info)
+        return ModelIterationInfo(reply.version_infos[0])
 
     async def update_model_info(self, name: str, properties: Dict[str, str]) -> None:
         req = model_registry_api.CreateOrUpdateModelRequest()
@@ -183,9 +219,7 @@ class ModelRegistry:
         try:
             reply = await self._model_registry_stub.RetrieveModels(req)
         except Exception as exc:
-            # Model Registry gRPC API has not way to ask if a model exists.
-            # So we assume any error is due to the model not existing!
-            # TODO: Update gRPC API accordingly.
+            # We assume any error is due to the model not existing!
             logger.debug(f"Failed to retrieve model [{name}] info: [{exc}]")
             return None
 
@@ -202,12 +236,5 @@ class ModelRegistry:
         if model_info is None:
             return None
         result = ModelInfo(model_info)
-        result.name = name
-
-        iteration_info = await self._get_iteration_info(name, -1)
-        if iteration_info is not None:
-            result.nb_iterations = iteration_info.version_number + 1
-        else:
-            result.nb_iterations = 0
 
         return result
