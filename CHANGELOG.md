@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.5.0 - 2023-01-26
+
 ## Fixed
 
 - In Datastore reward could be returned as 'None' instead of 0.0
