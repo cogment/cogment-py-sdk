@@ -15,7 +15,7 @@
 import grpc
 import grpc.aio  # type: ignore
 from prometheus_client import start_http_server as start_prometheus_server
-from prometheus_client.core import REGISTRY  # type: ignore
+from prometheus_client.core import REGISTRY as PROMETHEUS_REGISTRY  # type: ignore
 
 import cogment.api.orchestrator_pb2_grpc as orchestrator_grpc_api
 import cogment.api.agent_pb2_grpc as agent_grpc_api
@@ -54,7 +54,6 @@ import socket
 import urllib.parse as urlpar
 
 
-DEFAULT_PROMETHEUS_PORT = 8000
 _ADDITIONAL_REGISTRATION_ITEMS = {"__registration_source" : "PythonSDK-Implicit", "__version" : __version__}
 
 
@@ -115,7 +114,7 @@ class Context:
     """Top level class for the Cogment library from which to obtain all services."""
 
     def __init__(self, user_id: str, cog_settings: ModuleType, asyncio_loop=None,
-                       prometheus_registry=REGISTRY, directory_endpoint: ep.Endpoint = None,
+                       prometheus_registry=PROMETHEUS_REGISTRY, directory_endpoint: ep.Endpoint = None,
                        directory_auth_token: str = None):
         self._user_id = user_id
         self._actor_impls: Dict[str, SimpleNamespace] = {}
@@ -293,7 +292,7 @@ class Context:
 
         return registered
 
-    async def serve_all_registered(self, served_endpoint: ep.ServedEndpoint, prometheus_port=DEFAULT_PROMETHEUS_PORT):
+    async def serve_all_registered(self, served_endpoint: ep.ServedEndpoint, prometheus_port=None):
         if (len(self._actor_impls) == 0 and len(self._env_impls) == 0 and
                 self._prehook_impl is None and self._datalog_impl is None):
             raise CogmentError("Nothing registered to serve!")
