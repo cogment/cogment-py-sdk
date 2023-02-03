@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Prometheus service is disabled by default
 
+### Added
+
+- Model Registry method `iteration_updates` to stream/push new model iterations
+- Parameter `wait_for_trials` (for Datastore method `all_trials`) to wait for new trials
+
 ## v2.5.0 - 2023-01-26
 
 ## Fixed

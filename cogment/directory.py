@@ -185,7 +185,7 @@ class Directory:
     # The URL data takes precedence over the provided parameters
     async def get_inquired_endpoint(self, endpoint: ep.Endpoint, type: ServiceType = None,
                                     properties: Dict[str, str] = None):
-        """ Inquire directory for an enpoint with optional context (type and properties)"""
+        """ Inquire directory for an endpoint with optional context (type and properties)"""
 
         try:
             parsed_url = urlpar.urlparse(endpoint.url)

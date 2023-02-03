@@ -121,7 +121,7 @@ def launch_model_registry(
             "client",
             "directory",
             "register",
-            f"--endpoint={directory_endpoint}",
+            f"--directory_endpoint={directory_endpoint}",
             f"--host=localhost",
             f"--port={model_registry_port}",
             "--type=modelregistry",

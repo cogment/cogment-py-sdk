@@ -262,9 +262,9 @@ class Datastore:
         result = f"Datastore"
         return result
 
-    async def all_trials(self, bundle_size=1):
+    async def all_trials(self, bundle_size=1, wait_for_trials=0):
         request = datastore_api.RetrieveTrialsRequest()
-        request.timeout = 0
+        request.timeout = int(wait_for_trials * 1000)
         request.trials_count = bundle_size
         request.trial_handle = ""
 

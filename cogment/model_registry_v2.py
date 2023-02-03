@@ -14,13 +14,15 @@
 
 from typing import Dict, List
 
+import grpc.aio  # type: ignore
+
 import cogment.api.model_registry_pb2 as model_registry_api
 
 from cogment.errors import CogmentError
 from cogment.utils import logger
 
 
-GRPC_BYTE_SIZE_LIMIT = 4 * 1024 * 1024  # 4 MB
+GRPC_BYTE_SIZE_LIMIT = 4 * 1024 * 1024  # 4MB
 
 # This should not be a user decision, but we don't want to change the gRPC API at this time.
 # Arbitrary size hopefully small enough not to hit the gRPC size limit.
@@ -238,3 +240,25 @@ class ModelRegistry:
         result = ModelInfo(model_info)
 
         return result
+
+    async def iteration_updates(self, model_name: str):
+        req = model_registry_api.VersionUpdateRequest()
+        req.model_id = model_name
+
+        reply_itor = self._model_registry_stub.VersionUpdate(req)
+        if not reply_itor:
+            raise CogmentError("Failed to connect to the Model Registry")
+
+        try:
+            async for update in reply_itor:
+                if update == grpc.aio.EOF:
+                    raise CogmentError(f"No response to Model Registry iteration update request for [{model_name}]")
+                yield ModelIterationInfo(update.version_info)
+
+        except grpc.aio.AioRpcError as exc:
+            logger.debug(f"gRPC failed status details: [{exc.debug_error_string()}]")
+            if exc.code() == grpc.StatusCode.UNAVAILABLE:
+                logger.error(f"Model Registry communication lost [{exc.details()}]")
+            else:
+                logger.exception("Model Registry communication -- Unexpected aio failure")
+                raise
