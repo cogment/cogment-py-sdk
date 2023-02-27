@@ -93,6 +93,13 @@ class LatestModel:
         self._model.start_tracking()
         await self._model.available.wait()
 
+    async def wait_for_newer(self, iteration: int) -> None:
+        await self.wait_for_available()
+        while iteration >= self._model.iteration_info.iteration:
+            event = asyncio.Event()
+            self._model.set_event_on_new_model(event)
+            await event.wait()
+
     # Undocumented: But we leave it available for special cases or low latency step trials
     def get_no_wait(self) -> Tuple[Any, ModelIterationInfo]:
         return self._model.model, self._model.iteration_info
@@ -114,6 +121,7 @@ class _TrackedModel:
         self.iteration_info = None
 
         self._tracking_task = None
+        self._new_events = []
 
     def increment_reference(self):
         self.ref_count += 1
@@ -136,6 +144,9 @@ class _TrackedModel:
             self._tracking_task.cancel()
             self._tracking_task = None
 
+    def set_event_on_new_model(self, event):
+        self._new_events.append(event)
+
     async def _track_model(self):
         name = self.model_info.name
         registry = self.registry
@@ -157,6 +168,12 @@ class _TrackedModel:
                 if not self.available.is_set():
                     self.available.set()
                     logger.debug(f"First tracked model [{name}] iteration info [{info}]")
+
+                if len(self._new_events) > 0:
+                    running_new_events = self._new_events
+                    self._new_events.clear()
+                    for event in running_new_events:
+                        event.set()
 
         except Exception:
             logger.exception(f"Failed to track model [{name}]")
