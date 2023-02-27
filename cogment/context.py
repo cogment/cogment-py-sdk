@@ -399,7 +399,7 @@ class Context:
 
         channel = _make_client_channel(endpoint)
         stub = model_registry_api.ModelRegistrySPStub(channel)
-        return ModelRegistryV2(stub)
+        return ModelRegistryV2(stub, endpoint.url)
 
     async def join_trial(self, trial_id, endpoint=ep.Endpoint(), impl_name=None, actor_name=None, actor_class=None):
         requested_class = None

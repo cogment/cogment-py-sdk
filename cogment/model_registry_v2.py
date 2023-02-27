@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List
+from typing import Callable, Dict, List, Tuple, Any
+import asyncio
+import time
+import inspect
+import threading
 
 import grpc.aio  # type: ignore
 
@@ -28,6 +32,12 @@ GRPC_BYTE_SIZE_LIMIT = 4 * 1024 * 1024  # 4MB
 # Arbitrary size hopefully small enough not to hit the gRPC size limit.
 # Unfortunately it is impossible to know without requesting the data, so we play it safe.
 _RETRIEVAL_COUNT = 10
+
+# Asyncio based: Not thread safe.
+# These could be made thread local, but that would introduce a different set of use-case problems.
+_tracked_models = {}  # type: Dict[str, _TrackedModel]
+_tracked_models_removal_task = None
+_tracked_models_thread_id = None
 
 
 class ModelIterationInfo:
@@ -57,9 +67,138 @@ class ModelInfo:
         return result
 
 
+class LatestModel:
+    def __init__(self, tracked_model):
+        self._model = tracked_model
+        self._model.increment_reference()
+
+        # We only provide the name, because the properties can change
+        # over time and we don't track them with the iteration info.
+        self.name = self._model.model_info.name
+
+    def __del__(self):
+        self._model.decrement_reference()
+
+    def is_deserialized(self) -> bool:
+        return (self._model.deserialized_func is not None)
+
+    async def get(self) -> Tuple[Any, ModelIterationInfo]:
+        await self.wait_for_available()
+        return self.get_no_wait()
+
+    def is_available(self) -> bool:
+        return self._model.available.is_set()  # type: ignore
+
+    async def wait_for_available(self) -> None:
+        self._model.start_tracking()
+        await self._model.available.wait()
+
+    # Undocumented: But we leave it available for special cases or low latency step trials
+    def get_no_wait(self) -> Tuple[Any, ModelIterationInfo]:
+        return self._model.model, self._model.iteration_info
+
+
+class _TrackedModel:
+    def __init__(self, info, deserialize_func, registry):
+        self.model_info = info
+        self.registry = registry
+        self.deserialize_func = deserialize_func
+
+        self.available = asyncio.Event()
+        self.last_ref = time.monotonic()
+        self.ref_count = 0
+
+        # The model is a bytes string if 'deserialize_func' is None
+        # Otherwise it is the return value of `deserialize_func`
+        self.model = None
+        self.iteration_info = None
+
+        self._tracking_task = None
+
+    def increment_reference(self):
+        self.ref_count += 1
+        self.start_tracking()
+
+    def decrement_reference(self):
+        self.ref_count -= 1
+        if self.ref_count > 0:
+            return
+        self.last_ref = time.monotonic()
+        self.ref_count = 0
+
+    def start_tracking(self):
+        if self._tracking_task is None:
+            self._tracking_task = asyncio.create_task(self._track_model())
+            # self._tracking_task.set_name(f"Cogment-Model [{self.model_info.name}] tracking") # Python 3.8
+
+    def terminate(self):
+        if self._tracking_task is not None:
+            self._tracking_task.cancel()
+            self._tracking_task = None
+
+    async def _track_model(self):
+        name = self.model_info.name
+        registry = self.registry
+
+        # Continuously track/update model
+        try:
+            async for info in registry.iteration_updates(name):
+                registry_model = await registry.retrieve_model(name, info.iteration)
+                if registry_model is None:
+                    # This seems to happen regularly!!
+                    logger.warning(f"Tracked Model [{name}] iteration [{info.iteration}] returned no data")
+                    continue
+                if self.deserialize_func is not None:
+                    self.model = self.deserialize_func(registry_model)
+                else:
+                    self.model = registry_model
+                self.iteration_info = info
+
+                if not self.available.is_set():
+                    self.available.set()
+                    logger.debug(f"First tracked model [{name}] iteration info [{info}]")
+
+        except Exception:
+            logger.exception(f"Failed to track model [{name}]")
+
+        self._tracking_task = None
+
+
+async def _tracked_models_removal():
+    global _tracked_models_removal_task
+    global _tracked_models_thread_id
+
+    _tracked_models_thread_id = threading.get_ident()
+
+    try:
+        while True:
+            await asyncio.sleep(60)
+            now = time.monotonic()
+
+            if len(_tracked_models) == 0:
+                self_task = _tracked_models_removal_task
+                _tracked_models_removal_task = None
+                _tracked_models_thread_id = None
+                logger.debug("Cancelled task for tracked models removal")
+                self_task.cancel()
+
+            for name in list(_tracked_models):
+                if _tracked_models[name].ref_count == 0 and (now - _tracked_models[name].last_ref) > 300 :
+                    _tracked_models[name].terminate()
+                    del _tracked_models[name]
+                    logger.debug(f"Stopped tracking model [{name}]. [{len(_tracked_models)}] tracked models left.")
+
+    except Exception:
+        logger.exception("Tracked models removal task failure")
+
+    _tracked_models_removal_task = None
+    _tracked_models_thread_id = None
+
+
 class ModelRegistry:
-    def __init__(self, stub):
+    def __init__(self, stub, endpoint_url):
         self._model_registry_stub = stub
+        self._endpoint_url = endpoint_url
 
     def __str__(self):
         return "ModelRegistry"
@@ -262,3 +401,55 @@ class ModelRegistry:
             else:
                 logger.exception("Model Registry communication -- Unexpected aio failure")
                 raise
+
+    # Utility function for simple use cases. More complex cases must use 'iteration_update' explicitly.
+    # This may fail if called in different threads or with different async loops.
+    async def track_latest_model(self,
+                                 name: str,
+                                 deserialize_func: Callable[[bytes], Any] = None,
+                                 initial_wait: int = 0) -> LatestModel:
+        global _tracked_models_removal_task
+
+        if name not in _tracked_models:
+            _tracked_models[name] = None
+
+            # We want to fail early if 'deserialize_func' is wrong
+            if deserialize_func is not None:
+                sig = inspect.signature(deserialize_func)
+                if len(sig.parameters) != 1:
+                    raise CogmentError(f"Deserialize function must take only one parameter [{len(sig.parameters)}]")
+
+            # Check and wait for model to exist
+            model_info = await self.get_model_info(name)
+            fail_count = 0
+            while model_info is None:
+                fail_count += 1
+                if fail_count > initial_wait:
+                    del _tracked_models[name]
+                    raise CogmentError(f"Model [{name}] not found in Model Registry")
+                logger.debug(f"Model [{name}] not yet in Model Registry")
+                await asyncio.sleep(1.0)
+                model_info = await self.get_model_info(name)
+
+            _tracked_models[name] = _TrackedModel(model_info, deserialize_func, self)
+
+        else:  # Other task is already requesting the initial model info: wait
+            while _tracked_models[name] is None:
+                await asyncio.sleep(1.0)
+                if name not in _tracked_models:
+                    raise CogmentError(f"Model [{name}] may not be found in Model Registry")
+
+        tracked_model = _tracked_models[name]
+        if deserialize_func is not None and tracked_model.deserialize_func != deserialize_func:
+            raise CogmentError(f"Deserialize function mismatch with already set function")
+        if tracked_model.registry._endpoint_url != self._endpoint_url:
+            raise CogmentError(f"Different model registry to track the same model [{name}]"
+                               f": [{tracked_model.registry._endpoint_url}] vs [{self._endpoint_url}]")
+
+        if _tracked_models_removal_task is None:
+            _tracked_models_removal_task = asyncio.create_task(_tracked_models_removal())
+            # _tracked_models_removal_task.set_name("Cogment-Stop tracking unused models") # Python 3.8
+        elif _tracked_models_thread_id != threading.get_ident():
+            logger.warning("Tracking global models on different threads")
+
+        return LatestModel(tracked_model)
