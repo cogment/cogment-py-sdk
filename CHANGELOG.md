@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.7.0 - 2023-02-28
+
 ### Changed
 
 - Facility to track latest models automatically in the Model Registry
