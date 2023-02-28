@@ -41,14 +41,15 @@ class TrialInfo:
 
     def __init__(self, trial_id, api_state):
         self.trial_id = trial_id
+        self.properties = {}
         self.state = TrialState(api_state)
         self.env_name = None
         self.tick_id = None
         self.duration = None
 
     def __str__(self):
-        result = f"TrialInfo: trial_id = {self.trial_id}, env_name = {self.env_name}, state = {self.state}"
-        result += f", tick_id = {self.tick_id}, duration = {self.duration}"
+        result = f"TrialInfo: trial_id = {self.trial_id}, properties = {self.properties}, env_name = {self.env_name}"
+        result += f", state = {self.state}, tick_id = {self.tick_id}, duration = {self.duration}"
         return result
 
 
@@ -144,6 +145,7 @@ class Controller:
         result = []
         for reply in rep.trial:
             info_ex = TrialInfo(reply.trial_id, reply.state)
+            info_ex.properties = reply.properties
             info_ex.env_name = reply.env_name
             info_ex.tick_id = reply.tick_id
             info_ex.duration = reply.trial_duration

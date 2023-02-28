@@ -328,6 +328,17 @@ class TrialParameters:
             raise CogmentError(f"Wrong type [{type(val)}]")
 
     @property
+    def properties(self):
+        """User properties associated with the trial"""
+        return self._raw_params.properties
+
+    @properties.setter
+    def properties(self, val):
+        self._raw_params.properties.clear()
+        if val is not None:
+            self._raw_params.properties.update(val)
+
+    @property
     def max_steps(self):
         """Maximum number of steps before stopping the trial"""
         return self._raw_params.max_steps

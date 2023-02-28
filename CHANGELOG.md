@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Facility to track latest models automatically in the Model Registry
 
+### Added
+
+- 'properties' attribute to TrialParameters and TrialInfo
+
 ## v2.6.0 - 2023-02-03
 
 ### Changed
