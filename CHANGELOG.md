@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Deadlock in 'wait_for_newer' method of LatestModel
+
 ## v2.7.0 - 2023-02-28
 
 ### Changed

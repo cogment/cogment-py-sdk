@@ -171,7 +171,7 @@ class _TrackedModel:
 
                 if len(self._new_events) > 0:
                     running_new_events = self._new_events
-                    self._new_events.clear()
+                    self._new_events = []
                     for event in running_new_events:
                         event.set()
 
