@@ -52,6 +52,7 @@ import asyncio
 from types import SimpleNamespace
 import socket
 import urllib.parse as urlpar
+import warnings
 
 
 _ADDITIONAL_REGISTRATION_ITEMS = {"__registration_source" : "PythonSDK-Implicit", "__version" : __version__}
@@ -159,6 +160,9 @@ class Context:
             self._directory = Directory(stub, auth_token_to_use)
         else:
             self._directory = None
+
+        if not logger.hasHandlers():
+            warnings.warn("No logging handler defined (e.g. logging.basicConfig)")
 
     def __str__(self):
         result = f"Cogment Context: user id = {self._user_id}"

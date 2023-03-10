@@ -51,7 +51,6 @@ elif _COGMENT_LOG_LEVEL == "TRACE":
     logger.setLevel(logger.TRACE)
 else:
     logger.setLevel(_COGMENT_LOG_LEVEL)
-logger.addHandler(logging.NullHandler())
 
 
 # Timeout (in seconds) for the init data to come from the Orchestrator before we consider a failure.

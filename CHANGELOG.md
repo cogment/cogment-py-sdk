@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Changed
+
+- Enable warning and error logging even if user did not define a logging handler
+- Warn user when no logging handler is defined (i.e. proper logging is disabled)
+
 ## v2.7.1 - 2023-03-06
 
 ## Fixed
