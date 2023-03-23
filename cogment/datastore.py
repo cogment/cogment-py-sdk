@@ -52,8 +52,7 @@ class DatastoreTrialInfo:
         self.user_id = info.user_id
         self.sample_count = info.samples_count
 
-        self.parameters = TrialParameters(None)
-        self.parameters._set(cog_settings, info.params)
+        self.parameters = TrialParameters(cog_settings, raw_params=info.params)
 
     def __str__(self):
         result = f"DatastoreTrialInfo:"
@@ -174,7 +173,7 @@ class DatastoreActorData:
         """Observation space to the actor"""
         if self._raw_sample.HasField("observation"):
             actor_index = self._raw_sample.actor
-            obs_space = self._parameters.actors[actor_index]._actor_class.observation_space()
+            obs_space = self._parameters.actors[actor_index].actor_class_spec.observation_space()
 
             obs_index = self._raw_sample.observation
             obs_content = self._payloads[obs_index]
@@ -188,7 +187,7 @@ class DatastoreActorData:
         """Action space from the actor"""
         if self._raw_sample.HasField("action"):
             actor_index = self._raw_sample.actor
-            action_space = self._parameters.actors[actor_index]._actor_class.action_space()
+            action_space = self._parameters.actors[actor_index].actor_class_spec.action_space()
 
             action_index = self._raw_sample.action
             action_content = self._payloads[action_index]

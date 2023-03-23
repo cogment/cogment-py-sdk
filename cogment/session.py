@@ -42,9 +42,9 @@ class _EndingAck:
 class ActorInfo:
     """Class representing the information of an actor."""
 
-    def __init__(self, name, class_name):
+    def __init__(self, name, actor_class):
         self.actor_name = name
-        self.actor_class_name = class_name
+        self.actor_class_name = actor_class
 
     def __str__(self):
         result = f"ActorInfo: actor_name = {self.actor_name}, actor_class_name = {self.actor_class_name}"
@@ -204,7 +204,7 @@ class Session(ABC):
         self._auto_ack = True
 
         # Pre-compute since it will be used regularly
-        self._active_actors = [ActorInfo(actor.name, actor.actor_class.name) for actor in trial.actors]
+        self._active_actors = [ActorInfo(actor.name, actor.actor_class_spec.name) for actor in trial.actors]
 
     def __str__(self):
         result = f"Session: name = {self.name}, impl_name = {self.impl_name}, config = {self.config}"

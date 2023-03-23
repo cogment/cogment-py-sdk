@@ -115,9 +115,9 @@ class LogParams:
         actor = self._raw_params.actors[actor_index]
 
         actor_config = None
-        a_c = self._cog_settings.actor_classes.__getattribute__(actor.actor_class)
+        actor_class_spec = self._cog_settings.actor_classes.__getattribute__(actor.actor_class)
         if actor.HasField("config"):
-            actor_config = a_c.config_type()
+            actor_config = actor_class_spec.config_type()
             actor_config.ParseFromString(actor.config.content)
 
         actor_data = {
@@ -126,8 +126,8 @@ class LogParams:
             "endpoint": actor.endpoint,
             "implementation": actor.implementation,
             "config": actor_config,
-            "action_space": a_c.action_space,
-            "observation_space": a_c.observation_space,
+            "action_space": actor_class_spec.action_space,
+            "observation_space": actor_class_spec.observation_space,
         }
 
         return actor_data

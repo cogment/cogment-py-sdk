@@ -42,8 +42,8 @@ class ActorClassList:
     def __init__(self, *args):
         self._actor_classes_list = list(args)
 
-        for a_c in args:
-            setattr(self, a_c.name, a_c)
+        for actor_class_spec in args:
+            setattr(self, actor_class_spec.name, actor_class_spec)
 
     def __iter__(self):
         return iter(self._actor_classes_list)
@@ -70,15 +70,16 @@ class ActorClassList:
 class ActorSession(Session):
     """Derived class representing the session of an actor for a trial."""
 
-    def __init__(self, impl, actor_class, trial, name, impl_name, env_name, config):
+    def __init__(self, impl, actor_class_spec, trial, name, impl_name, env_name, config):
         super().__init__(trial, name, impl, impl_name, config)
-        self.class_name = actor_class.name
+        self.class_name = actor_class_spec.name
+        self.actor_class = actor_class_spec.name
         self.env_name = env_name
-        self._actor_class = actor_class
+        self._actor_class_spec = actor_class_spec
 
     def __str__(self):
         result = super().__str__()
-        result += f" --- ActorSession: class_name = {self.class_name}, config = {self.config}"
+        result += f" --- ActorSession: actor_class = {self.actor_class}, config = {self.config}"
         return result
 
     def get_active_actors(self):

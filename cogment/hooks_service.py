@@ -69,8 +69,8 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
         session.actors = []
         for actor in proto_params.actors:
             if actor.HasField("config"):
-                a_c = self._cog_settings.actor_classes.__getattribute__(actor.actor_class)
-                actor_config = a_c.config_type()
+                actor_class_spec = getattr(self._cog_settings.actor_classes, actor.actor_class)
+                actor_config = actor_class_spec.config_type()
                 actor_config.ParseFromString(actor.config.content)
             else:
                 actor_config = None
@@ -137,8 +137,7 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
 
             trial = Trial(trial_id, [], self._cog_settings)
 
-            trial_parameters = TrialParameters(None)
-            trial_parameters._set(self._cog_settings, request.params)
+            trial_parameters = TrialParameters(self._cog_settings, raw_params=request.params)
 
             session = PrehookSession(trial, user_id, trial_parameters)
             self._decode(session, request.params)

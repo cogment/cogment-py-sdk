@@ -20,9 +20,9 @@ class Trial:
 
     class Actor:
         """Internal class maintaining the information of an actor in a trial."""
-        def __init__(self, name, actor_class):
+        def __init__(self, name, actor_class_spec):
             self.name = name
-            self.actor_class = actor_class
+            self.actor_class_spec = actor_class_spec
 
     def __init__(self, id, actors_in_trial, cog_settings):
         self.id = id
@@ -36,13 +36,13 @@ class Trial:
         for actor in actors_in_trial:
             if actor.actor_class not in self.cog_settings.actor_classes:
                 raise CogmentError(f"class [{actor.actor_class}] of actor [{actor.name}] cannot be found.")
-            actor_class = self.cog_settings.actor_classes[actor.actor_class]
-            new_actor = self.Actor(name=actor.name, actor_class=actor_class)
+            actor_class_spec = self.cog_settings.actor_classes[actor.actor_class]
+            new_actor = self.Actor(name=actor.name, actor_class_spec=actor_class_spec)
             self.actors.append(new_actor)
 
     def __str__(self):
         result = f"Trial: id = {self.id}, tick_id = {self.tick_id}, ended = {self.ended}"
         result += f", actors = "
         for actor in self.actors:
-            result += f"{{name = {actor.name}, class = {actor.actor_class.name}}},"
+            result += f"{{name = {actor.name}, class = {actor.actor_class_spec.name}}},"
         return result

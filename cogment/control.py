@@ -39,13 +39,21 @@ class TrialState(Enum):
 class TrialInfo:
     """Class representing the details of a trial."""
 
-    def __init__(self, trial_id, api_state):
-        self.trial_id = trial_id
-        self.properties = {}
-        self.state = TrialState(api_state)
-        self.env_name = None
-        self.tick_id = None
-        self.duration = None
+    def __init__(self, trial_id, api_state, raw_info):
+        if raw_info is None:
+            self.trial_id = trial_id
+            self.state = TrialState(api_state)
+            self.properties = None
+            self.env_name = None
+            self.tick_id = None
+            self.duration = None
+        else:
+            self.trial_id = raw_info.trial_id
+            self.state = TrialState(raw_info.state)
+            self.properties = raw_info.properties
+            self.env_name = raw_info.env_name
+            self.tick_id = raw_info.tick_id
+            self.duration = raw_info.trial_duration
 
     def __str__(self):
         result = f"TrialInfo: trial_id = {self.trial_id}, properties = {self.properties}, env_name = {self.env_name}"
@@ -140,22 +148,17 @@ class Controller:
             metadata = []
             for id in trial_ids:
                 metadata.append(("trial-id", id))
-        rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+        reply = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
 
         result = []
-        for reply in rep.trial:
-            info_ex = TrialInfo(reply.trial_id, reply.state)
-            info_ex.properties = reply.properties
-            info_ex.env_name = reply.env_name
-            info_ex.tick_id = reply.tick_id
-            info_ex.duration = reply.trial_duration
-
+        for info in reply.trial:
+            info_ex = TrialInfo(None, None, info)
             result.append(info_ex)
 
         return result
 
-    async def watch_trials(self, trial_state_filters=[]):
-        request = orchestrator_api.TrialListRequest()
+    async def watch_trials(self, trial_state_filters=[], full_info: bool = False):
+        request = orchestrator_api.TrialListRequest(full_info=full_info)
         for filter in trial_state_filters:
             if type(filter) != TrialState:
                 raise CogmentError(f"Unknown filter type [{type(filter)}]: must of type 'cogment.TrialState'")
@@ -167,8 +170,12 @@ class Controller:
 
         try:
             async for reply in reply_itor:
-                info = TrialInfo(reply.trial_id, reply.state)
-                keep_looping = yield info
+                if reply.HasField("info"):
+                    info_ex = TrialInfo(None, None, reply.info)
+                else:
+                    info_ex = TrialInfo(reply.trial_id, reply.state, None)
+
+                keep_looping = yield info_ex
                 if keep_looping is not None and not bool(keep_looping):
                     break
 

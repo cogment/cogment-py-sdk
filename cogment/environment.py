@@ -96,11 +96,11 @@ class EnvironmentSession(Session):
                             new_obs[actor_index] = obs
                             break  # Names are unique in trial
                     else:
-                        class_name, actor_name = target.split(".")
-                        if class_name == actor.actor_class.name:
+                        actor_class, actor_name = target.split(".")
+                        if actor_class == actor.actor_class_spec.name:
                             if actor_name == actor.name or actor_name == "*":
                                 if new_obs[actor_index] is not None:
-                                    raise CogmentError(f"Duplicate actor [{class_name}.{actor.name}] "
+                                    raise CogmentError(f"Duplicate actor [{actor_class}.{actor.name}] "
                                                        f"in observations list")
                                 new_obs[actor_index] = obs
 
@@ -113,7 +113,7 @@ class EnvironmentSession(Session):
         package.timestamp = timestamp
 
         seen_observations = {}
-        for actor_index, actor in enumerate(self._trial.actors):
+        for actor_index, _ in enumerate(self._trial.actors):
             actor_obs = new_obs[actor_index]
             obs_id = id(actor_obs)
             obs_key = seen_observations.get(obs_id)

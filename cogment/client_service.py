@@ -34,7 +34,7 @@ class _EndQueue:
 def _impl_can_serve_actor_class(impl, actor_class):
     if impl.actor_classes:
         for ac in impl.actor_classes:
-            if ac == actor_class.name:
+            if ac == actor_class:
                 return True
         return False
     else:
@@ -56,7 +56,7 @@ def _process_normal_data(data, session):
         tick_id = data.observation.tick_id
         session._trial.tick_id = tick_id
 
-        obs_space = session._actor_class.observation_space()
+        obs_space = session._actor_class_spec.observation_space()
         obs_space.ParseFromString(data.observation.content)
 
         recv_event.observation = RecvObservation(data.observation, obs_space)
@@ -298,21 +298,21 @@ class ClientServicer:
         if not actor_name:
             raise CogmentError(f"Trial [{self.trial_id}] - Empty actor name for client actor")
 
-        actor_class = self._cog_settings.actor_classes.get(init_data.actor_class)
-        if actor_class is None:
+        actor_class_spec = self._cog_settings.actor_classes.get(init_data.actor_class)
+        if actor_class_spec is None:
             raise CogmentError(f"Trial [{self.trial_id}] - "
                                f"Unknown class [{init_data.actor_class}] for client actor [{actor_name}]")
 
         config = None
         if init_data.HasField("config"):
-            if actor_class.config_type is None:
+            if actor_class_spec.config_type is None:
                 raise CogmentError(f"Trial [{self.trial_id}] - Client actor [{actor_name}] "
                                    f"received config data of unknown type (was it defined in cogment.yaml?)")
-            config = actor_class.config_type()
+            config = actor_class_spec.config_type()
             config.ParseFromString(init_data.config.content)
 
         trial = Trial(self.trial_id, [], self._cog_settings)
-        new_session = ActorSession(impl, actor_class, trial, actor_name, init_data.impl_name,
+        new_session = ActorSession(impl, actor_class_spec, trial, actor_name, init_data.impl_name,
                                    init_data.env_name, config)
 
         logger.debug(f"Trial [{self.trial_id}] - impl [{init_data.impl_name}] for actor [{actor_name}] started")

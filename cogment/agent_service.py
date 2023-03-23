@@ -68,8 +68,8 @@ def get_actor_impl(trial_id, actor_impls, init_data):
     if actor_impl is not None:
         # Check compatibility
         compatible = (len(actor_impl.actor_classes) == 0)
-        for class_name in actor_impl.actor_classes:
-            if class_name == init_data.actor_class:
+        for actor_class in actor_impl.actor_classes:
+            if actor_class == init_data.actor_class:
                 compatible = True
                 break
         if not compatible:
@@ -80,8 +80,8 @@ def get_actor_impl(trial_id, actor_impls, init_data):
 
         # Search for exact match first
         for init_data.impl_name, impl in actor_impls.items():
-            for class_name in impl.actor_classes:
-                if class_name == init_data.actor_class:
+            for actor_class in impl.actor_classes:
+                if actor_class == init_data.actor_class:
                     actor_impl = impl
                     break
             if actor_impl is not None:
@@ -112,7 +112,7 @@ def _process_normal_data(data, session):
         tick_id = data.observation.tick_id
         session._trial.tick_id = tick_id
 
-        obs_space = session._actor_class.observation_space()
+        obs_space = session._actor_class_spec.observation_space()
         obs_space.ParseFromString(data.observation.content)
 
         recv_event.observation = RecvObservation(data.observation, obs_space)
@@ -336,8 +336,8 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
         actor_impl = get_actor_impl(trial_id, self._impls, init_input)
 
         actor_name = init_input.actor_name
-        actor_class = self._cog_settings.actor_classes.get(init_input.actor_class)
-        if actor_class is None:
+        actor_class_spec = self._cog_settings.actor_classes.get(init_input.actor_class)
+        if actor_class_spec is None:
             raise CogmentError(f"Trial [{trial_id}] - "
                                f"Unknown class [{init_input.actor_class}] for service actor [{actor_name}]")
 
@@ -347,16 +347,16 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
 
         config = None
         if init_input.HasField("config"):
-            if actor_class.config_type is None:
+            if actor_class_spec.config_type is None:
                 raise CogmentError(f"Trial [{trial_id}] - Service actor [{actor_name}] "
                                    f"received config data of unknown type (was it defined in cogment.yaml?)")
-            config = actor_class.config_type()
+            config = actor_class_spec.config_type()
             config.ParseFromString(init_input.config.content)
 
         self._prometheus_data.actors_started.labels(init_input.impl_name).inc()
 
         trial = Trial(trial_id, [], self._cog_settings)
-        new_session = ActorSession(actor_impl.impl, actor_class, trial, actor_name, init_input.impl_name,
+        new_session = ActorSession(actor_impl.impl, actor_class_spec, trial, actor_name, init_input.impl_name,
                                    init_input.env_name, config)
         new_session._prometheus_data = self._prometheus_data
         self._sessions.add(key)

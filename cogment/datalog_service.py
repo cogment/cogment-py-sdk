@@ -144,7 +144,7 @@ class LogSample:
                 if self._log_params:
                     action_space = self._log_params.get_actor(actor_index)["action_space"]()
                 else:
-                    action_space = self._parameters.actors[actor_index]._actor_class.action_space()
+                    action_space = self._parameters.actors[actor_index].actor_class_spec.action_space()
                 action_space.ParseFromString(data.content)
 
             return RecvAction(actor_index, data.tick_id, status, timestamp, action_space)
@@ -165,7 +165,7 @@ class LogSample:
         if self._log_params:
             obs_space = self._log_params.get_actor(actor_index)["observation_space"]()
         else:
-            obs_space = self._parameters.actors[actor_index]._actor_class.observation_space()
+            obs_space = self._parameters.actors[actor_index].actor_class_spec.observation_space()
 
         if self._raw_sample.HasField("observations"):
             data = self._raw_sample.observations
@@ -238,8 +238,7 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
             if not request.HasField("trial_params"):
                 raise CogmentError(f"Initial data log request for [{trial_id}] does not contain parameters.")
 
-            trial_parameters = TrialParameters(None)
-            trial_parameters._set(self._cog_settings, request.trial_params)
+            trial_parameters = TrialParameters(self._cog_settings, raw_params=request.trial_params)
 
             session = DatalogSession(self._impl, trial_id, user_id, trial_parameters)
             user_task = session._start_user_task()

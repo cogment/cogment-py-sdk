@@ -21,27 +21,29 @@ from cogment.utils import logger
 class ActorParameters:
     """Class wrapping the trial api parameters for an actor"""
 
-    def __init__(self, cog_settings, class_name, **kwargs):
-        # Done not to waste resources for internal use with a '_set' call
-        if cog_settings is not None:
-            self._cog_settings = cog_settings
-            self._raw_params = common_api.ActorParams()
+    def __init__(self, cog_settings, class_name=None, **kwargs):
+        self._cog_settings = cog_settings
 
-            if class_name is None:
-                raise CogmentError(f"Required attribute 'class_name' missing")
+        if "raw_params" in kwargs:
+            self._raw_params = kwargs["raw_params"]
+            return
+
+        self._raw_params = common_api.ActorParams()
+
+        if class_name is not None:
             if type(class_name) is not str:
                 raise CogmentError(f"Wrong type for 'class_name' [{type(class_name)}]")
             self._raw_params.actor_class = class_name
+        else:
+            if "actor_class" not in kwargs:
+                raise CogmentError(f"Required attribute 'actor_class' missing")
+            self._raw_params.actor_class = kwargs["actor_class"]
 
-            # Provide an easy way for users to set parameter attributes on construction
-            for name, value in kwargs.items():
-                if name[0] == "_" or name not in dir(self):
-                    raise CogmentError(f"Unknown attribute [{name}]")
-                setattr(self, name, value)
-
-    def _set(self, cog_settings, raw_params):
-        self._cog_settings = cog_settings
-        self._raw_params = raw_params
+        # Provide an easy way for users to set parameter attributes on construction
+        for name, value in kwargs.items():
+            if name[0] == "_" or name not in dir(self):
+                raise CogmentError(f"Unknown attribute [{name}]")
+            setattr(self, name, value)
 
     def __str__(self):
         result = f"ActorParameters: {self._raw_params}"
@@ -53,7 +55,10 @@ class ActorParameters:
     def config(self):
         """Config sent to actor on trial start"""
         if self._raw_params.HasField("config"):
-            config_instance = self._actor_class.config_type()
+            if self._cog_settings is None:
+                raise CogmentError(f"Unknown type to return (no 'cog_settings')")
+
+            config_instance = self.actor_class_spec.config_type()
             config_instance.ParseFromString(self._raw_params.config.content)
         else:
             config_instance = None
@@ -64,10 +69,27 @@ class ActorParameters:
     def config(self, val):
         if val is None:
             self._raw_params.ClearField("config")
-        elif type(val) is self._actor_class.config_type:
-            self._raw_params.config.content = val.SerializeToString()
         else:
-            raise CogmentError(f"Wrong type [{type(val)}]")
+            if self._cog_settings is not None:
+                if type(val) is not self.actor_class_spec.config_type:
+                    raise CogmentError(f"Wrong type [{type(val)}]")
+
+            self._raw_params.config.content = val.SerializeToString()
+
+    @property
+    def config_serialized(self):
+        """Config sent to actor on trial start in raw serialized format"""
+        if self._raw_params.HasField("config"):
+            return self._raw_params.config.content
+        else:
+            return None
+
+    @config_serialized.setter
+    def config_serialized(self, val: bytes):
+        if val is None:
+            self._raw_params.ClearField("config")
+        else:
+            self._raw_params.config.content = val
 
     @property
     def class_name(self):
@@ -78,6 +100,24 @@ class ActorParameters:
     def class_name(self, val):
         # We could make a setter, but we would have to sync with the config and default_action: not worth it.
         raise CogmentError(f"Cannot change class name of existing instance of ActorParameters")
+
+    @property
+    def actor_class(self):
+        """Class of the actor (defined in spec)"""
+        return self._raw_params.actor_class
+
+    @actor_class.setter
+    def actor_class(self, val):
+        if self._cog_settings is not None:
+            # We could make a setter, but we would have to sync with the config and default_action: not worth it.
+            raise CogmentError(f"Cannot change actor class of existing instance of ActorParameters")
+
+        if val is None or len(val) == 0:
+            raise CogmentError(f"Cannot reset required actor class")
+        elif type(val) is str:
+            self._raw_params.actor_class = val
+        else:
+            raise CogmentError(f"Wrong type [{type(val)}]")
 
     @property
     def name(self):
@@ -163,7 +203,10 @@ class ActorParameters:
     def default_action(self):
         """The default action space for optional actors not connected"""
         if self._raw_params.HasField("default_action"):
-            action_space = self._actor_class.action_space()
+            if self._cog_settings is None:
+                raise CogmentError(f"Unknown type to return (no 'cog_settings')")
+
+            action_space = self.actor_class_spec.action_space()
             action_space.ParseFromString(self._raw_params.default_action.content)
         else:
             action_space = None
@@ -174,14 +217,34 @@ class ActorParameters:
     def default_action(self, val):
         if val is None:
             self._raw_params.ClearField("default_action")
-        elif type(val) is self._actor_class.action_space:
-            self._raw_params.default_action.content = val.SerializeToString()
         else:
-            raise CogmentError(f"Wrong type [{type(val)}]")
+            if self._cog_settings is not None:
+                if type(val) is not self.actor_class_spec.action_space:
+                    raise CogmentError(f"Wrong type [{type(val)}]")
+
+            self._raw_params.default_action.content = val.SerializeToString()
 
     @property
-    def _actor_class(self):
-        return getattr(self._cog_settings.actor_classes, self._raw_params.actor_class)
+    def default_action_serialized(self):
+        """The default action space for optional actors not connected, in raw serialized format"""
+        if self._raw_params.HasField("default_action"):
+            return self._raw_params.default_action.content
+        else:
+            return None
+
+    @default_action_serialized.setter
+    def default_action_serialized(self, val: bytes):
+        if val is None:
+            self._raw_params.ClearField("default_action")
+        else:
+            self._raw_params.default_action.content = val
+
+    @property
+    def actor_class_spec(self):
+        if self._cog_settings is not None:
+            return self._cog_settings.actor_classes[self._raw_params.actor_class]
+        else:
+            raise CogmentError(f"Unknown actor class spec (no 'cog_settings' available)")
 
 
 class _ActorsList:
@@ -200,14 +263,12 @@ class _ActorsList:
 
     def __getitem__(self, key):
         if type(key) is int:
-            actor_params = ActorParameters(None, None)
-            actor_params._set(self._cog_settings, self._raw_params.actors[key])
+            actor_params = ActorParameters(self._cog_settings, raw_params=self._raw_params.actors[key])
         elif type(key) is slice:
             actor_params = []
             actors = self._raw_params.actors
             for actual_index in range(len(actors))[key]:
-                params = ActorParameters(None, None)
-                params._set(self._cog_settings, actors[actual_index])
+                params = ActorParameters(self._cog_settings, raw_params=actors[actual_index])
                 actor_params.append(params)
         else:
             raise CogmentError(f"Wrong key type [{type(key)}]")
@@ -228,8 +289,7 @@ class _ActorsList:
 
     def __iter__(self):
         for raw_actor in self._raw_params.actors:
-            actor_params = ActorParameters(None, None)
-            actor_params._set(self._cog_settings, raw_actor)
+            actor_params = ActorParameters(self._cog_settings, raw_params=raw_actor)
             yield actor_params
 
     def append(self, val):
@@ -254,27 +314,26 @@ class _ActorsList:
 class TrialParameters:
     """Class wrapping the api parameters of a trial"""
 
-    _SERIALIZATION_TYPE = 2
+    _SERIALIZATION_TYPE = 3
     _METHODS = ["get_serialization_type", "serialize", "deserialize"]
 
     def __init__(self, cog_settings, **kwargs):
-        # Done not to waste resources for internal use with a '_set' call
-        if cog_settings is not None:
-            self._cog_settings = cog_settings
-            self._raw_params = common_api.TrialParams()
-            self._actors = _ActorsList(cog_settings, self._raw_params)
-
-            # Provide an easy way for users to set parameter attributes on construction
-            for name, value in kwargs.items():
-                # TODO: We could also protect the methods
-                if name[0] == "_" or name in self._METHODS or name not in dir(self):
-                    raise CogmentError(f"Unknown attribute [{name}]")
-                setattr(self, name, value)
-
-    def _set(self, cog_settings, raw_params):
         self._cog_settings = cog_settings
-        self._raw_params = raw_params
-        self._actors = _ActorsList(cog_settings, raw_params)
+
+        if "raw_params" in kwargs:
+            self._raw_params = kwargs["raw_params"]
+            self._actors = _ActorsList(cog_settings, self._raw_params)
+            return
+
+        self._raw_params = common_api.TrialParams()
+        self._actors = _ActorsList(cog_settings, self._raw_params)
+
+        # Provide an easy way for users to set parameter attributes on construction
+        for name, value in kwargs.items():
+            # TODO: We could also protect the methods
+            if name[0] == "_" or name in self._METHODS or name not in dir(self):
+                raise CogmentError(f"Unknown attribute [{name}]")
+            setattr(self, name, value)
 
     def __str__(self):
         result = f"TrialParameters: {self._raw_params}"
@@ -309,6 +368,9 @@ class TrialParameters:
     def config(self):
         """Config for initial trial setup by pre-trial hooks"""
         if self._raw_params.HasField("trial_config"):
+            if self._cog_settings is None:
+                raise CogmentError(f"Unknown type to return (no 'cog_settings')")
+
             config_instance = self._cog_settings.trial.config_type()
             config_instance.ParseFromString(self._raw_params.trial_config.content)
         else:
@@ -320,12 +382,26 @@ class TrialParameters:
     def config(self, val):
         if val is None:
             self._raw_params.ClearField("trial_config")
+        else:
+            if self._cog_settings is not None and not isinstance(val, self._cog_settings.trial.config_type):
+                raise CogmentError(f"Wrong type [{type(val)}]")
 
-        elif isinstance(val, self._cog_settings.trial.config_type):
             self._raw_params.trial_config.content = val.SerializeToString()
 
+    @property
+    def config_serialized(self):
+        """Config for initial trial setup by pre-trial hooks in raw serialized format"""
+        if self._raw_params.HasField("trial_config"):
+            return self._raw_params.trial_config.content
         else:
-            raise CogmentError(f"Wrong type [{type(val)}]")
+            return None
+
+    @config_serialized.setter
+    def config_serialized(self, val: bytes):
+        if val is None:
+            self._raw_params.ClearField("trial_config")
+        else:
+            self._raw_params.trial_config.content = val
 
     @property
     def properties(self):
@@ -419,6 +495,9 @@ class TrialParameters:
     def environment_config(self):
         """Config sent to environment on trial start"""
         if(self._raw_params.environment.HasField("config")):
+            if self._cog_settings is None:
+                raise CogmentError(f"Unknown type to return (no 'cog_settings')")
+
             config_instance = self._cog_settings.environment.config_type()
             config_instance.ParseFromString(self._raw_params.environment.config.content)
         else:
@@ -430,12 +509,26 @@ class TrialParameters:
     def environment_config(self, val):
         if val is None:
             self._raw_params.environment.ClearField("config")
+        else:
+            if self._cog_settings is not None and not isinstance(val, self._cog_settings.environment.config_type):
+                raise CogmentError(f"Wrong type [{type(val)}]")
 
-        elif isinstance(val, self._cog_settings.environment.config_type):
             self._raw_params.environment.config.content = val.SerializeToString()
 
+    @property
+    def environment_config_serialized(self):
+        """Config sent to environment on trial start in raw serialized format"""
+        if(self._raw_params.environment.HasField("config")):
+            return self._raw_params.environment.config.content
         else:
-            raise CogmentError(f"Wrong type [{type(val)}]")
+            return None
+
+    @environment_config_serialized.setter
+    def environment_config_serialized(self, val: bytes):
+        if val is None:
+            self._raw_params.environment.ClearField("config")
+        else:
+            self._raw_params.environment.config.content = val
 
     @property
     def environment_name(self):
@@ -487,9 +580,12 @@ class TrialParameters:
 
     @actors.setter
     def actors(self, val):
-        for param in val:
-            if type(param) is not ActorParameters:
-                raise CogmentError(f"Wrong type for actor parameter [{type(param)}]")
+        if val is None:
+            self._actors.clear()
+        else:
+            for param in val:
+                if type(param) is not ActorParameters:
+                    raise CogmentError(f"Wrong type for actor parameter [{type(param)}]")
 
-        self._actors.clear()
-        self._actors.extend(val)
+            self._actors.clear()
+            self._actors.extend(val)

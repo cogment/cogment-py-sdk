@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Option to request full info (not just id and state) from 'watch_trials'
+- Ability to use 'TrialParameters' and 'ActorParameters' without cog_settings
+
 ### Changed
 
 - Enable warning and error logging even if user did not define a logging handler

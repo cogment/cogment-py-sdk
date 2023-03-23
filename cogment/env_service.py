@@ -100,7 +100,7 @@ def _process_normal_data(data, session):
             else:
                 status = ActorStatus.ACTIVE
                 timestamp = act_set.timestamp
-                action = actor.actor_class.action_space()
+                action = actor.actor_class_spec.action_space()
                 action.ParseFromString(act_set.actions[index])
 
             recv_event.actions.append(RecvAction(index, act_set.tick_id, status, timestamp, action))
