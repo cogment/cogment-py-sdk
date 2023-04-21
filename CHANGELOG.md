@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.8.0 - 2023-04-21
+
 ### Added
 
 - Option to request full info (not just id and state) from 'watch_trials'
