@@ -61,6 +61,9 @@ class DatastoreTrialInfo:
         result += f", parameters = {self.parameters}"
         return result
 
+    def has_specs(self):
+        return self.parameters.has_specs()
+
 
 class DatastoreReward:
     """Class representing an individual reward sent during this sample."""
@@ -162,6 +165,10 @@ class DatastoreActorData:
         result += f", nb sent messages = {len(self._raw_sample.sent_messages)}"
         return result
 
+    def has_specs(self):
+        # If the trial parameters have spec, the actor's should have spec
+        return self._parameters.has_specs()
+
     @property
     def name(self):
         """Name of the actor"""
@@ -170,7 +177,7 @@ class DatastoreActorData:
 
     @property
     def observation(self):
-        """Observation space to the actor"""
+        """Observation for the actor"""
         if self._raw_sample.HasField("observation"):
             actor_index = self._raw_sample.actor
             obs_space = self._parameters.actors[actor_index].actor_class_spec.observation_space()
@@ -183,8 +190,18 @@ class DatastoreActorData:
             return None
 
     @property
+    def observation_serialized(self):
+        """Serialized observation for the actor"""
+        if self._raw_sample.HasField("observation"):
+            obs_index = self._raw_sample.observation
+            obs_content = self._payloads[obs_index]
+            return obs_content
+        else:
+            return None
+
+    @property
     def action(self):
-        """Action space from the actor"""
+        """Action of the actor"""
         if self._raw_sample.HasField("action"):
             actor_index = self._raw_sample.actor
             action_space = self._parameters.actors[actor_index].actor_class_spec.action_space()
@@ -193,6 +210,16 @@ class DatastoreActorData:
             action_content = self._payloads[action_index]
             action_space.ParseFromString(action_content)
             return action_space
+        else:
+            return None
+
+    @property
+    def action_serialized(self):
+        """Serialized action of the actor"""
+        if self._raw_sample.HasField("action"):
+            action_index = self._raw_sample.action
+            action_content = self._payloads[action_index]
+            return action_content
         else:
             return None
 
@@ -248,6 +275,9 @@ class DatastoreSample:
         result += f", nb actors = {len(self.actors_data)}"
         return result
 
+    def has_specs(self):
+        return self._parameters.has_specs()
+
 
 class Datastore:
     """Class representing the session of a datalog for a trial."""
@@ -255,23 +285,27 @@ class Datastore:
     def __init__(self, stub, cog_settings):
         self._datastore_stub = stub
         self._cog_settings = cog_settings
-        self._timeout = 0
 
     def __str__(self):
         result = f"Datastore"
         return result
 
-    async def all_trials(self, bundle_size=1, wait_for_trials=0):
+    def has_specs(self):
+        return (self._cog_settings is not None)
+
+    async def all_trials(self, bundle_size=1, wait_for_trials=0, properties={}, ids=[]):
         request = datastore_api.RetrieveTrialsRequest()
         request.timeout = int(wait_for_trials * 1000)
         request.trials_count = bundle_size
         request.trial_handle = ""
+        request.properties.update(properties)
+        request.trial_ids.extend(ids)
 
         while True:
             reply = await self._datastore_stub.RetrieveTrials(request)
 
-            for rep_info in reply.trial_infos:
-                info = DatastoreTrialInfo(self._cog_settings, rep_info)
+            for reply_info in reply.trial_infos:
+                info = DatastoreTrialInfo(self._cog_settings, reply_info)
                 yield info
 
             if len(reply.trial_infos) < bundle_size:
@@ -281,17 +315,16 @@ class Datastore:
             else:
                 break
 
-    async def get_trials(self, ids):
+    async def get_trials(self, ids=[], properties={}):
         request = datastore_api.RetrieveTrialsRequest()
-        request.timeout = self._timeout
-        for id in ids:
-            request.trial_ids.append(id)
+        request.properties.update(properties)
+        request.trial_ids.extend(ids)
 
         reply = await self._datastore_stub.RetrieveTrials(request)
 
         trial_infos = []
-        for rep_info in reply.trial_infos:
-            info = DatastoreTrialInfo(self._cog_settings, rep_info)
+        for reply_info in reply.trial_infos:
+            info = DatastoreTrialInfo(self._cog_settings, reply_info)
             trial_infos.append(info)
 
         return trial_infos

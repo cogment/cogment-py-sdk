@@ -10,12 +10,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - Option to request full info (not just id and state) from 'watch_trials'
-- Ability to use 'TrialParameters' and 'ActorParameters' without cog_settings
+- Ability to use the SDK without spec (cog_settings)
+- Automatic port selection for 'Context.serve_all_registered()'
+- Ability to specify an explicit host to register a service to the directory
+- Ability to specify trial properties for 'Datastore.all_trials()' and 'Datastore.get_trials()'
+- Ability to specify trial ids for 'Datastore.all_trials()'
 
 ### Changed
 
 - Enable warning and error logging even if user did not define a logging handler
 - Warn user when no logging handler is defined (i.e. proper logging is disabled)
+- Better self IP address discovery functionality
 
 ## v2.7.1 - 2023-03-06
 

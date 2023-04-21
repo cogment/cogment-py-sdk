@@ -235,7 +235,7 @@ class Session(ABC):
             return False
 
         except Exception:
-            logger.exception(f"An exception occured in user implementation of [{self.name}]")
+            logger.exception(f"An exception occurred in user implementation of [{self.name}]")
             raise
 
     def _start_user_task(self):

@@ -38,3 +38,6 @@ from cogment.errors import CogmentError
 
 # Necessary because of cogment CLI "cog_settings.py" generated code
 from cogment.actor import ActorClass, ActorClassList
+
+# Used in Cogment Enterprise
+from cogment.utils import make_logger

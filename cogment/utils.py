@@ -36,21 +36,31 @@ def _logger_deprecated(self, msg):
         self.DEPRECATED_LOGGED.add(msg)
 
 
-# `logger` type is set to `Any` to stop pylint from complaining
-# about: '"Logger" has no attribute "deprecated"'. Similarly for "trace".
-logger: typing.Any = logging.getLogger("cogment.sdk")
-setattr(logger, "TRACE", 5)  # We don't want a new global level name (i.e. with 'logging.addLevelName')
-setattr(logger, "trace", types.MethodType(_logger_trace, logger))
-setattr(logger, "DEPRECATED_LOGGED", set())
-setattr(logger, "deprecated", types.MethodType(_logger_deprecated, logger))
+def make_logger(name, env_name=None, default_level="INFO"):
+    # `logger` type is set to `Any` to stop pylint from complaining
+    # about: '"Logger" has no attribute "deprecated"'. Similarly for "trace".
+    logger: typing.Any = logging.getLogger(name)
+    setattr(logger, "TRACE", 5)  # We don't want a new global level name (i.e. with 'logging.addLevelName')
+    setattr(logger, "trace", types.MethodType(_logger_trace, logger))
+    setattr(logger, "DEPRECATED_LOGGED", set())
+    setattr(logger, "deprecated", types.MethodType(_logger_deprecated, logger))
 
-_COGMENT_LOG_LEVEL = os.environ.get("COGMENT_LOG_LEVEL", "INFO").upper()
-if _COGMENT_LOG_LEVEL == "OFF":
-    logger.setLevel(logging.CRITICAL)
-elif _COGMENT_LOG_LEVEL == "TRACE":
-    logger.setLevel(logger.TRACE)
-else:
-    logger.setLevel(_COGMENT_LOG_LEVEL)
+    if env_name is not None:
+        log_level = os.environ.get(env_name, default_level).upper()
+    else:
+        log_level = default_level.upper()
+
+    if log_level == "OFF":
+        logger.setLevel(logging.CRITICAL)
+    elif log_level == "TRACE":
+        logger.setLevel(logger.TRACE)
+    else:
+        logger.setLevel(log_level)
+
+    return logger
+
+
+logger = make_logger("cogment.sdk", "COGMENT_LOG_LEVEL")
 
 
 # Timeout (in seconds) for the init data to come from the Orchestrator before we consider a failure.

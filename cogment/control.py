@@ -72,6 +72,9 @@ class Controller:
         result = f"Controller: user id = {self._user_id}"
         return result
 
+    def has_specs(self):
+        return True  # This class does not rely on the spec
+
     async def get_actors(self, trial_id):
         req = orchestrator_api.TrialInfoRequest()
         req.get_actor_list = True
@@ -95,7 +98,10 @@ class Controller:
         if trial_config is not None:
             if trial_params is not None:
                 raise CogmentError(f"Cannot provide both a start config and start parameters")
-            req.config.content = trial_config.SerializeToString()
+            if type(trial_config) is not bytes:
+                req.config.content = trial_config.SerializeToString()
+            else:
+                req.config.content = trial_config
         elif trial_params is not None:
             req.params.CopyFrom(trial_params._raw_params)
             if trial_params._raw_params.HasField("trial_config"):

@@ -220,6 +220,9 @@ class ModelRegistry:
     def __str__(self):
         return "ModelRegistry"
 
+    def has_specs(self):
+        return True  # This class does not rely on the spec
+
     async def store_model(self,
             name: str, model: bytes, iteration_properties: Dict[str, str] = None) -> ModelIterationInfo:
         return await self._send_model(name, model, iteration_properties, True)

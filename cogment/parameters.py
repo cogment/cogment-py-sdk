@@ -21,6 +21,8 @@ from cogment.utils import logger
 class ActorParameters:
     """Class wrapping the trial api parameters for an actor"""
 
+    _METHODS = ["has_specs"]
+
     def __init__(self, cog_settings, class_name=None, **kwargs):
         self._cog_settings = cog_settings
 
@@ -41,13 +43,16 @@ class ActorParameters:
 
         # Provide an easy way for users to set parameter attributes on construction
         for name, value in kwargs.items():
-            if name[0] == "_" or name not in dir(self):
+            if name[0] == "_" or name in self._METHODS or name not in dir(self):
                 raise CogmentError(f"Unknown attribute [{name}]")
             setattr(self, name, value)
 
     def __str__(self):
         result = f"ActorParameters: {self._raw_params}"
         return result
+
+    def has_specs(self):
+        return (self._cog_settings is not None)
 
     # ----------------- properties -------------------
 
@@ -254,6 +259,13 @@ class _ActorsList:
         self._cog_settings = cog_settings
         self._raw_params = raw_params
 
+        # dict(actor name : actor index)
+        # This is not perfect, if the name of actors change, this will become
+        # out of date. And creating a back reference is not an option here.
+        # We also don't want to do a search for every call as it would be very
+        # inefficient for current use case in enterprise.
+        self._actor_indexes = None
+
     def __str__(self):
         result = f"Actors Parameters: {self._raw_params.actors}"
         return result
@@ -264,12 +276,23 @@ class _ActorsList:
     def __getitem__(self, key):
         if type(key) is int:
             actor_params = ActorParameters(self._cog_settings, raw_params=self._raw_params.actors[key])
+
         elif type(key) is slice:
             actor_params = []
             actors = self._raw_params.actors
             for actual_index in range(len(actors))[key]:
                 params = ActorParameters(self._cog_settings, raw_params=actors[actual_index])
                 actor_params.append(params)
+
+        elif type(key) is str:
+            if self._actor_indexes is None:
+                self._actor_indexes = {actor.name : index for index, actor in enumerate(self._raw_params.actors)}
+
+            actor_index = self._actor_indexes.get(key)
+            if actor_index is None:
+                raise CogmentError(f"Unknown actor name [{key}]")
+            actor_params = ActorParameters(self._cog_settings, raw_params=self._raw_params.actors[actor_index])
+
         else:
             raise CogmentError(f"Wrong key type [{type(key)}]")
 
@@ -278,6 +301,7 @@ class _ActorsList:
     def __setitem__(self, key, val):
         if type(key) is int and type(val) is ActorParameters:
             self._raw_params.actors[key].CopyFrom(val._raw_params)
+            self._actor_indexes = None
         elif type(key) is slice:
             # Complicated for very little gain
             raise CogmentError(f"Slices are not valid for setting")
@@ -286,6 +310,7 @@ class _ActorsList:
 
     def __delitem__(self, key):
         del self._raw_params.actors[key]
+        self._actor_indexes = None
 
     def __iter__(self):
         for raw_actor in self._raw_params.actors:
@@ -309,13 +334,14 @@ class _ActorsList:
 
     def clear(self):
         self._raw_params.ClearField("actors")
+        self._actor_indexes = None
 
 
 class TrialParameters:
     """Class wrapping the api parameters of a trial"""
 
     _SERIALIZATION_TYPE = 3
-    _METHODS = ["get_serialization_type", "serialize", "deserialize"]
+    _METHODS = ["get_serialization_type", "serialize", "deserialize", "has_specs"]
 
     def __init__(self, cog_settings, **kwargs):
         self._cog_settings = cog_settings
@@ -360,6 +386,9 @@ class TrialParameters:
 
         self._raw_params = params
         self._actors = _ActorsList(self._cog_settings, params)
+
+    def has_specs(self):
+        return (self._cog_settings is not None)
 
     # ----------------- properties -------------------
 

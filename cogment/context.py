@@ -57,6 +57,28 @@ import warnings
 
 _ADDITIONAL_REGISTRATION_ITEMS = {"__registration_source" : "PythonSDK-Implicit", "__version" : __version__}
 
+# (host, port): This IP address is normally not assigned, it is reserved for local benchmarking by IANA (RFC2544).
+_SPECIAL_CONNECTION_IP = ("192.19.254.254", 65535)
+
+
+def _self_ip_address():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM | socket.SOCK_NONBLOCK)
+    try:
+        sock.connect(_SPECIAL_CONNECTION_IP)
+        addr = sock.getsockname()[0]
+    except Exception as exc:
+        logger.debug(f"Failed to connect to get host ip address [{exc}]")
+        addr = None
+    finally:
+        sock.close()
+
+    if not addr or addr.startswith("127.") or addr == "0.0.0.0":
+        logger.debug(f"Could not get host address [{addr}]")
+        addr = None
+
+    logger.debug(f"Host address [{addr}]")
+    return addr
+
 
 def _make_client_channel(grpc_endpoint: ep.Endpoint):
     parsed_url = urlpar.urlparse(grpc_endpoint.url)
@@ -91,7 +113,7 @@ def _make_server(served_endpoint: ep.ServedEndpoint):
 
     address = f"[::]:{served_endpoint.port}"
     if not served_endpoint.using_ssl():
-        server.add_insecure_port(address)
+        port = server.add_insecure_port(address)
     else:
         if served_endpoint.root_certificates:
             require_client_auth = True
@@ -106,9 +128,14 @@ def _make_server(served_endpoint: ep.ServedEndpoint):
             certs = None
 
         creds = grpc.ssl_server_credentials(certs, root, require_client_auth)
-        server.add_secure_port(address, creds)
+        port = server.add_secure_port(address, creds)
 
-    return server
+    if served_endpoint.port == 0:
+        logger.info(f"Serving on port [{port}]")
+    elif served_endpoint.port != port:
+        logger.warning(f"gRPC ignored requested port [{served_endpoint.port}] and is serving on port [{port}]")
+
+    return (server, port)
 
 
 class Context:
@@ -123,6 +150,7 @@ class Context:
         self._prehook_impl: SimpleNamespace = None
         self._datalog_impl: SimpleNamespace = None
         self._grpc_server = None  # type: Any
+        self._grpc_server_port: int = 0
         self._prometheus_registry = prometheus_registry
         self._cog_settings = cog_settings
 
@@ -137,6 +165,8 @@ class Context:
             self.asyncio_loop = asyncio_loop
 
         if directory_endpoint is not None:
+            if not isinstance(directory_endpoint, ep.Endpoint):
+                CogmentError(f"Wrong argument type for 'directory_endpoint', must be a 'cogment.Endpoint' type")
             endpoint_to_use = directory_endpoint
         else:
             env_endpoint = os.environ.get("COGMENT_DIRECTORY_ENDPOINT")
@@ -144,29 +174,41 @@ class Context:
                 endpoint_to_use = ep.Endpoint(env_endpoint)
             else:
                 endpoint_to_use = None
+        logger.debug(f"Directory endpoint [{endpoint_to_use}]")
 
         if directory_auth_token is not None:
+            if type(directory_auth_token) is not str:
+                CogmentError(f"Wrong argument type for 'directory_auth_token', must be 'str' type")
+            if not endpoint_to_use:
+                logger.warning(f"Context 'directory_auth_token' argument unused because"
+                               f" the directory endpoint is not set")
             auth_token_to_use = directory_auth_token
         else:
             auth_token_to_use = os.environ.get("COGMENT_DIRECTORY_AUTHENTICATION_TOKEN")
+        logger.debug(f"Directory authorization token [{auth_token_to_use is not None and len(auth_token_to_use) > 0}]")
 
         if endpoint_to_use:
             try:
-                channel = _make_client_channel(endpoint_to_use)
+                self._directory = self.get_directory(endpoint_to_use, auth_token_to_use)
             except CogmentError as exc:
                 raise CogmentError(f"Directory endpoint: {exc}")
-
-            stub = directory_grpc_api.DirectorySPStub(channel)
-            self._directory = Directory(stub, auth_token_to_use)
         else:
+            logger.debug(f"No directory set")
             self._directory = None
 
         if not logger.hasHandlers():
             warnings.warn("No logging handler defined (e.g. logging.basicConfig)")
 
     def __str__(self):
-        result = f"Cogment Context: user id = {self._user_id}"
+        result = f"Cogment Context: user id = {self._user_id}, served_port = {self.served_port}"
         return result
+
+    @property
+    def served_port(self):
+        return self._grpc_server_port
+
+    def has_specs(self):
+        return (self._cog_settings is not None)
 
     def register_actor(self,
                        impl: Callable[[ActorSession], Awaitable[None]],
@@ -256,38 +298,42 @@ class Context:
 
         registered.clear()
 
-    async def _directory_registration(self, port, ssl):
+    async def _directory_registration(self, host, port, ssl):
         registered: List[Tuple[int, str]] = []
 
         if self._directory is None:
             logger.debug(f"No directory for implicit service registration")
             return registered
 
-        socket_addr = socket.gethostbyname(socket.gethostname())
-        logger.debug(f"Registering services available here [{socket_addr}] to Directory")
+        if host is None:
+            host = _self_ip_address()
+            if not host:
+                logger.warning(f"Could not determine this host address for directory registration")
+                return registered
 
+        logger.debug(f"Registering services available here [{host}] to Directory")
         try:
             for actor in self._actor_impls.values():
                 properties = actor.properties
                 for actor_class in actor.actor_classes:
                     properties[ep.ACTOR_CLASS_PROPERTY_NAME] = actor_class
                     res = await self._directory.register_host(
-                        ServiceType.ACTOR, socket_addr, port, ssl, properties)
+                        ServiceType.ACTOR, host, port, ssl, properties)
                     registered.append(res)
 
             for env in self._env_impls.values():
                 res = await self._directory.register_host(
-                    ServiceType.ENVIRONMENT, socket_addr, port, ssl, env.properties)
+                    ServiceType.ENVIRONMENT, host, port, ssl, env.properties)
                 registered.append(res)
 
             if self._prehook_impl is not None:
                 res = await self._directory.register_host(
-                    ServiceType.HOOK, socket_addr, port, ssl, self._prehook_impl.properties)
+                    ServiceType.HOOK, host, port, ssl, self._prehook_impl.properties)
                 registered.append(res)
 
             if self._datalog_impl is not None:
                 res = await self._directory.register_host(
-                    ServiceType.DATALOG, socket_addr, port, ssl, self._datalog_impl.properties)
+                    ServiceType.DATALOG, host, port, ssl, self._datalog_impl.properties)
                 registered.append(res)
 
         except Exception:
@@ -296,14 +342,15 @@ class Context:
 
         return registered
 
-    async def serve_all_registered(self, served_endpoint: ep.ServedEndpoint, prometheus_port=None):
+    async def serve_all_registered(self, served_endpoint: ep.ServedEndpoint = ep.ServedEndpoint(),
+                                   prometheus_port=None, directory_registration_host: str = None):
         if (len(self._actor_impls) == 0 and len(self._env_impls) == 0 and
                 self._prehook_impl is None and self._datalog_impl is None):
             raise CogmentError("Nothing registered to serve!")
         if self._grpc_server is not None:
             raise CogmentError("Cannot serve the same components twice")
 
-        self._grpc_server = _make_server(served_endpoint)
+        self._grpc_server, self._grpc_server_port = _make_server(served_endpoint)
 
         if self._actor_impls:
             servicer = AgentServicer(self._actor_impls, self._cog_settings, self._prometheus_registry)
@@ -325,13 +372,14 @@ class Context:
             start_prometheus_server(prometheus_port, "", self._prometheus_registry)
 
         await self._grpc_server.start()
-        logger.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] started")
+        logger.debug(f"Context gRPC server at port [{self._grpc_server_port}] for user [{self._user_id}] started")
 
-        directory_registered = await self._directory_registration(served_endpoint.port, served_endpoint.using_ssl())
+        directory_registered = await self._directory_registration(directory_registration_host, self._grpc_server_port,
+                                                                  served_endpoint.using_ssl())
 
         try:
             await self._grpc_server.wait_for_termination()
-            logger.debug(f"Context gRPC server at port [{served_endpoint.port}] for user [{self._user_id}] exited")
+            logger.debug(f"Context gRPC server at port [{self._grpc_server_port}] for user [{self._user_id}] exited")
 
         finally:
             await self._directory_deregistration(directory_registered)
@@ -387,6 +435,10 @@ class Context:
         channel = _make_client_channel(endpoint)
         stub = directory_grpc_api.DirectorySPStub(channel)
         return Directory(stub, authentication_token)
+
+    # Undocumented
+    def get_context_directory(self):
+        return self._directory
 
     async def get_model_registry(self, endpoint=ep.Endpoint()):
         logger.deprecated(f"'get_model_registry' is deprecated, use 'get_model_registry_v2'")
