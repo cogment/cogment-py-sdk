@@ -4,7 +4,7 @@ set -e
 
 rm -rf dist
 
-python -m venv .venv
+python3 -m venv .venv
 # shellcheck source=/dev/null
 source .venv/bin/activate
 
@@ -12,7 +12,7 @@ pip install -e ".[generate]"
 pip install -r requirements.txt
 pycodestyle
 mypy cogment/
-python -m build
+python3 -m build
 
 deactivate
 
