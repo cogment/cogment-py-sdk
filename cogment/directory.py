@@ -171,6 +171,7 @@ class Directory:
         for dir_url, dir_ssl in dir_urls:
             if (ssl_endpoint and dir_ssl) or (not ssl_endpoint and not dir_ssl):
                 url = dir_url
+                break  # We take the first (most recent) one
 
         if url is not None:
             new_endpoint = copy.copy(endpoint)
