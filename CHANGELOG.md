@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Fixed
 
 - Use the most recent directory entry when there are duplicates
+- Self IP address discovery functionality is now working on macOS
 
 ## v2.8.0 - 2023-04-21
 
@@ -66,8 +67,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Simplified interface for Model Registry (context.get_model_registry_v2)
 
 ## v2.4.1 - 2022-12-02
-- Support and dependency check for python 3.10
 
+- Support and dependency check for python 3.10
 
 ## v2.4.0 - 2022-11-18
 

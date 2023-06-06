@@ -62,7 +62,11 @@ _SPECIAL_CONNECTION_IP = ("192.19.254.254", 65535)
 
 
 def _self_ip_address():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM | socket.SOCK_NONBLOCK)
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM | socket.SOCK_NONBLOCK)
+    except AttributeError:
+        # socket.SOCK_NONBLOCK is only defined on "modern" linuxes, fallbacking to not using it
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.connect(_SPECIAL_CONNECTION_IP)
         addr = sock.getsockname()[0]
