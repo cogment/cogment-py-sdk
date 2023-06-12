@@ -208,10 +208,10 @@ class Context:
         return result
 
     @property
-    def served_port(self):
+    def served_port(self) -> int:
         return self._grpc_server_port
 
-    def has_specs(self):
+    def has_specs(self) -> bool:
         return (self._cog_settings is not None)
 
     def register_actor(self,
