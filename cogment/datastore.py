@@ -100,6 +100,8 @@ class DatastoreReward:
         if self._raw_reward.HasField("user_data"):
             data_index = self._raw_reward.user_data
             data_content = self._payloads[data_index]
+            if data_content is None:
+                return None
             any = common_api.RewardSource().user_data  # Easier than instantiating 'google.protobuf.any_pb2.Any'
             any.ParseFromString(data_content)
 
@@ -139,6 +141,8 @@ class DatastoreMessage:
         if self._raw_message.HasField("payload"):
             payload_index = self._raw_message.payload
             payload_content = self._payloads[payload_index]
+            if payload_content is None:
+                return None
             any = common_api.Message().payload  # Easier than instantiating 'google.protobuf.any_pb2.Any'
             any.ParseFromString(payload_content)
 
@@ -184,6 +188,8 @@ class DatastoreActorData:
 
             obs_index = self._raw_sample.observation
             obs_content = self._payloads[obs_index]
+            if obs_content is None:
+                return None
             obs_space.ParseFromString(obs_content)
             return obs_space
         else:
@@ -208,6 +214,8 @@ class DatastoreActorData:
 
             action_index = self._raw_sample.action
             action_content = self._payloads[action_index]
+            if action_content is None:
+                return None
             action_space.ParseFromString(action_content)
             return action_space
         else:

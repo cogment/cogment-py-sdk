@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Return None when no data is availble in datastore content
+
 ## v2.8.1 - 2023-06-06
 
 ## Fixed
