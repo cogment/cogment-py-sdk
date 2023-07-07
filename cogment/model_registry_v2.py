@@ -156,8 +156,8 @@ class _TrackedModel:
             async for info in registry.iteration_updates(name):
                 registry_model = await registry.retrieve_model(name, info.iteration)
                 if registry_model is None:
-                    # This seems to happen regularly!!
-                    logger.warning(f"Tracked Model [{name}] iteration [{info.iteration}] returned no data")
+                    logger.warning(f"Tracked Model [{name}] iteration [{info.iteration}] unavailable:"
+                                    " it was probably flushed from the model registry cache")
                     continue
                 if self.deserialize_func is not None:
                     self.model = self.deserialize_func(registry_model)
