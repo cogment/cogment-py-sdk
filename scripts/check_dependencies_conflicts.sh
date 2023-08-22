@@ -39,34 +39,32 @@ TARGET_DEPENDENCIES_LIST=(
   "scikit-learn" # latest version
 )
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.." || (
-  printf "Could not change the working directory to the repository root.\n"
-  exit 1
-)
+set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 VENV_DEPENDENCY_CHECK='.venv.dep_check'
 
 SYSTEM_CONFLICT_DEPENDENCIES_LIST=() # Dependencies not compatible with the env's python version (not due to cogment)
 CONFLICT_DEPENDENCIES_LIST=()
 
-# Ensures pip has latest version on all venv
-pip install upgrade_ensurepip
-python -m upgrade_ensurepip
-
 printf "Dependency compatibility with %s" "$(python -V)"
 for dependency in "${TARGET_DEPENDENCIES_LIST[@]}"; do
-  if ! (rm -rf "${VENV_DEPENDENCY_CHECK}" && python -m venv "${VENV_DEPENDENCY_CHECK}"); then
-    printf "\n%s: Unable to reinitialize the virtual environment." "${dependency}"
-    exit 1
-  fi
+  rm -rf "${VENV_DEPENDENCY_CHECK}"
+  python -m venv "${VENV_DEPENDENCY_CHECK}"
+
   # shellcheck source=/dev/null
   source "${VENV_DEPENDENCY_CHECK}/bin/activate"
+
+  set +e
   if ! OUT=$(pip install --dry-run --no-deps "${dependency}" --no-cache-dir 2>&1); then
     SYSTEM_CONFLICT_DEPENDENCIES_LIST+=("$dependency")
     printf "\n%s: not supported" "${dependency}"
   else
     printf "\n%s" "${dependency}"
   fi
+  set -e
+
   deactivate
 done
 
@@ -77,18 +75,21 @@ printf "\nList of dependencies to skip: %s" "${SYSTEM_CONFLICT_DEPENDENCIES_LIST
 printf "\nDependency compatibility with cogment and %s" "$(python -V)"
 for dependency in "${TARGET_DEPENDENCIES_LIST[@]}"; do
   if ! [[ " ${SYSTEM_CONFLICT_DEPENDENCIES_LIST[*]} " =~ ${dependency} ]]; then
-    if ! (rm -rf "${VENV_DEPENDENCY_CHECK}" && python -m venv "${VENV_DEPENDENCY_CHECK}"); then
-      printf "\n%s: Unable to reinitialize the virtual environment." "${dependency}"
-      exit 1
-    fi
+    rm -rf "${VENV_DEPENDENCY_CHECK}"
+    python -m venv "${VENV_DEPENDENCY_CHECK}"
+
     # shellcheck source=/dev/null
     source "${VENV_DEPENDENCY_CHECK}/bin/activate"
+
+    set +e
     if ! OUT=$(pip install -e ".[generate]" "${dependency}" --no-cache-dir 2>&1 && pip check); then
       CONFLICT_DEPENDENCIES_LIST+=("## ${dependency} ${OUT}")
       printf "\n%s: **conflict**" "${dependency}"
     else
       printf "\n%s" "${dependency}"
     fi
+    set -e
+
     deactivate
   fi
 done

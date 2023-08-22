@@ -4,7 +4,7 @@ grpcio-reflection >=1.42, <1.45
 grpcio-tools ==1.43
 protobuf ~=3.7
 prometheus-client >= 0.8, <0.9
-PyYAML ~=5.3.1
+PyYAML >=6.0.1,<6.1
 click ~= 8.0.3
 
 # Development dependencies

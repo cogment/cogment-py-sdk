@@ -1,25 +1,25 @@
 [build-system]
-requires = [ 
-    "setuptools>=42", 
-    "grpcio-tools >=1.42,<1.45", 
-    "PyYaml ~=5.3.1",
+requires = [
+    "setuptools>=42",
+    "grpcio-tools >=1.42,<1.45",
+    "PyYaml >=5.3.1,<6.1",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cogment"
 description = "Cogment python SDK"
-classifiers = [ 
-    "Programming Language :: Python :: 3", 
-    "Development Status :: 5 - Production/Stable", 
-    "License :: OSI Approved :: Apache Software License", 
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 dynamic = [ "readme", "version",]
 requires-python = ">=3.7, <3.11"
-dependencies = [ 
-    "grpcio >=1.42, <1.45", 
-    "grpcio-reflection >=1.42, <1.45", 
+dependencies = [
+    "grpcio >=1.42, <1.45",
+    "grpcio-reflection >=1.42, <1.45",
     "protobuf ~=3.7",
     "prometheus-client >= 0.8, <0.9",
 ]
@@ -34,9 +34,9 @@ repository = "https://github.com/cogment/cogment-py-sdk"
 "Reference Documentation" = "https://cogment.ai/docs/reference/python"
 
 [project.optional-dependencies]
-generate = [ 
-    "PyYaml ~=5.3.1", 
-    "grpcio-tools ==1.43", 
+generate = [
+    "PyYaml >=5.3.1,<6.1",
+    "grpcio-tools ==1.43",
     "click ~= 8.0.3",
 ]
 
@@ -51,8 +51,8 @@ include-package-data = false
 "." = [ "CHANGELOG.md",]
 
 [tool.setuptools.dynamic.readme]
-file = [ 
-    "README.md", 
+file = [
+    "README.md",
     "CHANGELOG.md",
 ]
 content-type = "text/markdown"

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## Fixed
+
+- Upgraded to support PyYaml up to 6.0.1 as [v5 was broken](https://github.com/yaml/pyyaml/issues/724) by the release of cython 3.
+
 ## v2.8.2 - 2023-07-10
 
 ## Fixed

@@ -81,6 +81,12 @@ check_dependencies_conflicts:
     parallel:
         matrix:
             - PYTHON_VERSION: ["3.7", "3.8", "3.9", "3.10"]
+    # Only run this job if there's been a change in dependencies
+    rules:
+        - changes:
+              - scripts/check_dependencies_conflicts.sh
+              - requirements.txt
+              - pyproject.toml
     script:
         - ./scripts/check_dependencies_conflicts.sh
     timeout: 2h
