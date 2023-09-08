@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import grpc
+import psutil
 
 import cogment.api.common_pb2 as common_api
 
@@ -73,3 +74,19 @@ def list_versions():
     reply.versions.add(name='grpc', version=grpc.__version__)
 
     return reply
+
+
+# Normally [0-100], representing machine load.
+# But "loadavg" may give > 1 per cpu on Linux.
+# Actual range is [0-254] (to work with Cogment Directory load balancing).
+def machine_load() -> int:
+    cpu_count = psutil.cpu_count()
+    if cpu_count is None or cpu_count == 0:
+        cpu_count = len(psutil.cpu_percent(percpu=True))
+    if cpu_count is None or cpu_count == 0:
+        return None
+
+    float_load = 100.0 * (psutil.getloadavg()[0] / cpu_count)
+    load = max(0, min(int(float_load), 254))
+
+    return load

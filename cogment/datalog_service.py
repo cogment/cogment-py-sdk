@@ -22,7 +22,8 @@ from cogment.control import TrialState
 from cogment.datalog import DatalogSession, LogParams
 from cogment.parameters import TrialParameters
 from cogment.errors import CogmentError
-from cogment.utils import list_versions, logger
+import cogment.utils as utils
+from cogment.utils import logger
 from cogment.session import RecvObservation, ActorStatus, RecvAction, RecvMessage, RecvReward
 
 import asyncio
@@ -266,7 +267,40 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
     # Override
     async def Version(self, request, context):
         try:
-            return list_versions()
+            return utils.list_versions()
         except Exception:
             logger.exception("Version")
             raise
+
+    # Override
+    async def Status(self, request, context):
+        reply = common_api.StatusReply()
+
+        try:
+            if len(request.names) == 0:
+                return reply
+
+            # We purposefully don't scan for "*" ahead of time to allow explicit values before
+            all = False
+            for name in request.names:
+                if name == "*":
+                    all = True
+
+                if all or name == "overall_load":
+                    load = utils.machine_load()
+                    if load:
+                        reply.statuses["overall_load"] = str(load)
+                    else:
+                        reply.statuses["overall_load"] = "0"
+
+                if all or name == "nb_sessions":
+                    reply.statuses["nb_sessions"] = str(len(self._sessions))
+
+                if all:
+                    break
+
+        except Exception:
+            logger.exception("Status")
+            raise
+
+        return reply

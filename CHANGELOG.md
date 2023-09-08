@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- 'Status' RPC support for all services
+
 ## v2.8.3 - 2023-08-22
 
 ## Fixed

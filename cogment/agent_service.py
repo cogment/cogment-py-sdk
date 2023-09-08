@@ -19,7 +19,8 @@ from prometheus_client import Summary, Counter, Gauge
 import cogment.api.agent_pb2_grpc as agent_grpc_api
 import cogment.api.common_pb2 as common_api
 
-from cogment.utils import list_versions, logger, INIT_TIMEOUT
+import cogment.utils as utils
+from cogment.utils import logger
 from cogment.trial import Trial
 from cogment.actor import ActorSession
 from cogment.session import RecvEvent, RecvObservation, RecvMessage, RecvReward, EventType, _InitAck, _EndingAck
@@ -415,7 +416,7 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
         trial_id = metadata["trial-id"]
 
         try:
-            init_data = await asyncio.wait_for(self._get_init_data(context, trial_id), INIT_TIMEOUT)
+            init_data = await asyncio.wait_for(self._get_init_data(context, trial_id), utils.INIT_TIMEOUT)
             if init_data is None:
                 return
             key = _trial_key(trial_id, init_data.actor_name)
@@ -439,8 +440,41 @@ class AgentServicer(agent_grpc_api.ServiceActorSPServicer):
     # Override
     async def Version(self, request, context):
         try:
-            return list_versions()
+            return utils.list_versions()
 
         except Exception:
             logger.exception("Version")
             raise
+
+    # Override
+    async def Status(self, request, context):
+        reply = common_api.StatusReply()
+
+        try:
+            if len(request.names) == 0:
+                return reply
+
+            # We purposefully don't scan for "*" ahead of time to allow explicit values before
+            all = False
+            for name in request.names:
+                if name == "*":
+                    all = True
+
+                if all or name == "overall_load":
+                    load = utils.machine_load()
+                    if load:
+                        reply.statuses["overall_load"] = str(load)
+                    else:
+                        reply.statuses["overall_load"] = "0"
+
+                if all or name == "nb_sessions":
+                    reply.statuses["nb_sessions"] = str(len(self._sessions))
+
+                if all:
+                    break
+
+        except Exception:
+            logger.exception("Status")
+            raise
+
+        return reply

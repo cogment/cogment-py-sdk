@@ -3,6 +3,7 @@ requires = [
     "setuptools>=42",
     "grpcio-tools >=1.42,<1.45",
     "PyYaml >=5.3.1,<6.1",
+    "types-psutil ~=5.9",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -36,6 +37,7 @@ repository = "https://github.com/cogment/cogment-py-sdk"
 [project.optional-dependencies]
 generate = [
     "PyYaml >=5.3.1,<6.1",
+    "psutil ~=5.9",
     "grpcio-tools ==1.43",
     "click ~= 8.0.3",
 ]
