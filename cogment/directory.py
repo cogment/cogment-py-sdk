@@ -40,6 +40,7 @@ class ServiceType(Enum):
     DATALOG = directory_api.ServiceType.DATALOG_SERVICE
     DATASTORE = directory_api.ServiceType.DATASTORE_SERVICE
     MODEL_REG = directory_api.ServiceType.MODEL_REGISTRY_SERVICE
+    DIRECTORY = directory_api.ServiceType.DIRECTORY_SERVICE
     OTHER = directory_api.ServiceType.OTHER_SERVICE
 
 
@@ -253,6 +254,8 @@ class Directory:
                 dir_type = ServiceType.DATASTORE
             elif path == ep.MODEL_REGISTRY_PATH:
                 dir_type = ServiceType.MODEL_REG
+            elif path == ep.DIRECTORY_PATH:
+                dir_type = ServiceType.DIRECTORY
             else:
                 raise CogmentError(f"Unknown path for cogment endpoint [{endpoint.url}]")
 

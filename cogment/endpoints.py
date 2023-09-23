@@ -35,6 +35,7 @@ LIFECYCLE_PATH = "lifecycle"
 ACTOR_SERVICE_PATH = "actservice"
 DATASTORE_PATH = "datastore"
 MODEL_REGISTRY_PATH = "modelregistry"
+DIRECTORY_PATH = "directory"
 
 # Reserved query property names
 ACTOR_CLASS_PROPERTY_NAME = "__actor_class"
