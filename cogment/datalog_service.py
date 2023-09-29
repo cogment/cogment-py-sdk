@@ -293,9 +293,6 @@ class DatalogServicer(datalog_grpc_api.DatalogSPServicer):
                     else:
                         reply.statuses["overall_load"] = "0"
 
-                if all or name == "nb_sessions":
-                    reply.statuses["nb_sessions"] = str(len(self._sessions))
-
                 if all:
                     break
 

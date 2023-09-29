@@ -200,9 +200,6 @@ class PrehookServicer(hooks_grpc_api.TrialHooksSPServicer):
                     else:
                         reply.statuses["overall_load"] = "0"
 
-                if all or name == "nb_sessions":
-                    reply.statuses["nb_sessions"] = str(len(self._sessions))
-
                 if all:
                     break
 
