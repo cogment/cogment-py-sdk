@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## Fixed
 
 - Missing directory service type in API
-- Remove implicit directory property `__version` that contained invalid characters
 
 ## v2.8.3 - 2023-08-22
 

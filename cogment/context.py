@@ -55,7 +55,7 @@ import urllib.parse as urlpar
 import warnings
 
 
-_ADDITIONAL_REGISTRATION_ITEMS = {"__registration_source" : "PythonSDK-Implicit"}
+_ADDITIONAL_REGISTRATION_ITEMS = {"__registration_source" : "PythonSDK-Implicit", "__version" : __version__}
 
 # (host, port): This IP address is normally not assigned, it is reserved for local benchmarking by IANA (RFC2544).
 _SPECIAL_CONNECTION_IP = ("192.19.254.254", 65535)
