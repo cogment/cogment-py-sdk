@@ -81,7 +81,7 @@ $ pycodestyle
 Run the `mypy` type annotations checks using
 
 ```console
-$ mypy cogment/
+$ mypy .
 ```
 
 ### Check conflicting dependencies with "popular" Python packages

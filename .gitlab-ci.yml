@@ -51,13 +51,13 @@ mypy:
     extends: .base
     stage: lint
     script:
-        - mypy cogment/
+        - mypy .
 
-apache_licenses_check:
+licenses_checker:
     stage: lint
-    image: registry.gitlab.com/ai-r/apache-license-checker:latest
+    image: registry.gitlab.com/ai-r/cogment/license-checker:latest
     script:
-        - apache-license-checker
+        - license-checker
 
 shellcheck:
     image: koalaman/shellcheck-alpine:stable

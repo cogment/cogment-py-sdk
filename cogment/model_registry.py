@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ from prometheus_client import Summary
 
 from cogment.errors import CogmentError
 from cogment.utils import logger
+from cogment.grpc_metadata import GrpcMetadata
 
 
 MODEL_REGISTRY_STORE_VERSION_TIME = Summary(
@@ -99,10 +100,22 @@ class Model(ModelInfo):
 
 
 class ModelRegistry:
-    def __init__(self, stub):
+    def __init__(self, stub, metadata: GrpcMetadata = GrpcMetadata()):
         self._model_registry_stub = stub
         self._info_cache: Dict[str, ModelInfo] = _LRU()
         self._data_cache: Dict[str, bytes] = _LRU()
+        self._metadata = metadata.copy()
+
+    def __await__(self):
+        """
+        Make model registry instances awaitable
+        This, frankly dirty hack, allows using `await context.get_model_registry(endpoint)` with any kind of endpoint
+        """
+
+        async def _self():
+            return self
+
+        return asyncio.create_task(_self()).__await__()
 
     async def store_initial_version(self, model: Model) -> VersionInfo:
         """
@@ -122,7 +135,7 @@ class ModelRegistry:
         cached_model_info = ModelInfo(model.id, model.user_data)
 
         req = model_registry_api.CreateOrUpdateModelRequest(model_info=registry_model_info)
-        await self._model_registry_stub.CreateOrUpdateModel(req)
+        await self._model_registry_stub.CreateOrUpdateModel(req, metadata=self._metadata.to_grpc_metadata())
 
         self._info_cache[model.id] = cached_model_info
 
@@ -170,7 +183,8 @@ class ModelRegistry:
             try:
                 version_data = model.serialized_model
                 version_info = model_registry_api.ModelVersionInfo(
-                    model_id=model.id, archived=archived, data_size=len(version_data))
+                    model_id=model.id, archived=archived, data_size=len(version_data)
+                )
                 for key, value in model.version_user_data.items():
                     version_info.user_data[key] = str(value)
 
@@ -180,7 +194,7 @@ class ModelRegistry:
                 chunksize = math.trunc(GRPC_BYTE_SIZE_LIMIT / 2)
 
                 chunked_version_data = [
-                    version_data[index:index + chunksize] for index in range(0, len(version_data), chunksize)
+                    version_data[index : index + chunksize] for index in range(0, len(version_data), chunksize)
                 ]
                 for data_chunk in chunked_version_data:
                     chunk_body = model_registry_api.CreateVersionRequestChunk.Body(data_chunk=data_chunk)
@@ -193,7 +207,9 @@ class ModelRegistry:
             raise CogmentError("Cannot store a model without a serialized_model attribute")
 
         with MODEL_REGISTRY_STORE_VERSION_TIME.labels(model_id=model.id).time():
-            rep = await self._model_registry_stub.CreateVersion(generate_chunks())
+            rep = await self._model_registry_stub.CreateVersion(
+                generate_chunks(), metadata=self._metadata.to_grpc_metadata()
+            )
 
         if model._deserialized_model:
             self._data_cache[rep.version_info.data_hash] = model._deserialized_model
@@ -201,7 +217,10 @@ class ModelRegistry:
         return VersionInfo(rep.version_info)
 
     async def retrieve_version(
-        self, model_id: str, version_number=-1, deserialize_func: Callable[[bytes], Any] = None,
+        self,
+        model_id: str,
+        version_number=-1,
+        deserialize_func: Callable[[bytes], Any] = None,
     ) -> Model:
         """
         Retrieve a version of the model
@@ -221,7 +240,9 @@ class ModelRegistry:
         async def retrieve_version_info(model_id, version_number):
             req = model_registry_api.RetrieveVersionInfosRequest(model_id=model_id, version_numbers=[version_number])
             try:
-                rep = await self._model_registry_stub.RetrieveVersionInfos(req)
+                rep = await self._model_registry_stub.RetrieveVersionInfos(
+                    req, metadata=self._metadata.to_grpc_metadata()
+                )
             except Exception:
                 logger.error(
                     f"Failed to retrieve model version with id [{model_id}] and version number [{version_number}]"
@@ -232,7 +253,8 @@ class ModelRegistry:
             return version_info_pb
 
         [model_info, version_info] = await asyncio.gather(
-            self.retrieve_model_info(model_id), retrieve_version_info(model_id, version_number)
+            self.retrieve_model_info(model_id),
+            retrieve_version_info(model_id, version_number),
         )
 
         if model_info is None or version_info is None:
@@ -247,14 +269,17 @@ class ModelRegistry:
                 stored_version_info=VersionInfo(version_info),
                 user_data=model_info.user_data,
                 version_user_data=version_info.user_data,
-                deserialized_model=self._data_cache[version_info.data_hash]
+                deserialized_model=self._data_cache[version_info.data_hash],
             )
 
         else:
             req = model_registry_api.RetrieveVersionDataRequest(
-                model_id=model_id, version_number=version_info.version_number)
+                model_id=model_id, version_number=version_info.version_number
+            )
             data = b""
-            async for chunk in self._model_registry_stub.RetrieveVersionData(req):
+            async for chunk in self._model_registry_stub.RetrieveVersionData(
+                req, metadata=self._metadata.to_grpc_metadata()
+            ):
                 data += chunk.data_chunk
 
             model = Model(

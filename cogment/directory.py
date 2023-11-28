@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@ import grpc
 import grpc.aio  # type: ignore
 
 import cogment.api.directory_pb2 as directory_api
+from cogment.api.directory_pb2 import ServiceEndpoint
 
 from cogment.errors import CogmentError
 from cogment.utils import logger
+from cogment.grpc_metadata import GrpcMetadata
 import cogment.endpoints as ep
 
 import copy
@@ -32,42 +34,51 @@ AUTHENTICATION_TOKEN_METADATA_NAME = "authentication-token"
 class ServiceType(Enum):
     """Enum class for the different services available in directory."""
 
-    LIFE_CYCLE = directory_api.ServiceType.TRIAL_LIFE_CYCLE_SERVICE
-    CLIENT_ACTOR = directory_api.ServiceType.CLIENT_ACTOR_CONNECTION_SERVICE
-    ACTOR = directory_api.ServiceType.ACTOR_SERVICE
-    ENVIRONMENT = directory_api.ServiceType.ENVIRONMENT_SERVICE
-    HOOK = directory_api.ServiceType.PRE_HOOK_SERVICE
-    DATALOG = directory_api.ServiceType.DATALOG_SERVICE
-    DATASTORE = directory_api.ServiceType.DATASTORE_SERVICE
-    MODEL_REG = directory_api.ServiceType.MODEL_REGISTRY_SERVICE
-    DIRECTORY = directory_api.ServiceType.DIRECTORY_SERVICE
-    OTHER = directory_api.ServiceType.OTHER_SERVICE
+    LIFE_CYCLE = directory_api.ServiceType.TRIAL_LIFE_CYCLE_SERVICE  # type: ignore[attr-defined]
+    CLIENT_ACTOR = directory_api.ServiceType.CLIENT_ACTOR_CONNECTION_SERVICE  # type: ignore[attr-defined]
+    ACTOR = directory_api.ServiceType.ACTOR_SERVICE  # type: ignore[attr-defined]
+    ENVIRONMENT = directory_api.ServiceType.ENVIRONMENT_SERVICE  # type: ignore[attr-defined]
+    HOOK = directory_api.ServiceType.PRE_HOOK_SERVICE  # type: ignore[attr-defined]
+    DATALOG = directory_api.ServiceType.DATALOG_SERVICE  # type: ignore[attr-defined]
+    DATASTORE = directory_api.ServiceType.DATASTORE_SERVICE  # type: ignore[attr-defined]
+    MODEL_REG = directory_api.ServiceType.MODEL_REGISTRY_SERVICE  # type: ignore[attr-defined]
+    DIRECTORY = directory_api.ServiceType.DIRECTORY_SERVICE  # type: ignore[attr-defined]
+    OTHER = directory_api.ServiceType.OTHER_SERVICE  # type: ignore[attr-defined]
 
 
 # TODO: Add a cache to service?
 # TODO: Make ready for end users?
 class Directory:
-
-    def __init__(self, stub, auth_token: str):
+    def __init__(
+        self,
+        stub,
+        auth_token: str,
+        metadata: GrpcMetadata = GrpcMetadata(),
+    ):
         self._stub = stub
         self._auth_token = auth_token
+        self._metadata = metadata.copy()
 
         if self._auth_token:
-            self._metadata = [(AUTHENTICATION_TOKEN_METADATA_NAME, self._auth_token)]
-        else:
-            self._metadata = []
+            self._metadata = self._metadata.add(AUTHENTICATION_TOKEN_METADATA_NAME, self._auth_token)
 
     def __str__(self):
         result = f"Directory: authentication token = {self._auth_token}"
         return result
 
-    async def register_host(self, type: ServiceType, host: str, port: int, ssl=False,
-                            properties: Dict[str, str] = None):
+    async def register_host(
+        self,
+        type: ServiceType,
+        host: str,
+        port: int,
+        ssl=False,
+        properties: Dict[str, str] = None,
+    ):
         request = directory_api.RegisterRequest()
         if ssl:
-            request.endpoint.protocol = directory_api.ServiceEndpoint.Protocol.GRPC_SSL
+            request.endpoint.protocol = ServiceEndpoint.Protocol.GRPC_SSL  # type: ignore[attr-defined]
         else:
-            request.endpoint.protocol = directory_api.ServiceEndpoint.Protocol.GRPC
+            request.endpoint.protocol = ServiceEndpoint.Protocol.GRPC  # type: ignore[attr-defined]
         request.endpoint.host = host
         request.endpoint.port = port
         request.details.type = type.value
@@ -77,7 +88,7 @@ class Directory:
         def request_itor():
             yield request
 
-        reply_itor = self._stub.Register(request_itor(), metadata=self._metadata)
+        reply_itor = self._stub.Register(request_itor(), metadata=self._metadata.to_grpc_metadata())
         if not reply_itor:
             raise CogmentError("Failed to connect to the directory")
 
@@ -85,7 +96,7 @@ class Directory:
             if reply == grpc.aio.EOF:
                 raise CogmentError(f"No response to directory register request [{request}]")
 
-            if reply.status != directory_api.RegisterReply.Status.OK:
+            if reply.status != directory_api.RegisterReply.Status.OK:  # type: ignore[attr-defined]
                 raise CogmentError(f"Failed to register to the directory [{reply.status}] [{reply.error_msg}]")
 
             logger.debug(f"New directory registration [{type}] [{host}] [{port}] [{ssl}] [{properties}]"
@@ -102,7 +113,7 @@ class Directory:
         def request_itor():
             yield request
 
-        reply_itor = self._stub.Deregister(request_itor(), metadata=self._metadata)
+        reply_itor = self._stub.Deregister(request_itor(), metadata=self._metadata.to_grpc_metadata())
         if not reply_itor:
             raise CogmentError("Failed to connect to the directory")
 
@@ -110,7 +121,7 @@ class Directory:
             if reply == grpc.aio.EOF:
                 CogmentError(f"No response to deregister request")
 
-            if reply.status != directory_api.DeregisterReply.Status.OK:
+            if reply.status != directory_api.DeregisterReply.Status.OK:  # type: ignore[attr-defined]
                 CogmentError(f"Deregistration failed [{reply.status}] [{reply.error_msg}]")
 
             logger.debug(f"Deregistered from directory: service id [{service_id}]")
@@ -134,7 +145,7 @@ class Directory:
     async def _inquire(self, request) -> List[Tuple[str, bool]]:
         result: List[Tuple[str, bool]] = []
 
-        reply_itor = self._stub.Inquire(request, metadata=self._metadata)
+        reply_itor = self._stub.Inquire(request, metadata=self._metadata.to_grpc_metadata())
         if not reply_itor:
             raise CogmentError("Failed to connect to the directory")
 
@@ -143,13 +154,13 @@ class Directory:
                 logger.debug(f"No response to directory inquire request [{request}]")
                 return result
 
-            if reply.data.endpoint.protocol == directory_api.ServiceEndpoint.Protocol.GRPC:
+            if reply.data.endpoint.protocol == ServiceEndpoint.Protocol.GRPC:  # type: ignore[attr-defined]
                 address = f"{ep.GRPC_SCHEME}://{reply.data.endpoint.host}:{reply.data.endpoint.port}"
                 ssl = False
-            elif reply.data.endpoint.protocol == directory_api.ServiceEndpoint.Protocol.GRPC_SSL:
+            elif reply.data.endpoint.protocol == ServiceEndpoint.Protocol.GRPC_SSL:  # type: ignore[attr-defined]
                 address = f"{ep.GRPC_SCHEME}://{reply.data.endpoint.host}:{reply.data.endpoint.port}"
                 ssl = True
-            elif reply.data.endpoint.protocol == directory_api.ServiceEndpoint.Protocol.COGMENT:
+            elif reply.data.endpoint.protocol == ServiceEndpoint.Protocol.COGMENT:  # type: ignore[attr-defined]
                 host = reply.data.endpoint.host
                 if host != ep.CLIENT_ACTOR_HOST:
                     raise CogmentError(f"Invalid cogment endpoint from directory [{host}]")
@@ -185,9 +196,13 @@ class Directory:
         return new_endpoint
 
     # The URL data takes precedence over the provided parameters
-    async def get_inquired_endpoint(self, endpoint: ep.Endpoint, type: ServiceType = None,
-                                    properties: Dict[str, str] = None):
-        """ Inquire directory for an endpoint with optional context (type and properties)"""
+    async def get_inquired_endpoint(
+        self,
+        endpoint: ep.Endpoint,
+        type: ServiceType = None,
+        properties: Dict[str, str] = None,
+    ):
+        """Inquire directory for an endpoint with optional context (type and properties)"""
 
         try:
             parsed_url = urlpar.urlparse(endpoint.url)
@@ -200,7 +215,8 @@ class Directory:
 
         if parsed_url.scheme != ep.COGMENT_SCHEME:
             raise CogmentError(
-                f"Invalid endpoint scheme (must be '{ep.GRPC_SCHEME}' or '{ep.COGMENT_SCHEME}') [{endpoint.url}]")
+                f"Invalid endpoint scheme (must be '{ep.GRPC_SCHEME}' or '{ep.COGMENT_SCHEME}') [{endpoint.url}]"
+            )
         if parsed_url.hostname != ep.DISCOVERY_HOST:
             raise CogmentError(f"Unknown host for cogment endpoint [{endpoint.url}]")
 
@@ -217,7 +233,11 @@ class Directory:
                 # properties are ignored
                 if parsed_url.query:
                     try:
-                        query = urlpar.parse_qsl(parsed_url.query, keep_blank_values=True, strict_parsing=True)
+                        query = urlpar.parse_qsl(
+                            parsed_url.query,
+                            keep_blank_values=True,
+                            strict_parsing=True,
+                        )
                     except Exception as exc:
                         raise CogmentError(f"Endpoint [{endpoint.url}]: {exc}")
                 else:
@@ -226,8 +246,10 @@ class Directory:
                 properties = {key: val for key, val in query}
                 id = properties.get(ep.SERVICE_ID_PROPERTY_NAME)
                 if not id:
-                    raise CogmentError(f"A service path on a cogment endpoint must have an"
-                                       f" '{ep.SERVICE_ID_PROPERTY_NAME}' query [{endpoint.url}]")
+                    raise CogmentError(
+                        f"A service path on a cogment endpoint must have an"
+                        f" '{ep.SERVICE_ID_PROPERTY_NAME}' query [{endpoint.url}]"
+                    )
 
                 service_id = int(id)
                 dir_urls = await self.inquire_by_id(service_id)
@@ -272,8 +294,10 @@ class Directory:
         else:
             for key, val in query:
                 if key in properties:
-                    logger.warning(f"Key [{key}] in parameter 'properties'"
-                                   f" will be overwriten with endpoint url query value [{val}]")
+                    logger.warning(
+                        f"Key [{key}] in parameter 'properties'"
+                        f" will be overwriten with endpoint url query value [{val}]"
+                    )
                 properties[key] = val
 
         dir_urls = await self.inquire_by_type(dir_type, properties)

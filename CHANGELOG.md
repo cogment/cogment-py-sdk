@@ -7,31 +7,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Added
+
+- Ability to define metadata in the `Context` constructor, they will be passed to all grpc calls.
+- Support for SSL grpc endpoints without a private key.
+
+### Fixed
+
+- `context.get_controller([...])`, `context.get_datastore([...])`, `context.get_model_registry_v2([...])` can always be awaited.
+
 ## v2.9.0 - 2023-11-14
 
 ### Added
 
 - 'Status' RPC support for all services
 
-## Fixed
+### Fixed
 
 - Missing directory service type in API
 
 ## v2.8.3 - 2023-08-22
 
-## Fixed
+### Fixed
 
 - Upgraded to support PyYaml up to 6.0.1 as [v5 was broken](https://github.com/yaml/pyyaml/issues/724) by the release of cython 3.
 
 ## v2.8.2 - 2023-07-10
 
-## Fixed
+### Fixed
 
 - Return None when no data is availble in datastore content
 
 ## v2.8.1 - 2023-06-06
 
-## Fixed
+### Fixed
 
 - Use the most recent directory entry when there are duplicates
 - Self IP address discovery functionality is now working on macOS
@@ -55,7 +64,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v2.7.1 - 2023-03-06
 
-## Fixed
+### Fixed
 
 - Deadlock in 'wait_for_newer' method of LatestModel
 
@@ -82,7 +91,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v2.5.0 - 2023-01-26
 
-## Fixed
+### Fixed
 
 - In Datastore reward could be returned as 'None' instead of 0.0
 
@@ -101,14 +110,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - 'COGMENT_LOG_LEVEL' environment variable
 - Model Registry client
 
-## Fixed
+### Fixed
 
 - Port parameter needs to be an int
 - Context datastore request with default endpoint
 
 ## v2.3.0 - 2022-09-20
 
-## Fixed
+### Fixed
 
 - Reward tick ID was hard coded to -1
 
@@ -128,14 +137,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## v2.2.2 - 2022-06-20
 
-## Fixed
+### Fixed
 
 - Generate to handle multiple imports properly
 - Output deprecated warning for use of 'snapshot' in received observation
 
 ## v2.2.1 - 2022-05-27
 
-## Fixed
+### Fixed
 
 - Fix install of the package from a wheel
 
@@ -154,13 +163,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Integration tests are now able to install the Cogment CLI on their own.
 - Integration tests no longer uses a Docker image.
 
-## Fixed
+### Fixed
 
 - Fix integration test junit report output.
 
 ## v2.1.1 - 2022-04-11
 
-## Fixed
+### Fixed
 
 - Fixed a typo in the TrialParameter "environemnt_name" to "environment_name"
 
@@ -181,7 +190,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Add ability to provide parameters on trial start call
 - Datastore SDK
 
-## Fixed
+### Fixed
 
 - Fix the failure of the cogment package caused by the partial removal of gRPC 1.45 from pypi
 

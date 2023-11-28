@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,8 +51,13 @@ CLIENT_ACTOR_URL = "cogment://client"
 class Endpoint:
     """Class representing a remote Cogment endpoint where to connect."""
 
-    def __init__(self, url: str = BASIC_CONTEXT_DISCOVERY_URL):
+    def __init__(
+        self,
+        url: str = BASIC_CONTEXT_DISCOVERY_URL,
+        use_ssl: bool = False,
+    ):
         self.url: str = url
+        self.use_ssl: bool = use_ssl
         self.private_key: str = None
         self.root_certificates: str = None
         self.certificate_chain: str = None
@@ -63,15 +68,22 @@ class Endpoint:
         return result
 
     def using_ssl(self):
-        return (self.private_key is not None)
+        return self.use_ssl
 
-    def set_from_files(self, private_key_file=None, root_certificates_file=None, certificate_chain_file=None):
+    def set_from_files(
+        self,
+        private_key_file=None,
+        root_certificates_file=None,
+        certificate_chain_file=None,
+    ):
         try:
             if private_key_file:
                 with open(private_key_file) as fl:
                     self.private_key = fl.read()
                 if not self.private_key:
                     self.private_key = None
+                else:
+                    self.use_ssl = True
 
             if root_certificates_file:
                 with open(root_certificates_file) as fl:
@@ -103,7 +115,7 @@ class ServedEndpoint:
         self.root_certificates: str = None
 
     def using_ssl(self):
-        return (self.private_key_certificate_chain_pairs is not None)
+        return self.private_key_certificate_chain_pairs is not None
 
     # def set_from_files(private_key_certificate_chain_pairs_file=None, root_certificates_file=None):
     # TODO: This function would need to parse the PEM encoded `private_key_certificate_chain_pairs_file`

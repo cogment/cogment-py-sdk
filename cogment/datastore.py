@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import datetime
+import enum
+
 import grpc
 import grpc.aio  # type: ignore
 
 import cogment.api.common_pb2 as common_api
 import cogment.api.trial_datastore_pb2 as datastore_api
+from cogment.api.trial_datastore_pb2 import StoredTrialSampleField
 
 from cogment.control import TrialState
 from cogment.parameters import TrialParameters
 from cogment.errors import CogmentError
 from cogment.utils import logger
+from cogment.grpc_metadata import GrpcMetadata
 
-import asyncio
-import enum
-import datetime
 
 _REV_NANO = 1.0 / 1_000_000_000
 
@@ -33,20 +36,20 @@ _REV_NANO = 1.0 / 1_000_000_000
 class DatastoreFields(enum.Enum):
     """Enum class for the different fields of the actor data that can be retrieved."""
 
-    UNKNOWN = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_UNKNOWN
-    OBSERVATION = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_OBSERVATION
-    ACTION = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_ACTION
-    REWARD = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_REWARD
-    RECEIVED_REWARDS = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_RECEIVED_REWARDS
-    SENT_REWARDS = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_SENT_REWARDS
-    RECEIVED_MESSAGES = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_RECEIVED_MESSAGES
-    SENT_MESSAGES = datastore_api.StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_SENT_MESSAGES
+    UNKNOWN = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_UNKNOWN  # type: ignore[attr-defined]
+    OBSERVATION = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_OBSERVATION  # type: ignore[attr-defined]
+    ACTION = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_ACTION  # type: ignore[attr-defined]
+    REWARD = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_REWARD  # type: ignore[attr-defined]
+    RECEIVED_REWARDS = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_RECEIVED_REWARDS  # type: ignore[attr-defined]
+    SENT_REWARDS = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_SENT_REWARDS  # type: ignore[attr-defined]
+    RECEIVED_MESSAGES = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_RECEIVED_MESSAGES  # type: ignore[attr-defined]
+    SENT_MESSAGES = StoredTrialSampleField.STORED_TRIAL_SAMPLE_FIELD_SENT_MESSAGES  # type: ignore[attr-defined]
 
 
 class DatastoreTrialInfo:
     """Class representing trial info."""
 
-    def __init__(self, cog_settings, info: datastore_api.StoredTrialInfo):
+    def __init__(self, cog_settings, info):
         self.trial_id = info.trial_id
         self.trial_state = TrialState(info.last_state)
         self.user_id = info.user_id
@@ -290,16 +293,33 @@ class DatastoreSample:
 class Datastore:
     """Class representing the session of a datalog for a trial."""
 
-    def __init__(self, stub, cog_settings):
+    def __init__(
+        self,
+        stub,
+        cog_settings,
+        metadata: GrpcMetadata = GrpcMetadata(),
+    ):
         self._datastore_stub = stub
         self._cog_settings = cog_settings
+        self._metadata = metadata.copy()
 
     def __str__(self):
         result = f"Datastore"
         return result
 
+    def __await__(self):
+        """
+        Make datastore instances awaitable
+        This, frankly dirty hack, allows using `await context.get_datastore(endpoint)` with any kind of endpoint
+        """
+
+        async def _self():
+            return self
+
+        return asyncio.create_task(_self()).__await__()
+
     def has_specs(self):
-        return (self._cog_settings is not None)
+        return self._cog_settings is not None
 
     async def all_trials(self, bundle_size=1, wait_for_trials=0, properties={}, ids=[]):
         request = datastore_api.RetrieveTrialsRequest()
@@ -308,9 +328,11 @@ class Datastore:
         request.trial_handle = ""
         request.properties.update(properties)
         request.trial_ids.extend(ids)
-
         while True:
-            reply = await self._datastore_stub.RetrieveTrials(request)
+            reply = await self._datastore_stub.RetrieveTrials(
+                request,
+                metadata=self._metadata.to_grpc_metadata(),
+            )
 
             for reply_info in reply.trial_infos:
                 info = DatastoreTrialInfo(self._cog_settings, reply_info)
@@ -328,7 +350,10 @@ class Datastore:
         request.properties.update(properties)
         request.trial_ids.extend(ids)
 
-        reply = await self._datastore_stub.RetrieveTrials(request)
+        reply = await self._datastore_stub.RetrieveTrials(
+            request,
+            metadata=self._metadata.to_grpc_metadata(),
+        )
 
         trial_infos = []
         for reply_info in reply.trial_infos:
@@ -345,7 +370,7 @@ class Datastore:
         for id in ids:
             request.trial_ids.append(id)
 
-        await self._datastore_stub.DeleteTrials(request)
+        await self._datastore_stub.DeleteTrials(request, metadata=self._metadata.to_grpc_metadata())
 
     async def all_samples(self, trial_infos, actor_names=[], actor_classes=[], actor_implementations=[], fields=[]):
         if not trial_infos:
@@ -366,7 +391,10 @@ class Datastore:
         for enum_field in fields:
             request.selected_sample_fields.append(enum_field.value)
 
-        reply_itor = self._datastore_stub.RetrieveSamples(request)
+        reply_itor = self._datastore_stub.RetrieveSamples(
+            request,
+            metadata=self._metadata.to_grpc_metadata(),
+        )
         if not reply_itor:
             raise CogmentError(f"'all_samples' failed to connect")
 

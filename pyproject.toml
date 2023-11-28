@@ -16,13 +16,14 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
-dynamic = [ "readme", "version",]
+dynamic = ["readme", "version"]
 requires-python = ">=3.7, <3.11"
 dependencies = [
     "grpcio >=1.42, <1.45",
     "grpcio-reflection >=1.42, <1.45",
     "protobuf ~=3.7",
     "prometheus-client >= 0.8, <0.9",
+    "typing_extensions >= 4.6.3, < 4.7.0",
 ]
 
 [[project.authors]]
@@ -43,20 +44,17 @@ generate = [
 ]
 
 [tool.setuptools]
-packages = [ "cogment", "cogment.api",]
+packages = ["cogment", "cogment.api"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-"*" = [ "*.proto",]
+"*" = ["*.proto"]
 
 [tool.setuptools.data-files]
-"." = [ "CHANGELOG.md",]
+"." = ["CHANGELOG.md"]
 
 [tool.setuptools.dynamic.readme]
-file = [
-    "README.md",
-    "CHANGELOG.md",
-]
+file = ["README.md", "CHANGELOG.md"]
 content-type = "text/markdown"
 
 [tool.setuptools.dynamic.version]
@@ -77,15 +75,17 @@ python_version = 3.7
 warn_return_any = true
 warn_unused_configs = true
 strict_optional = false
-exclude = [
-    '.*_pb2\.py$'
-]
+exclude = ['tests', 'setup.py']
 
 [[tool.mypy.overrides]]
-module = [
-    "cogment.*",
-    "grpc",
-    "prometheus_client",
-]
+module = ["grpc", "prometheus_client"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["cogment.api.*"]
+ignore_errors = true
+
+[tool.black]
+line-length = 120
+target-version = ["py39"]
+color = true

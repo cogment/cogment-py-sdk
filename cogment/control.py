@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+from enum import Enum
 import grpc
 import grpc.aio  # type: ignore
 
@@ -20,20 +22,18 @@ import cogment.api.orchestrator_pb2 as orchestrator_api
 from cogment.errors import CogmentError
 from cogment.session import ActorInfo
 from cogment.utils import logger
-
-import asyncio
-from enum import Enum
+from cogment.grpc_metadata import GrpcMetadata
 
 
 class TrialState(Enum):
     """Enum class for the different states of a trial."""
 
-    UNKNOWN = common_api.TrialState.UNKNOWN
-    INITIALIZING = common_api.TrialState.INITIALIZING
-    PENDING = common_api.TrialState.PENDING
-    RUNNING = common_api.TrialState.RUNNING
-    TERMINATING = common_api.TrialState.TERMINATING
-    ENDED = common_api.TrialState.ENDED
+    UNKNOWN = common_api.TrialState.UNKNOWN  # type: ignore[attr-defined]
+    INITIALIZING = common_api.TrialState.INITIALIZING  # type: ignore[attr-defined]
+    PENDING = common_api.TrialState.PENDING  # type: ignore[attr-defined]
+    RUNNING = common_api.TrialState.RUNNING  # type: ignore[attr-defined]
+    TERMINATING = common_api.TrialState.TERMINATING  # type: ignore[attr-defined]
+    ENDED = common_api.TrialState.ENDED  # type: ignore[attr-defined]
 
 
 class TrialInfo:
@@ -64,13 +64,25 @@ class TrialInfo:
 class Controller:
     """Class representing a Cogment controller associated with an Orchestrator."""
 
-    def __init__(self, stub, user_id):
+    def __init__(self, stub, user_id, metadata: GrpcMetadata = GrpcMetadata()):
         self._lifecycle_stub = stub
         self._user_id = user_id
+        self._metadata = metadata.copy()
 
     def __str__(self):
         result = f"Controller: user id = {self._user_id}"
         return result
+
+    def __await__(self):
+        """
+        Make controller instances awaitable
+        This, frankly dirty hack, allows using `await context.get_controller(endpoint)` with any kind of endpoint
+        """
+
+        async def _self():
+            return self
+
+        return asyncio.create_task(_self()).__await__()
 
     def has_specs(self):
         return True  # This class does not rely on the spec
@@ -78,17 +90,18 @@ class Controller:
     async def get_actors(self, trial_id):
         req = orchestrator_api.TrialInfoRequest()
         req.get_actor_list = True
-        metadata = [("trial-id", trial_id)]
-        rep = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+        metadata = self._metadata.copy()
+        metadata.add("trial-id", trial_id)
+        rep = await self._lifecycle_stub.GetTrialInfo(
+            request=req,
+            metadata=metadata.to_grpc_metadata(),
+        )
         if len(rep.trial) == 0:
             raise CogmentError(f"Unknown trial [{trial_id}]")
         elif len(rep.trial) > 1:
             raise CogmentError(f"Unexpected response from orchestrator [{rep}] for [{trial_id}]")
 
-        result = [
-            ActorInfo(actor.name, actor.actor_class)
-            for actor in rep.trial[0].actors_in_trial
-        ]
+        result = [ActorInfo(actor.name, actor.actor_class) for actor in rep.trial[0].actors_in_trial]
         return result
 
     async def start_trial(self, trial_config=None, trial_id_requested=None, trial_params=None):
@@ -111,7 +124,7 @@ class Controller:
             req.trial_id_requested = trial_id_requested
 
         logger.debug(f"Requesting start of a trial with [{req}] ...")
-        rep = await self._lifecycle_stub.StartTrial(req)
+        rep = await self._lifecycle_stub.StartTrial(req, metadata=self._metadata.to_grpc_metadata())
 
         if rep.trial_id:
             logger.debug(f"Trial [{rep.trial_id}] started")
@@ -123,20 +136,21 @@ class Controller:
     async def terminate_trial(self, trial_ids, hard=False):
         req = orchestrator_api.TerminateTrialRequest()
         req.hard_termination = hard
+
+        metadata = self._metadata.copy()
         if type(trial_ids) == str:
             logger.deprecated("Using Controller.terminate_trial() with a string trial ID is deprecated.  Use a list.")
-            metadata = [("trial-id", trial_ids)]
+            metadata.add("trial-id", trial_ids)
         else:
-            metadata = []
             for id in trial_ids:
-                metadata.append(("trial-id", id))
+                metadata.add("trial-id", id)
 
         logger.debug(f"Requesting end of trial [{trial_ids}] (hard termination: [{hard}])")
-        await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata)
+        await self._lifecycle_stub.TerminateTrial(request=req, metadata=metadata.to_grpc_metadata())
 
     async def get_remote_versions(self):
         req = common_api.VersionRequest()
-        info = await self._lifecycle_stub.Version(request=req)
+        info = await self._lifecycle_stub.Version(request=req, metadata=self._metadata.to_grpc_metadata())
         result = {}
         for ver in info.versions:
             result[ver.name] = ver.version
@@ -144,17 +158,16 @@ class Controller:
 
     async def get_trial_info(self, trial_ids):
         req = orchestrator_api.TrialInfoRequest()
+        metadata = self._metadata.copy()
         if trial_ids is None:
             logger.deprecated("Using Controller.get_trial_info() with a null trial ID is deprecated.  Use a list.")
-            metadata = []
         elif type(trial_ids) == str:
             logger.deprecated("Using Controller.get_trial_info() with a string trial ID is deprecated.  Use a list.")
-            metadata = [("trial-id", trial_ids)]
+            metadata.add("trial-id", trial_ids)
         else:
-            metadata = []
             for id in trial_ids:
-                metadata.append(("trial-id", id))
-        reply = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata)
+                metadata.add("trial-id", id)
+        reply = await self._lifecycle_stub.GetTrialInfo(request=req, metadata=metadata.to_grpc_metadata())
 
         result = []
         for info in reply.trial:

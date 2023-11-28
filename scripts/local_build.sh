@@ -11,7 +11,7 @@ source .venv/bin/activate
 pip install -e ".[generate]"
 pip install -r requirements.txt
 pycodestyle
-mypy cogment/
+mypy .
 python3 -m build
 
 deactivate

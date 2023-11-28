@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import cogment.api.model_registry_pb2 as model_registry_api
 
 from cogment.errors import CogmentError
 from cogment.utils import logger
+from cogment.grpc_metadata import GrpcMetadata
 
 
 GRPC_BYTE_SIZE_LIMIT = 4 * 1024 * 1024  # 4MB
@@ -80,7 +81,7 @@ class LatestModel:
         self._model.decrement_reference()
 
     def is_deserialized(self) -> bool:
-        return (self._model.deserialized_func is not None)
+        return self._model.deserialized_func is not None
 
     async def get(self) -> Tuple[Any, ModelIterationInfo]:
         await self.wait_for_available()
@@ -156,8 +157,10 @@ class _TrackedModel:
             async for info in registry.iteration_updates(name):
                 registry_model = await registry.retrieve_model(name, info.iteration)
                 if registry_model is None:
-                    logger.warning(f"Tracked Model [{name}] iteration [{info.iteration}] unavailable:"
-                                    " it was probably flushed from the model registry cache")
+                    logger.warning(
+                        f"Tracked Model [{name}] iteration [{info.iteration}] unavailable:"
+                        " it was probably flushed from the model registry cache"
+                    )
                     continue
                 if self.deserialize_func is not None:
                     self.model = self.deserialize_func(registry_model)
@@ -200,7 +203,7 @@ async def _tracked_models_removal():
                 self_task.cancel()
 
             for name in list(_tracked_models):
-                if _tracked_models[name].ref_count == 0 and (now - _tracked_models[name].last_ref) > 300 :
+                if _tracked_models[name].ref_count == 0 and (now - _tracked_models[name].last_ref) > 300:
                     _tracked_models[name].terminate()
                     del _tracked_models[name]
                     logger.debug(f"Stopped tracking model [{name}]. [{len(_tracked_models)}] tracked models left.")
@@ -213,22 +216,36 @@ async def _tracked_models_removal():
 
 
 class ModelRegistry:
-    def __init__(self, stub, endpoint_url):
+    def __init__(self, stub, endpoint_url, metadata: GrpcMetadata = GrpcMetadata()):
         self._model_registry_stub = stub
         self._endpoint_url = endpoint_url
+        self._metadata = metadata.copy()
 
     def __str__(self):
         return "ModelRegistry"
 
+    def __await__(self):
+        """
+         Make model registry instances awaitable
+        This, frankly dirty hack, allows using `await context.get_model_registry_v2(endpoint)` with any kind of endpoint
+        """
+
+        async def _self():
+            return self
+
+        return asyncio.create_task(_self()).__await__()
+
     def has_specs(self):
         return True  # This class does not rely on the spec
 
-    async def store_model(self,
-            name: str, model: bytes, iteration_properties: Dict[str, str] = None) -> ModelIterationInfo:
+    async def store_model(
+        self, name: str, model: bytes, iteration_properties: Dict[str, str] = None
+    ) -> ModelIterationInfo:
         return await self._send_model(name, model, iteration_properties, True)
 
-    async def publish_model(self,
-            name: str, model: bytes, iteration_properties: Dict[str, str] = None) -> ModelIterationInfo:
+    async def publish_model(
+        self, name: str, model: bytes, iteration_properties: Dict[str, str] = None
+    ) -> ModelIterationInfo:
         return await self._send_model(name, model, iteration_properties, False)
 
     async def _send_model(self, name, model, iteration_properties, store) -> ModelIterationInfo:
@@ -238,12 +255,12 @@ class ModelRegistry:
             raise CogmentError("Model is empty")
 
         model_info = await self._get_model_info(name)
-        new_model = (model_info is None)
+        new_model = model_info is None
 
         if new_model:
             req = model_registry_api.CreateOrUpdateModelRequest()
             req.model_info.model_id = name
-            _ = await self._model_registry_stub.CreateOrUpdateModel(req)
+            _ = await self._model_registry_stub.CreateOrUpdateModel(req, metadata=self._metadata.to_grpc_metadata())
 
         if model is None:
             return None
@@ -270,7 +287,9 @@ class ModelRegistry:
             except Exception as exc:
                 raise CogmentError(f"Failure to generate model data for sending [{exc}]")
 
-        reply = await self._model_registry_stub.CreateVersion(generate_chunks())
+        reply = await self._model_registry_stub.CreateVersion(
+            generate_chunks(), metadata=self._metadata.to_grpc_metadata()
+        )
 
         return ModelIterationInfo(reply.version_info)
 
@@ -281,7 +300,9 @@ class ModelRegistry:
 
         model = bytes()
         try:
-            async for chunk in self._model_registry_stub.RetrieveVersionData(req):
+            async for chunk in self._model_registry_stub.RetrieveVersionData(
+                req, metadata=self._metadata.to_grpc_metadata()
+            ):
                 model += chunk.data_chunk
         except Exception as exc:
             # Either the model does not exist, the iteration does not exist, or there was a real error.
@@ -300,14 +321,14 @@ class ModelRegistry:
 
     async def remove_model(self, name: str) -> None:
         req = model_registry_api.DeleteModelRequest(model_id=name)
-        _ = await self._model_registry_stub.DeleteModel(req)
+        _ = await self._model_registry_stub.DeleteModel(req, metadata=self._metadata.to_grpc_metadata())
 
     async def list_models(self) -> List[ModelInfo]:
         req = model_registry_api.RetrieveModelsRequest(models_count=_RETRIEVAL_COUNT)
         models = []
         try:
             while True:
-                reply = await self._model_registry_stub.RetrieveModels(req)
+                reply = await self._model_registry_stub.RetrieveModels(req, metadata=self._metadata.to_grpc_metadata())
                 for model_info in reply.model_infos:
                     models.append(ModelInfo(model_info))
 
@@ -327,7 +348,9 @@ class ModelRegistry:
         iterations = []
         try:
             while True:
-                reply = await self._model_registry_stub.RetrieveVersionInfos(req)
+                reply = await self._model_registry_stub.RetrieveVersionInfos(
+                    req, metadata=self._metadata.to_grpc_metadata()
+                )
                 for iteration_info in reply.version_infos:
                     iterations.append(ModelIterationInfo(iteration_info))
 
@@ -345,7 +368,9 @@ class ModelRegistry:
     async def get_iteration_info(self, name: str, iteration: int) -> ModelIterationInfo:
         req = model_registry_api.RetrieveVersionInfosRequest(model_id=name, version_numbers=[iteration])
         try:
-            reply = await self._model_registry_stub.RetrieveVersionInfos(req)
+            reply = await self._model_registry_stub.RetrieveVersionInfos(
+                req, metadata=self._metadata.to_grpc_metadata()
+            )
         except Exception as exc:
             # Either the model does not exist, the iteration does not exist, or there was a real error.
             # The Model Registry should be fixed to differentiate.
@@ -371,14 +396,14 @@ class ModelRegistry:
         req.model_info.model_id = name
         req.model_info.user_data.update(properties)
         try:
-            _ = await self._model_registry_stub.CreateOrUpdateModel(req)
+            _ = await self._model_registry_stub.CreateOrUpdateModel(req, metadata=self._metadata.to_grpc_metadata())
         except Exception as exc:
             raise CogmentError(f"Failed to store model [{name}] properties: [{exc}]")
 
     async def _get_model_info(self, name):
         req = model_registry_api.RetrieveModelsRequest(model_ids=[name])
         try:
-            reply = await self._model_registry_stub.RetrieveModels(req)
+            reply = await self._model_registry_stub.RetrieveModels(req, metadata=self._metadata.to_grpc_metadata())
         except Exception as exc:
             # We assume any error is due to the model not existing!
             logger.debug(f"Failed to retrieve model [{name}] info: [{exc}]")
@@ -404,7 +429,7 @@ class ModelRegistry:
         req = model_registry_api.VersionUpdateRequest()
         req.model_id = model_name
 
-        reply_itor = self._model_registry_stub.VersionUpdate(req)
+        reply_itor = self._model_registry_stub.VersionUpdate(req, metadata=self._metadata.to_grpc_metadata())
         if not reply_itor:
             raise CogmentError("Failed to connect to the Model Registry")
 
@@ -424,10 +449,12 @@ class ModelRegistry:
 
     # Utility function for simple use cases. More complex cases must use 'iteration_update' explicitly.
     # This may fail if called in different threads or with different async loops.
-    async def track_latest_model(self,
-                                 name: str,
-                                 deserialize_func: Callable[[bytes], Any] = None,
-                                 initial_wait: int = 0) -> LatestModel:
+    async def track_latest_model(
+        self,
+        name: str,
+        deserialize_func: Callable[[bytes], Any] = None,
+        initial_wait: int = 0,
+    ) -> LatestModel:
         global _tracked_models_removal_task
 
         if name not in _tracked_models:
@@ -463,8 +490,10 @@ class ModelRegistry:
         if deserialize_func is not None and tracked_model.deserialize_func != deserialize_func:
             raise CogmentError(f"Deserialize function mismatch with already set function")
         if tracked_model.registry._endpoint_url != self._endpoint_url:
-            raise CogmentError(f"Different model registry to track the same model [{name}]"
-                               f": [{tracked_model.registry._endpoint_url}] vs [{self._endpoint_url}]")
+            raise CogmentError(
+                f"Different model registry to track the same model [{name}]"
+                f": [{tracked_model.registry._endpoint_url}] vs [{self._endpoint_url}]"
+            )
 
         if _tracked_models_removal_task is None:
             _tracked_models_removal_task = asyncio.create_task(_tracked_models_removal())

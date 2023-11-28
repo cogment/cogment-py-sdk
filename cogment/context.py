@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ from cogment.datalog_service import DatalogServicer
 from cogment.errors import CogmentError
 from cogment.utils import logger
 from cogment.version import __version__
+from cogment.grpc_metadata import GrpcMetadata
 
 import os
 from typing import Callable, Awaitable, Dict, List, Any, Tuple
@@ -145,9 +146,16 @@ def _make_server(served_endpoint: ep.ServedEndpoint):
 class Context:
     """Top level class for the Cogment library from which to obtain all services."""
 
-    def __init__(self, user_id: str, cog_settings: ModuleType, asyncio_loop=None,
-                       prometheus_registry=PROMETHEUS_REGISTRY, directory_endpoint: ep.Endpoint = None,
-                       directory_auth_token: str = None):
+    def __init__(
+        self,
+        user_id: str,
+        cog_settings: ModuleType,
+        asyncio_loop=None,
+        prometheus_registry=PROMETHEUS_REGISTRY,
+        directory_endpoint: ep.Endpoint = None,
+        directory_auth_token: str = None,
+        metadata: GrpcMetadata = GrpcMetadata(),
+    ):
         self._user_id = user_id
         self._actor_impls: Dict[str, SimpleNamespace] = {}
         self._env_impls: Dict[str, SimpleNamespace] = {}
@@ -157,6 +165,7 @@ class Context:
         self._grpc_server_port: int = 0
         self._prometheus_registry = prometheus_registry
         self._cog_settings = cog_settings
+        self._metadata = metadata.copy()
 
         if asyncio_loop is None:
             # Make sure we are running in a asyncio.Task. Even if technically this init does not need
@@ -357,20 +366,20 @@ class Context:
         self._grpc_server, self._grpc_server_port = _make_server(served_endpoint)
 
         if self._actor_impls:
-            servicer = AgentServicer(self._actor_impls, self._cog_settings, self._prometheus_registry)
-            agent_grpc_api.add_ServiceActorSPServicer_to_server(servicer, self._grpc_server)
+            agent_servicer = AgentServicer(self._actor_impls, self._cog_settings, self._prometheus_registry)
+            agent_grpc_api.add_ServiceActorSPServicer_to_server(agent_servicer, self._grpc_server)
 
         if self._env_impls:
-            servicer = EnvironmentServicer(self._env_impls, self._cog_settings, self._prometheus_registry)
-            env_grpc_api.add_EnvironmentSPServicer_to_server(servicer, self._grpc_server)
+            env_servicer = EnvironmentServicer(self._env_impls, self._cog_settings, self._prometheus_registry)
+            env_grpc_api.add_EnvironmentSPServicer_to_server(env_servicer, self._grpc_server)
 
         if self._prehook_impl is not None:
-            servicer = PrehookServicer(self._prehook_impl.impl, self._cog_settings, self._prometheus_registry)
-            hooks_grpc_api.add_TrialHooksSPServicer_to_server(servicer, self._grpc_server)
+            prehook_servicer = PrehookServicer(self._prehook_impl.impl, self._cog_settings, self._prometheus_registry)
+            hooks_grpc_api.add_TrialHooksSPServicer_to_server(prehook_servicer, self._grpc_server)
 
         if self._datalog_impl is not None:
-            servicer = DatalogServicer(self._datalog_impl.impl, self._cog_settings)
-            datalog_grpc_api.add_DatalogSPServicer_to_server(servicer, self._grpc_server)
+            datalog_servicer = DatalogServicer(self._datalog_impl.impl, self._cog_settings)
+            datalog_grpc_api.add_DatalogSPServicer_to_server(datalog_servicer, self._grpc_server)
 
         if self._prometheus_registry is not None and prometheus_port is not None:
             start_prometheus_server(prometheus_port, "", self._prometheus_registry)
@@ -391,7 +400,7 @@ class Context:
     def _make_controller(self, endpoint):
         channel = _make_client_channel(endpoint)
         stub = orchestrator_grpc_api.TrialLifecycleSPStub(channel)
-        return Controller(stub, self._user_id)
+        return Controller(stub, self._user_id, self._metadata)
 
     async def _inquire_and_make_controller(self, endpoint):
         inquired_endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.LIFE_CYCLE)
@@ -413,7 +422,7 @@ class Context:
     def _make_datastore(self, endpoint):
         channel = _make_client_channel(endpoint)
         stub = datastore_grpc_api.TrialDatastoreSPStub(channel)
-        return Datastore(stub, self._cog_settings)
+        return Datastore(stub, self._cog_settings, self._metadata)
 
     async def _inquire_and_make_datastore(self, endpoint):
         inquired_endpoint = await self._directory.get_inquired_endpoint(endpoint, ServiceType.DATASTORE)
@@ -438,7 +447,7 @@ class Context:
     def get_directory(self, endpoint: ep.Endpoint, authentication_token: str = None):
         channel = _make_client_channel(endpoint)
         stub = directory_grpc_api.DirectorySPStub(channel)
-        return Directory(stub, authentication_token)
+        return Directory(stub, authentication_token, self._metadata)
 
     # Undocumented
     def get_context_directory(self):
@@ -451,7 +460,7 @@ class Context:
 
         channel = _make_client_channel(endpoint)
         stub = model_registry_api.ModelRegistrySPStub(channel)
-        return ModelRegistry(stub)
+        return ModelRegistry(stub, self._metadata)
 
     async def get_model_registry_v2(self, endpoint=ep.Endpoint()):
         if self._directory is not None:
@@ -459,7 +468,7 @@ class Context:
 
         channel = _make_client_channel(endpoint)
         stub = model_registry_api.ModelRegistrySPStub(channel)
-        return ModelRegistryV2(stub, endpoint.url)
+        return ModelRegistryV2(stub, endpoint.url, self._metadata)
 
     async def join_trial(self, trial_id, endpoint=ep.Endpoint(), impl_name=None, actor_name=None, actor_class=None):
         requested_class = None

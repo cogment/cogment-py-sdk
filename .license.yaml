@@ -1,0 +1,11 @@
+license:
+  copyright_year: 2023
+  author: "AI Redefined Inc. <dev+cogment@ai-r.com>"
+  ignore:
+    - "cogment/api/"
+    - ".venv/"
+    - "?eggs"
+    - "**/__pycache__"
+    - "**/cogment_*.yaml"
+    - "**/*_pb2*.py"
+    - "**/cog_settings.py"

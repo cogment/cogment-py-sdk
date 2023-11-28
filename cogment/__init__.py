@@ -1,4 +1,4 @@
-# Copyright 2021 AI Redefined Inc. <dev+cogment@ai-r.com>
+# Copyright 2023 AI Redefined Inc. <dev+cogment@ai-r.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ from cogment.datalog_service import LogParams, LogSample
 from cogment.parameters import ActorParameters, TrialParameters
 from cogment.datastore import DatastoreFields
 from cogment.model_registry import Model
+from cogment.grpc_metadata import GrpcMetadata
 
 from cogment.errors import CogmentError
 
