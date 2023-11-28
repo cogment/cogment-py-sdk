@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+## v2.10.0 - 2023-11-28
+
 ### Added
 
 - Ability to define metadata in the `Context` constructor, they will be passed to all grpc calls.
