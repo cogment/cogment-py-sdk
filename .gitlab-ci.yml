@@ -4,8 +4,24 @@ stages:
     - build
     - publish
 
+workflow:
+    # Only run for merge requests, tags, and the default branch
+    rules:
+        - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+        - if: $CI_COMMIT_TAG
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.default_rules: &default_rules
+    - when: always
+
+.publish_to_github_rules: &publish_to_github_rules
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.publish_to_pypi_rules: &publish_to_pypi_rules
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9]+)?$/
+
 .base:
-    image: python:3.7
+    image: python:3.10
     variables:
         PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
     before_script:
@@ -46,18 +62,24 @@ pycodestyle:
     stage: lint
     script:
         - pycodestyle
+    rules:
+        - *default_rules
 
 mypy:
     extends: .base
     stage: lint
     script:
         - mypy .
+    rules:
+        - *default_rules
 
 licenses_checker:
     stage: lint
     image: registry.gitlab.com/ai-r/cogment/license-checker:latest
     script:
         - license-checker
+    rules:
+        - *default_rules
 
 shellcheck:
     image: koalaman/shellcheck-alpine:stable
@@ -66,6 +88,8 @@ shellcheck:
         - shellcheck --version
     script:
         - shellcheck $(find . -name '*.sh' | xargs)
+    rules:
+        - *default_rules
 
 shfmt:
     image: mvdan/shfmt:v3.1.0-alpine
@@ -74,6 +98,8 @@ shfmt:
         - shfmt -version
     script:
         - shfmt -i 2 -ci -d .
+    rules:
+        - *default_rules
 
 check_dependencies_conflicts:
     image: python:$PYTHON_VERSION
@@ -81,17 +107,15 @@ check_dependencies_conflicts:
     parallel:
         matrix:
             - PYTHON_VERSION: ["3.7", "3.8", "3.9", "3.10"]
-
-    # We only want to run this job if there's been a change in dependencies.
-    # But as is, this rule seems to create another pipeline with just this check.
-    #rules:
-    #    - changes:
-    #          - scripts/check_dependencies_conflicts.sh
-    #          - requirements.txt
-    #          - pyproject.toml
     script:
         - ./scripts/check_dependencies_conflicts.sh
     timeout: 2h
+    # We only want to run this job if there's been a change in dependencies.
+    rules:
+        - changes:
+              - scripts/check_dependencies_conflicts.sh
+              - requirements.txt
+              - pyproject.toml
 
 integration_test:
     extends: .base
@@ -102,6 +126,8 @@ integration_test:
         when: always
         reports:
             junit: integration_test_report.xml
+    rules:
+        - *default_rules
 
 build_sdist:
     extends: .base
@@ -114,6 +140,8 @@ build_sdist:
         paths:
             - dist/*.tar.gz
             - dist/*.whl
+    rules:
+        - *default_rules
 
 publish_to_pypi:
     extends: .base
@@ -121,8 +149,8 @@ publish_to_pypi:
     script:
         - python -m build
         - python -m twine upload dist/* --non-interactive -u $PYPI_USERNAME -p $PYPI_PASSWORD
-    only:
-        - /^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9]+)?$/
+    rules:
+        - *publish_to_pypi_rules
 
 publish_branch_to_github:
     extends: .base_gh_ssh_agent
@@ -132,5 +160,5 @@ publish_branch_to_github:
         - git remote add downstream git@github.com:cogment/cogment-py-sdk.git
         - git fetch downstream ${CI_COMMIT_BRANCH}
         - git push --tags downstream ${CI_COMMIT_BRANCH}:${CI_COMMIT_BRANCH}
-    only:
-        - main
+    rules:
+        - *publish_to_github_rules

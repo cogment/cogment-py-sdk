@@ -1,8 +1,8 @@
 [build-system]
 requires = [
-    "setuptools>=42",
-    "grpcio-tools >=1.42,<1.45",
-    "PyYaml >=5.3.1,<6.1",
+    "setuptools >=42",
+    "grpcio-tools >=1.42, <1.49",
+    "PyYaml >=5.3.1, <6.1",
     "types-psutil ~=5.9",
 ]
 build-backend = "setuptools.build_meta"
@@ -19,11 +19,11 @@ classifiers = [
 dynamic = ["readme", "version"]
 requires-python = ">=3.7, <3.11"
 dependencies = [
-    "grpcio >=1.42, <1.45",
-    "grpcio-reflection >=1.42, <1.45",
-    "protobuf ~=3.7",
-    "prometheus-client >= 0.8, <0.9",
-    "typing_extensions >= 4.6.3, < 4.7.0",
+    "grpcio >=1.42, <1.49",
+    "grpcio-reflection >=1.42, <1.49",
+    "protobuf >=3.7, <4.0",
+    "prometheus-client >=0.8, <0.9",
+    "typing_extensions >=4.6.3, < 4.7.0",
 ]
 
 [[project.authors]]
@@ -37,10 +37,10 @@ repository = "https://github.com/cogment/cogment-py-sdk"
 
 [project.optional-dependencies]
 generate = [
-    "PyYaml >=5.3.1,<6.1",
+    "PyYaml >=5.3.1, <6.1",
     "psutil ~=5.9",
-    "grpcio-tools ==1.43",
-    "click ~= 8.0.3",
+    "grpcio-tools >=1.42, <1.49",
+    "click ~=8.0.3",
 ]
 
 [tool.setuptools]
@@ -71,7 +71,7 @@ junit_suite_name = "cogment_py_sdk_tests"
 timeout = 15
 
 [tool.mypy]
-python_version = 3.7
+python_version = 3.10
 warn_return_any = true
 warn_unused_configs = true
 strict_optional = false

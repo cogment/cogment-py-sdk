@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+### Fixed
+
+- Updates `grpcio` to work with python 3.10 on macOS.
+
 ## v2.10.0 - 2023-11-28
 
 ### Added

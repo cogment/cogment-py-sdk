@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import logging
+import urllib.request
+from unittest.mock import AsyncMock
+
+import pytest
+
 import cogment
 
 from helpers.find_free_port import find_free_port
 from helpers.launch_cogment import launch_orchestrator
-
-import pytest
-import mock
-
-import asyncio
-import urllib.request
-import logging
 
 logger = logging.getLogger("cogment.unit-tests")
 
@@ -509,7 +509,7 @@ class TestIntegration:
             prometheus_registry=None,
         )
 
-        pre_trial_hook = mock.AsyncMock(wraps=create_pre_trial_hook(environment_implementation="test_environment"))
+        pre_trial_hook = AsyncMock(wraps=create_pre_trial_hook(environment_implementation="test_environment"))
         context.register_pre_trial_hook(pre_trial_hook)
         context.register_environment(impl_name="test_environment", impl=environment)
         context.register_actor(impl_name="test", impl=agent)
