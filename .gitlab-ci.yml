@@ -10,12 +10,13 @@ workflow:
         - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
         - if: $CI_COMMIT_TAG
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+        - if: $CI_COMMIT_BRANCH == 'main'
 
 .default_rules: &default_rules
     - when: always
 
 .publish_to_github_rules: &publish_to_github_rules
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == 'main'
 
 .publish_to_pypi_rules: &publish_to_pypi_rules
     - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9]+)?$/
